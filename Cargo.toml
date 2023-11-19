@@ -12,16 +12,16 @@ parallel = ["cecs/parallel"]
 wasm = ["wgpu/webgl"]
 
 [dependencies]
-tracing = { version = "0.1.37" }
+tracing = { version = "0.1.40" }
 cecs = { git = "https://github.com/caolo-game/cecs", default-features = false }
 anyhow = "1.0.75"
 bytemuck = { version = "1.14.0", features = ["derive"] }
 fastrand = "2.0.1"
 glam = { version = "0.24.2", features = ["bytemuck"] }
 image = { version = "0.24.7", default-features = false, features = ["png"] }
-smallvec = "1.11.1"
-wgpu = { version = "0.17.1" }
-winit = "0.28.7"
+smallvec = "1.11.2"
+wgpu = { version = "0.18.0" }
+winit = "0.28"
 kira = { version = "0.8", optional = true }
 instant = { version = "0.1.12", features = ["stdweb", "wasm-bindgen"] }
 

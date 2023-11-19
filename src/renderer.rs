@@ -3,7 +3,7 @@ pub mod texture;
 
 use cecs::prelude::*;
 use tracing::debug;
-use wgpu::Backends;
+use wgpu::{Backends, InstanceFlags, StoreOp};
 use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::{
@@ -31,16 +31,25 @@ pub struct GraphicsState {
 
 impl GraphicsState {
     pub async fn new(window: &Window) -> Self {
+        #[cfg(not(debug_assertions))]
+        let flags = InstanceFlags::default();
+        #[cfg(debug_assertions)]
+        let flags = InstanceFlags::debugging();
+
         let size = window.inner_size();
+
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: Backends::all(),
             dx12_shader_compiler: Default::default(),
+            flags,
+            gles_minor_version: Default::default(),
         });
         let surface = unsafe {
             instance
-                .create_surface(&window)
+                .create_surface(window)
                 .expect("Failed to create surface")
         };
+
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -146,17 +155,19 @@ impl GraphicsState {
                                 b: 0.451,
                                 a: 1.0,
                             }),
-                            store: true,
+                            store: StoreOp::Store,
                         },
                     })],
                     depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                         view: &self.depth_texture.view,
                         depth_ops: Some(wgpu::Operations {
                             load: wgpu::LoadOp::Clear(1.0),
-                            store: true,
+                            store: StoreOp::Store,
                         }),
                         stencil_ops: None,
                     }),
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
                 });
                 sprite_pipeline.render(&mut render_pass, &camera_bind_group);
             }
