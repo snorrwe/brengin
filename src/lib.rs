@@ -1,5 +1,6 @@
 pub mod assets;
 pub mod camera;
+pub mod prelude;
 pub mod quat_ext;
 pub mod renderer;
 pub mod transform;
@@ -124,7 +125,7 @@ impl Default for App {
 }
 
 impl App {
-    pub fn add_plugin<T: Plugin + 'static>(&mut self, plugin: T) {
+    pub fn add_plugin<T: Plugin + 'static>(&mut self, plugin: T) -> &mut Self {
         let id = TypeId::of::<T>();
         assert!(
             !self.plugins.contains(&id),
@@ -132,6 +133,7 @@ impl App {
         );
         self.plugins.insert(id);
         plugin.build(self);
+        self
     }
 
     pub fn stage(&mut self, stage: Stage) -> &mut SystemStage<'static> {
