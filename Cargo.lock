@@ -248,6 +248,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "brengin"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "cecs",
+ "fastrand",
+ "glam",
+ "image",
+ "instant",
+ "kira",
+ "smallvec",
+ "tracing",
+ "web-sys",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -577,25 +596,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7268b386296a025e474d5140678f75d6de9493ae55a5d709eeb9dd08149945e1"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "engine"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "cecs",
- "fastrand",
- "glam",
- "image",
- "instant",
- "kira",
- "smallvec",
- "tracing",
- "web-sys",
- "wgpu",
- "winit",
 ]
 
 [[package]]
