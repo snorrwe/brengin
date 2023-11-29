@@ -270,6 +270,7 @@ impl App {
             world.add_stage(stage);
         }
         world.run_stage(self.startup_systems).unwrap();
+        world.vacuum();
         world
     }
 }
