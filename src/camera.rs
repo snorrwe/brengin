@@ -18,6 +18,18 @@ pub struct Camera3d {
     pub zfar: f32,
 }
 
+/// Cameras marked with this component are automatically updated to fit their window
+/// Camera entities do not have this component by default
+pub struct WindowCamera;
+
+fn update_camera_aspect(gs: Res<GraphicsState>, mut q: Query<&mut Camera3d, With<WindowCamera>>) {
+    let size = gs.size();
+    let aspect = size.width as f32 / size.height as f32;
+    q.par_for_each_mut(move |cam| {
+        cam.aspect = aspect;
+    });
+}
+
 impl Camera3d {
     pub fn view_projection(&self) -> Mat4 {
         let view = Mat4::look_at_lh(self.eye, self.target, self.up);
@@ -137,6 +149,7 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build<'a>(self, app: &mut crate::App) {
+        app.stage(Stage::PreUpdate).add_system(update_camera_aspect);
         app.stage(Stage::Update)
             .add_system(update_view_projections)
             .add_system(insert_missing_camera_buffers.after(update_view_projections))
