@@ -7,7 +7,7 @@ use wgpu::{Backends, InstanceFlags, StoreOp};
 use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::{
-    camera::{Camera3d, CameraBuffers, CameraPlugin, CameraUniform, ViewFrustum},
+    camera::{Camera3d, CameraBuffer, CameraPlugin, CameraUniform, ViewFrustum},
     Plugin,
 };
 
@@ -118,9 +118,9 @@ impl GraphicsState {
         }
     }
 
-    pub fn render(
+    pub fn render<'a>(
         &mut self,
-        cameras: &CameraBuffers,
+        cameras: impl Iterator<Item = &'a CameraBuffer>,
         sprite_pipeline: &sprite_renderer::SpritePipeline,
     ) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
@@ -133,12 +133,12 @@ impl GraphicsState {
                 label: Some("Render Encoder"),
             });
 
-        for camera_buffer in cameras.0.values() {
+        for camera_buffer in cameras {
             let camera_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &self.camera_bind_group_layout,
                 entries: &[wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: camera_buffer.as_entire_binding(),
+                    resource: camera_buffer.0.as_entire_binding(),
                 }],
                 label: Some("camera_bind_group"),
             });
@@ -250,9 +250,9 @@ fn render_system(
     mut state: ResMut<GraphicsState>,
     mut cmd: Commands,
     sprite_pipeline: Res<sprite_renderer::SpritePipeline>,
-    cameras: Res<CameraBuffers>,
+    cameras: Query<&CameraBuffer>,
 ) {
-    let result = state.render(&cameras, &sprite_pipeline);
+    let result = state.render(cameras.iter(), &sprite_pipeline);
     // Reconfigure the surface if lost
     if let Err(wgpu::SurfaceError::Lost) = result {
         let size = state.size();

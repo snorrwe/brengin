@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use cecs::prelude::*;
 use glam::{Mat4, Vec3, Vec4};
 
@@ -67,21 +65,30 @@ fn update_view_projections(mut q: Query<(&GlobalTransform, &Camera3d, &mut Camer
     }
 }
 
+fn insert_missing_camera_buffers(
+    renderer: Res<GraphicsState>,
+    q_new: Query<(EntityId, &CameraUniform), WithOut<CameraBuffer>>,
+    mut cmd: Commands,
+) {
+    for (id, uni) in q_new.iter() {
+        let buffer = renderer.device().create_buffer(&wgpu::BufferDescriptor {
+            label: Some(format!("camera3d-{id}").as_str()),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            size: std::mem::size_of::<CameraUniform>() as u64,
+            mapped_at_creation: false,
+        });
+        renderer
+            .queue()
+            .write_buffer(&buffer, 0, bytemuck::cast_slice(&[uni.view_proj]));
+        cmd.entity(id).insert(CameraBuffer(buffer));
+    }
+}
+
 fn update_camera_buffers(
     renderer: Res<GraphicsState>,
-    mut buffers: ResMut<CameraBuffers>,
-    q: Query<(EntityId, &CameraUniform)>,
+    q: Query<(&CameraUniform, &mut CameraBuffer)>,
 ) {
-    for (id, uni) in q.iter() {
-        let buffer = buffers.0.entry(id).or_insert_with(|| {
-            renderer.device().create_buffer(&wgpu::BufferDescriptor {
-                label: Some(format!("camera3d-{id}").as_str()),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                size: std::mem::size_of::<CameraUniform>() as u64,
-                mapped_at_creation: false,
-            })
-        });
-
+    for (uni, CameraBuffer(buffer)) in q.iter() {
         renderer
             .queue()
             .write_buffer(buffer, 0, bytemuck::cast_slice(&[uni.view_proj]));
@@ -124,16 +131,15 @@ fn update_frustum(mut q: Query<(&mut ViewFrustum, &CameraUniform)>) {
     }
 }
 
-#[derive(Default)]
-pub struct CameraBuffers(pub HashMap<EntityId, wgpu::Buffer>);
+pub struct CameraBuffer(pub wgpu::Buffer);
 
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build<'a>(self, app: &mut crate::App) {
-        app.insert_resource(CameraBuffers::default());
         app.stage(Stage::Update)
             .add_system(update_view_projections)
+            .add_system(insert_missing_camera_buffers.after(update_view_projections))
             .add_system(update_camera_buffers.after(update_view_projections))
             .add_system(update_frustum.after(update_view_projections));
     }
