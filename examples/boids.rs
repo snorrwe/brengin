@@ -2,7 +2,7 @@
 
 use brengin::{
     assets::{self, Assets, Handle},
-    camera::Camera3d,
+    camera::{Camera3d, WindowCamera},
     glam::{Quat, Vec2, Vec3},
     prelude::*,
     renderer::{
@@ -93,6 +93,7 @@ fn setup_boids(
 ) {
     //camera
     cmd.spawn()
+        .insert(WindowCamera)
         .insert_bundle(camera_bundle(Camera3d {
             eye: Vec3::new(0.0, 0.0, 100.0),
             target: Vec3::ZERO,
