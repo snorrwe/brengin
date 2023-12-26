@@ -12,10 +12,13 @@ pub mod audio;
 pub use cecs;
 pub use glam;
 pub use image;
-use transform::TransformPlugin;
-pub use winit::event::*;
+pub use wgpu;
+pub use winit;
+
+use winit::{event::*, window::Theme};
 
 use std::{any::TypeId, collections::HashSet};
+use transform::TransformPlugin;
 
 use renderer::{GraphicsState, RenderResult, RendererPlugin};
 
@@ -115,8 +118,10 @@ impl std::ops::DerefMut for App {
 
 impl Default for App {
     fn default() -> Self {
+        let mut world = World::new(1024);
+        world.insert_resource(WindowDescriptor::default());
         Self {
-            world: World::new(1024),
+            world,
             stages: Default::default(),
             startup_systems: SystemStage::new("startup"),
             plugins: Default::default(),
@@ -159,10 +164,14 @@ impl App {
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new();
 
-        let window = window
-            .with_title("Boids") // FIXME: allow configuring the window
-            .build(&event_loop)
-            .expect("Failed to build window");
+        let window = self.world.run_view_system(|desc: Res<WindowDescriptor>| {
+            window
+                .with_title(&desc.title) // FIXME: allow configuring the window
+                .with_fullscreen(desc.fullscreen.clone())
+                .with_theme(Some(Theme::Dark))
+                .build(&event_loop)
+                .expect("Failed to build window")
+        });
 
         #[cfg(target_family = "wasm")]
         {
@@ -266,6 +275,7 @@ impl App {
 
     fn build(self) -> World {
         let mut world = self.world;
+        world.insert_resource(WindowDescriptor::default());
         for (_, stage) in self.stages {
             world.add_stage(stage);
         }
@@ -343,5 +353,20 @@ impl Plugin for DefaultPlugins {
 
         #[cfg(feature = "audio")]
         app.add_plugin(audio::AudioPlugin);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WindowDescriptor {
+    pub title: String,
+    pub fullscreen: Option<winit::window::Fullscreen>,
+}
+
+impl Default for WindowDescriptor {
+    fn default() -> Self {
+        Self {
+            title: "brengin".to_string(),
+            fullscreen: None,
+        }
     }
 }
