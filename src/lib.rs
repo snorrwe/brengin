@@ -362,6 +362,11 @@ pub struct WindowDescriptor {
     pub fullscreen: Option<winit::window::Fullscreen>,
 }
 
+// for MacOS:
+// winit Fullscreen contains a c_void pointer
+unsafe impl Send for WindowDescriptor {}
+unsafe impl Sync for WindowDescriptor {}
+
 impl Default for WindowDescriptor {
     fn default() -> Self {
         Self {
