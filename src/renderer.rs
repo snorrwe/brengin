@@ -243,7 +243,9 @@ pub struct RendererPlugin;
 
 impl Plugin for RendererPlugin {
     fn build(self, app: &mut crate::App) {
-        app.stage(crate::Stage::Render).add_system(render_system);
+        app.with_stage(crate::Stage::Render, |s| {
+            s.add_system(render_system);
+        });
         app.add_plugin(CameraPlugin);
         app.add_plugin(SpriteRendererPlugin);
     }

@@ -149,11 +149,14 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build<'a>(self, app: &mut crate::App) {
-        app.stage(Stage::PreUpdate).add_system(update_camera_aspect);
-        app.stage(Stage::Update)
-            .add_system(update_view_projections)
-            .add_system(insert_missing_camera_buffers.after(update_view_projections))
-            .add_system(update_camera_buffers.after(update_view_projections))
-            .add_system(update_frustum.after(update_view_projections));
+        app.with_stage(Stage::PreUpdate, |s| {
+            s.add_system(update_camera_aspect);
+        })
+        .with_stage(Stage::Update, |s| {
+            s.add_system(update_view_projections)
+                .add_system(insert_missing_camera_buffers.after(update_view_projections))
+                .add_system(update_camera_buffers.after(update_view_projections))
+                .add_system(update_frustum.after(update_view_projections));
+        });
     }
 }

@@ -155,13 +155,15 @@ impl<'a> std::ops::Mul for &'a Transform {
 pub struct TransformPlugin;
 impl Plugin for TransformPlugin {
     fn build(self, app: &mut crate::App) {
-        app.stage(crate::Stage::PostUpdate)
-            .add_system(insert_missing_children)
-            .add_system(clean_children)
-            .add_system(append_new_children.after(insert_missing_children));
-        app.stage(crate::Stage::Transform)
-            .add_system(update_root_transforms)
-            .add_system(update_child_transforms);
+        app.with_stage(crate::Stage::PostUpdate, |s| {
+            s.add_system(insert_missing_children)
+                .add_system(clean_children)
+                .add_system(append_new_children.after(insert_missing_children));
+        })
+        .with_stage(crate::Stage::Transform, |s| {
+            s.add_system(update_root_transforms)
+                .add_system(update_child_transforms);
+        });
     }
 }
 
@@ -171,7 +173,7 @@ fn update_root_transforms(mut root: Query<(&Transform, &mut GlobalTransform), Wi
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(feature = "parallel")]
 fn update_child_transforms(
     root: Query<(&Transform, &Children), WithOut<Parent>>,
     qchildren: Query<(&Transform, &mut GlobalTransform, Option<&Children>)>,
@@ -192,7 +194,7 @@ fn update_child_transforms(
     });
 }
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(feature = "parallel")]
 unsafe fn update_children_transforms_recursive(
     qchildren: &Query<(&Transform, &mut GlobalTransform, Option<&Children>)>,
     parent_tr: &Transform,
@@ -224,7 +226,7 @@ unsafe fn update_children_transforms_recursive(
     }
 }
 
-#[cfg(target_family = "wasm")]
+#[cfg(not(feature = "parallel"))]
 fn update_child_transforms(
     root: Query<(&Transform, &Children), WithOut<Parent>>,
     qchildren: Query<(&Transform, &mut GlobalTransform, Option<&Children>)>,
@@ -236,7 +238,7 @@ fn update_child_transforms(
     });
 }
 
-#[cfg(target_family = "wasm")]
+#[cfg(not(feature = "parallel"))]
 unsafe fn update_children_transforms_recursive(
     qchildren: &Query<(&Transform, &mut GlobalTransform, Option<&Children>)>,
     parent_tr: &Transform,

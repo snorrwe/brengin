@@ -504,20 +504,22 @@ pub struct SpriteRendererPlugin;
 impl Plugin for SpriteRendererPlugin {
     fn build(self, app: &mut crate::App) {
         // putting this system in update means that the last frame's data is presented
-        app.stage(crate::Stage::Update)
-            .add_system(add_missing_sheets)
-            .add_system(compute_sprite_instances)
-            .add_system(
-                update_sprite_pipelines
-                    .after(compute_sprite_instances)
-                    .after(add_missing_sheets),
-            )
-            .add_system(unload_sheets)
-            .add_system(insert_missing_cull)
-            .add_system(update_visible)
-            .add_system(update_invisible);
-        app.stage(crate::Stage::PreUpdate)
-            .add_system(clear_pipeline_instances);
+        app.with_stage(crate::Stage::Update, |s| {
+            s.add_system(add_missing_sheets)
+                .add_system(compute_sprite_instances)
+                .add_system(
+                    update_sprite_pipelines
+                        .after(compute_sprite_instances)
+                        .after(add_missing_sheets),
+                )
+                .add_system(unload_sheets)
+                .add_system(insert_missing_cull)
+                .add_system(update_visible)
+                .add_system(update_invisible);
+        })
+        .with_stage(crate::Stage::PreUpdate, |s| {
+            s.add_system(clear_pipeline_instances);
+        });
         app.insert_resource(SpritePipelineInstances::default())
     }
 }

@@ -161,11 +161,12 @@ struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(self, app: &mut App) {
-        app.stage(Stage::Update)
-            .add_system(update_boids)
-            .add_system(update_boids_vel.after(update_boids))
-            .add_system(update_boids_pos.after(update_boids))
-            .add_system(update_transform.after(update_boids));
+        app.with_stage(Stage::Update, |s| {
+            s.add_system(update_boids)
+                .add_system(update_boids_vel.after(update_boids))
+                .add_system(update_boids_pos.after(update_boids))
+                .add_system(update_transform.after(update_boids));
+        });
 
         app.add_startup_system(setup_boids);
         app.insert_resource(BoidConfig {

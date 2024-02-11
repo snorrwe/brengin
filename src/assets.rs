@@ -235,6 +235,8 @@ impl<T> Default for AssetsPlugin<T> {
 impl<T: Component> Plugin for AssetsPlugin<T> {
     fn build(self, app: &mut crate::App) {
         app.insert_resource(Assets::<T>::default());
-        app.stage(crate::Stage::Update).add_system(gc_assets::<T>);
+        app.with_stage(crate::Stage::Update, |s| {
+            s.add_system(gc_assets::<T>);
+        });
     }
 }

@@ -141,15 +141,21 @@ impl App {
         self
     }
 
-    pub fn stage(&mut self, stage: Stage) -> &mut SystemStage<'static> {
+    pub fn with_stage(
+        &mut self,
+        stage: Stage,
+        f: impl FnOnce(&mut SystemStage<'static>),
+    ) -> &mut Self {
         let stage = self
             .stages
             .entry(stage)
             .or_insert_with(move || SystemStage::new(format!("Stage-{:?}", stage)));
-
-        // # SAFETY
-        // No fucking idea, but I can't decypher the bloody compiler error so here we are
-        unsafe { std::mem::transmute::<&mut SystemStage, &mut SystemStage>(stage) }
+        f(
+            // # SAFETY
+            // No fucking idea, but I can't decypher the bloody compiler error so here we are
+            unsafe { std::mem::transmute::<&mut SystemStage, &mut SystemStage>(stage) },
+        );
+        self
     }
 
     pub fn add_startup_system<P>(
@@ -343,9 +349,9 @@ impl Plugin for DefaultPlugins {
         app.insert_resource(DeltaTime(std::time::Duration::default()));
         app.insert_resource(KeyBoardInputs::default());
 
-        app.stage(Stage::PreUpdate)
-            .add_system(update_time)
-            .add_system(update_inputs);
+        app.with_stage(Stage::PreUpdate, |s| {
+            s.add_system(update_time).add_system(update_inputs);
+        });
 
         app.add_plugin(assets::AssetsPlugin::<renderer::sprite_renderer::SpriteSheet>::default());
         app.add_plugin(TransformPlugin);
