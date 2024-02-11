@@ -18,6 +18,8 @@ pub fn camera_bundle(camera: Camera3d) -> impl cecs::bundle::Bundle {
 }
 
 pub struct GraphicsState {
+    pub clear_color: wgpu::Color,
+
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -104,6 +106,12 @@ impl GraphicsState {
             config,
             surface,
             camera_bind_group_layout,
+            clear_color: wgpu::Color {
+                r: 0.4588,
+                g: 0.031,
+                b: 0.451,
+                a: 1.0,
+            },
         }
     }
 
@@ -149,12 +157,7 @@ impl GraphicsState {
                         view: &view,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.4588,
-                                g: 0.031,
-                                b: 0.451,
-                                a: 1.0,
-                            }),
+                            load: wgpu::LoadOp::Clear(self.clear_color),
                             store: StoreOp::Store,
                         },
                     })],
