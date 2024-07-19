@@ -62,10 +62,7 @@ impl Audio {
         bytes: &'static [u8],
         assets: &mut Assets<Self>,
     ) -> anyhow::Result<Handle<Self>> {
-        let data = StaticSoundData::from_cursor(
-            std::io::Cursor::new(bytes),
-            kira::sound::static_sound::StaticSoundSettings::new(),
-        )?;
+        let data = StaticSoundData::from_cursor(std::io::Cursor::new(bytes))?;
         let res = Self { data };
         let handle = assets.insert(res);
         Ok(handle)
@@ -75,8 +72,7 @@ impl Audio {
         p: impl AsRef<Path>,
         assets: &mut Assets<Self>,
     ) -> anyhow::Result<Handle<Self>> {
-        let data =
-            StaticSoundData::from_file(p, kira::sound::static_sound::StaticSoundSettings::new())?;
+        let data = StaticSoundData::from_file(p)?;
         let res = Self { data };
         let handle = assets.insert(res);
         Ok(handle)

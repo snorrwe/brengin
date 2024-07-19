@@ -8,6 +8,7 @@ pub mod transform;
 #[cfg(feature = "audio")]
 pub mod audio;
 
+use anyhow::Context;
 // reexport
 pub use cecs;
 pub use glam;
@@ -15,17 +16,19 @@ pub use image;
 pub use wgpu;
 pub use winit;
 
-use winit::{event::*, window::Theme};
+use winit::{
+    application::ApplicationHandler,
+    event::*,
+    keyboard::{KeyCode, PhysicalKey},
+    window::{Theme, WindowAttributes},
+};
 
-use std::{any::TypeId, collections::HashSet};
+use std::{any::TypeId, collections::HashSet, sync::Arc};
 use transform::TransformPlugin;
 
 use renderer::{GraphicsState, RenderResult, RendererPlugin};
 
-use winit::{
-    event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
-};
+use winit::event_loop::EventLoop;
 
 use cecs::prelude::*;
 
@@ -129,6 +132,131 @@ impl Default for App {
     }
 }
 
+pub struct Window(pub Arc<winit::window::Window>);
+
+enum RunningApp {
+    Pending(App),
+    Initialized(World),
+}
+
+impl RunningApp {
+    fn as_pending(&mut self) -> Option<&mut App> {
+        if let Self::Pending(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    fn world_mut(&mut self) -> &mut World {
+        match self {
+            RunningApp::Pending(app) => &mut app.world,
+            RunningApp::Initialized(w) => w,
+        }
+    }
+}
+
+impl ApplicationHandler for RunningApp {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let app = self.as_pending().unwrap();
+        let attributes = app.world.get_resource_or_default::<WindowAttributes>();
+        let window = event_loop.create_window(attributes.clone()).unwrap();
+        let window = Arc::new(window);
+        // FIXME:
+        // do not block here
+        let graphics_state = pollster::block_on(GraphicsState::new(Arc::clone(&window)));
+
+        app.world
+            .run_system(|mut cmd: Commands| -> anyhow::Result<()> {
+                cmd.spawn().insert(Window(Arc::clone(&window)));
+
+                let sprite_pipeline =
+                    renderer::sprite_renderer::SpritePipeline::new(&graphics_state);
+                cmd.insert_resource(sprite_pipeline);
+                cmd.insert_resource(graphics_state);
+
+                anyhow::Result::Ok(())
+            })
+            .unwrap()
+            .expect("Failed to create window");
+
+        *self = RunningApp::Initialized(std::mem::take(app).build());
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        tracing::trace!(?event, "Event received");
+        let world = match self {
+            RunningApp::Pending(_) => return,
+            RunningApp::Initialized(w) => w,
+        };
+        match event {
+            #[cfg(not(target_family = "wasm"))]
+            WindowEvent::CloseRequested
+            | WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state: ElementState::Pressed,
+                        physical_key: PhysicalKey::Code(KeyCode::Escape),
+                        ..
+                    },
+                ..
+            } => {
+                event_loop.exit();
+            }
+            WindowEvent::Resized(size) => {
+                world
+                    .run_system(move |mut state: ResMut<GraphicsState>| {
+                        state.resize(size);
+                    })
+                    .unwrap();
+            }
+
+            WindowEvent::KeyboardInput { event, .. } => {
+                world
+                    .get_resource_mut::<KeyBoardInputs>()
+                    .unwrap()
+                    .next
+                    .push(event.clone());
+            }
+            WindowEvent::RedrawRequested => {
+                world.tick();
+
+                let result = world.get_resource::<RenderResult>();
+                if let Some(result) = result {
+                    match result {
+                        Ok(_) => {}
+                        // handled by the renderer system
+                        Err(wgpu::SurfaceError::Lost) => {}
+                        // The system is out of memory, we should probably quit
+                        Err(wgpu::SurfaceError::OutOfMemory) => {
+                            error!("gpu out of memory");
+                            event_loop.exit();
+                        }
+                        // All other errors (Outdated, Timeout) should be resolved by the next frame
+                        Err(e) => debug!("rendering failed: {:?}", e),
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        self.world_mut()
+            .run_system(|q: Query<&Window>| {
+                for Window(window) in q.iter() {
+                    window.request_redraw();
+                }
+            })
+            .unwrap();
+    }
+}
+
 impl App {
     pub fn add_plugin<T: Plugin + 'static>(&mut self, plugin: T) -> &mut Self {
         let id = TypeId::of::<T>();
@@ -166,122 +294,26 @@ impl App {
         self
     }
 
-    pub async fn run(mut self) {
-        let event_loop = EventLoop::new();
-        let window = WindowBuilder::new();
+    pub async fn run(mut self) -> anyhow::Result<()> {
+        let event_loop = EventLoop::new().context("Failed to initialize EventLoop")?;
 
         let window = self.world.run_view_system(|desc: Res<WindowDescriptor>| {
-            window
-                .with_title(&desc.title) // FIXME: allow configuring the window
+            WindowAttributes::default()
+                .with_title(&desc.title)
                 .with_fullscreen(desc.fullscreen.clone())
                 .with_theme(Some(Theme::Dark))
-                .build(&event_loop)
-                .expect("Failed to build window")
         });
 
-        #[cfg(target_family = "wasm")]
-        {
-            // Winit prevents sizing with CSS, so we have to set
-            // the size manually when on web.
-            use winit::dpi::PhysicalSize;
-            window.set_inner_size(PhysicalSize::new(1960 / 2, 1080 / 2));
+        self.world.insert_resource(window);
 
-            use winit::platform::web::WindowExtWebSys;
-            web_sys::window()
-                .and_then(|win| win.document())
-                .and_then(|doc| {
-                    let dst = doc.body()?;
-                    let canvas = web_sys::Element::from(window.canvas());
-                    dst.append_child(&canvas).ok()?;
-                    Some(())
-                })
-                .expect("Couldn't append canvas to document body.");
-        }
+        let mut app = RunningApp::Pending(self);
+        event_loop.run_app(&mut app)?;
 
-        let graphics_state = GraphicsState::new(&window).await;
-
-        let sprite_pipeline = renderer::sprite_renderer::SpritePipeline::new(&graphics_state);
-        self.insert_resource(sprite_pipeline);
-        self.insert_resource(graphics_state);
-
-        let mut world = self.build();
-
-        event_loop.run(move |event, _, control_flow| {
-            tracing::trace!(?event, "Event received");
-            match event {
-                Event::WindowEvent { event, window_id } if window_id == window.id() => {
-                    match event {
-                        #[cfg(not(target_family = "wasm"))]
-                        WindowEvent::CloseRequested
-                        | WindowEvent::KeyboardInput {
-                            input:
-                                KeyboardInput {
-                                    state: ElementState::Pressed,
-                                    virtual_keycode: Some(VirtualKeyCode::Escape),
-                                    ..
-                                },
-                            ..
-                        } => *control_flow = ControlFlow::Exit,
-                        WindowEvent::Resized(size) => {
-                            world
-                                .run_system(move |mut state: ResMut<GraphicsState>| {
-                                    state.resize(size);
-                                })
-                                .unwrap();
-                        }
-                        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                            let size = *new_inner_size;
-                            world
-                                .run_system(move |mut state: ResMut<GraphicsState>| {
-                                    state.resize(size);
-                                })
-                                .unwrap();
-                        }
-
-                        WindowEvent::KeyboardInput { input, .. } => {
-                            world
-                                .get_resource_mut::<KeyBoardInputs>()
-                                .unwrap()
-                                .next
-                                .push(input.clone());
-                        }
-                        _ => {}
-                    }
-                }
-                Event::MainEventsCleared => {
-                    // RedrawRequested will only trigger once, unless we manually
-                    // request it.
-                    window.request_redraw();
-                }
-                Event::RedrawRequested(window_id) if window_id == window.id() => {
-                    // update the world
-                    //
-                    world.tick();
-
-                    let result = world.get_resource::<RenderResult>();
-                    if let Some(result) = result {
-                        match result {
-                            Ok(_) => {}
-                            // handled by the renderer system
-                            Err(wgpu::SurfaceError::Lost) => {}
-                            // The system is out of memory, we should probably quit
-                            Err(wgpu::SurfaceError::OutOfMemory) => {
-                                error!("gpu out of memory");
-                                *control_flow = ControlFlow::Exit
-                            }
-                            // All other errors (Outdated, Timeout) should be resolved by the next frame
-                            Err(e) => debug!("rendering failed: {:?}", e),
-                        }
-                    }
-                }
-                _ => {}
-            }
-        });
+        Ok(())
     }
 
     fn build(self) -> World {
         let mut world = self.world;
-        world.insert_resource(WindowDescriptor::default());
         for (_, stage) in self.stages {
             world.add_stage(stage);
         }
@@ -302,11 +334,11 @@ pub enum Stage {
 
 #[derive(Default)]
 pub struct KeyBoardInputs {
-    pub inputs: Vec<KeyboardInput>,
-    pub(crate) next: Vec<KeyboardInput>,
-    pub pressed: HashSet<VirtualKeyCode>,
-    pub just_released: HashSet<VirtualKeyCode>,
-    pub just_pressed: HashSet<VirtualKeyCode>,
+    pub inputs: Vec<KeyEvent>,
+    pub(crate) next: Vec<KeyEvent>,
+    pub pressed: HashSet<KeyCode>,
+    pub just_released: HashSet<KeyCode>,
+    pub just_pressed: HashSet<KeyCode>,
 }
 
 impl KeyBoardInputs {
@@ -318,7 +350,7 @@ impl KeyBoardInputs {
         for k in self.inputs.iter() {
             match k.state {
                 ElementState::Pressed => {
-                    if let Some(k) = k.virtual_keycode {
+                    if let PhysicalKey::Code(k) = k.physical_key {
                         if !self.pressed.contains(&k) {
                             self.just_pressed.insert(k);
                         }
@@ -326,7 +358,7 @@ impl KeyBoardInputs {
                     }
                 }
                 ElementState::Released => {
-                    if let Some(k) = k.virtual_keycode {
+                    if let PhysicalKey::Code(k) = k.physical_key {
                         self.pressed.remove(&k);
                         self.just_released.insert(k);
                     }

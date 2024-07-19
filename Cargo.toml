@@ -14,25 +14,25 @@ wasm = ["wgpu/webgl", "dep:web-sys", "instant/stdweb", "instant/wasm-bindgen"]
 [dependencies]
 tracing = { version = "0.1.40" }
 cecs = { git = "https://github.com/caolo-game/cecs", default-features = false }
-anyhow = "1.0.75"
-bytemuck = { version = "1.14.0", features = ["derive"] }
-fastrand = "2.0.1"
-glam = { version = "0.24.2", features = ["bytemuck"] }
-image = { version = "0.24.7", default-features = false, features = ["png"] }
-smallvec = "1.11.2"
-wgpu = { version = "0.18.0" }
-winit = "0.28"
-kira = { version = "0.8", optional = true }
-instant = { version = "0.1.12", features = [] }
+anyhow = "1.0.86"
+bytemuck = { version = "1.16.1", features = ["derive"] }
+fastrand = "2.1.0"
+glam = { version = "0.28.0", features = ["bytemuck"] }
+image = { version = "0.25.1", default-features = false, features = ["png"] }
+smallvec = "1.13.2"
+wgpu = { version = "22.0.0" }
+winit = "0.30"
+kira = { version = "0.9", optional = true }
+instant = { version = "0.1.13", features = [] }
 web-sys = { version = "0.3", features = [
     "Document",
     "Window",
     "Element",
 ], optional = true }
+pollster = "0.3.0"
 
 [dev-dependencies]
-pollster = "0.3.0"
-tracing-subscriber = "0.3.17"
+tracing-subscriber = "0.3.18"
 
 [[example]]
 name = "boids"

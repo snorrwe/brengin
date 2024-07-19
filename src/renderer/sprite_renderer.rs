@@ -336,10 +336,12 @@ impl SpritePipeline {
                         module: &shader,
                         entry_point: "vs_main",
                         buffers: &[Vertex::desc(), SpriteInstanceRaw::desc()],
+                        compilation_options: Default::default(),
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &shader,
                         entry_point: "fs_main",
+                        compilation_options: Default::default(),
                         targets: &[Some(wgpu::ColorTargetState {
                             format: renderer.config.format,
                             blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -371,6 +373,7 @@ impl SpritePipeline {
                         alpha_to_coverage_enabled: true,
                     },
                     multiview: None,
+                    cache: None,
                 });
 
         let vertex_buffer = renderer
