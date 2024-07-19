@@ -1,6 +1,8 @@
 pub mod sprite_renderer;
 pub mod texture;
 
+use std::sync::Arc;
+
 use cecs::prelude::*;
 use tracing::debug;
 use wgpu::{Backends, InstanceFlags, StoreOp};
@@ -20,7 +22,7 @@ pub fn camera_bundle(camera: Camera3d) -> impl cecs::bundle::Bundle {
 pub struct GraphicsState {
     pub clear_color: wgpu::Color,
 
-    surface: wgpu::Surface,
+    surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
@@ -32,7 +34,7 @@ pub struct GraphicsState {
 }
 
 impl GraphicsState {
-    pub async fn new(window: &Window) -> Self {
+    pub async fn new(window: Arc<Window>) -> Self {
         #[cfg(not(debug_assertions))]
         let flags = InstanceFlags::default();
         #[cfg(debug_assertions)]
@@ -46,11 +48,9 @@ impl GraphicsState {
             flags,
             gles_minor_version: Default::default(),
         });
-        let surface = unsafe {
-            instance
-                .create_surface(window)
-                .expect("Failed to create surface")
-        };
+        let surface = instance
+            .create_surface(window)
+            .expect("Failed to create surface");
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -66,15 +66,17 @@ impl GraphicsState {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::empty(),
+                    required_features: wgpu::Features::empty(),
                     // WebGL doesn't support all of wgpu's features, so if
                     // we're building for the web we'll have to disable some.
-                    limits: if cfg!(target_arch = "wasm32") {
+                    required_limits: if cfg!(target_arch = "wasm32") {
                         wgpu::Limits::downlevel_webgl2_defaults()
                     } else {
                         wgpu::Limits::default()
                     },
                     label: None,
+                    // TODO: lett application control this
+                    memory_hints: wgpu::MemoryHints::Performance,
                 },
                 None, // Trace path
             )
@@ -90,6 +92,8 @@ impl GraphicsState {
             // TODO: configure
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            // TODO: configure
+            desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
 
@@ -126,9 +130,9 @@ impl GraphicsState {
         }
     }
 
-    pub fn render<'a>(
-        &mut self,
-        cameras: impl Iterator<Item = &'a CameraBuffer>,
+    pub fn render<'b>(
+        &'b mut self,
+        cameras: impl Iterator<Item = &'b CameraBuffer>,
         sprite_pipeline: &sprite_renderer::SpritePipeline,
     ) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;

@@ -181,7 +181,7 @@ async fn game() {
     let mut app = App::default();
     app.add_plugin(DefaultPlugins);
     app.add_plugin(GamePlugin);
-    app.run().await;
+    app.run().await.unwrap();
 }
 
 fn main() {
