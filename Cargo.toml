@@ -15,12 +15,12 @@ wasm = ["wgpu/webgl", "dep:web-sys", "instant/stdweb", "instant/wasm-bindgen"]
 tracing = { version = "0.1.40" }
 cecs = { git = "https://github.com/caolo-game/cecs", default-features = false }
 anyhow = "1.0.86"
-bytemuck = { version = "1.16.1", features = ["derive"] }
+bytemuck = { version = "1.16.3", features = ["derive"] }
 fastrand = "2.1.0"
 glam = { version = "0.28.0", features = ["bytemuck"] }
-image = { version = "0.25.1", default-features = false, features = ["png"] }
+image = { version = "0.25.2", default-features = false, features = ["png"] }
 smallvec = "1.13.2"
-wgpu = { version = "22.0.0" }
+wgpu = { version = "22.1.0" }
 winit = "0.30"
 kira = { version = "0.9", optional = true }
 instant = { version = "0.1.13", features = [] }
