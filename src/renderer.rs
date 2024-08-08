@@ -146,6 +146,7 @@ impl GraphicsState {
             });
 
         for camera_buffer in cameras {
+            // FIXME: retain the camera bind ground
             let camera_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &self.camera_bind_group_layout,
                 entries: &[wgpu::BindGroupEntry {
