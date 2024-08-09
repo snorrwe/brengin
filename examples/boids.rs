@@ -116,7 +116,7 @@ fn setup_boids(
 
     info!(N, "Spawning boids");
     for _ in 0..N {
-        // TODO scale by map size
+        // TODO: scale by map size
         let x = fastrand::f32();
         let y = fastrand::f32();
 
