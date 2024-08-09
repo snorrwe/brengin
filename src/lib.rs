@@ -163,25 +163,24 @@ impl ApplicationHandler for RunningApp {
             return;
         };
         let attributes = app.world.get_resource_or_default::<WindowAttributes>();
-        let window = event_loop.create_window(attributes.clone()).expect("Failed to create window");
+        let window = event_loop
+            .create_window(attributes.clone())
+            .expect("Failed to create window");
         let window = Arc::new(window);
         // FIXME:
         // do not block here
         let graphics_state = pollster::block_on(GraphicsState::new(Arc::clone(&window)));
 
         app.world
-            .run_system(|mut cmd: Commands| -> anyhow::Result<()> {
+            .run_system(|mut cmd: Commands| {
                 cmd.spawn().insert(Window(Arc::clone(&window)));
 
                 let sprite_pipeline =
                     renderer::sprite_renderer::SpritePipeline::new(&graphics_state);
                 cmd.insert_resource(sprite_pipeline);
                 cmd.insert_resource(graphics_state);
-
-                anyhow::Result::Ok(())
             })
-            .unwrap()
-            .expect("Failed to create window");
+            .unwrap();
 
         *self = RunningApp::Initialized(std::mem::take(app).build());
     }
