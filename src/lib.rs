@@ -158,7 +158,10 @@ impl RunningApp {
 
 impl ApplicationHandler for RunningApp {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let app = self.as_pending().unwrap();
+        let Some(app) = self.as_pending() else {
+            debug!("App resumed");
+            return;
+        };
         let attributes = app.world.get_resource_or_default::<WindowAttributes>();
         let window = event_loop.create_window(attributes.clone()).unwrap();
         let window = Arc::new(window);
