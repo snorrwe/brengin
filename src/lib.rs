@@ -23,7 +23,13 @@ use winit::{
     window::{Theme, WindowAttributes},
 };
 
-use std::{any::TypeId, collections::HashSet, sync::Arc};
+use std::{
+    any::TypeId,
+    collections::HashSet,
+    sync::{Arc, Mutex},
+    thread::JoinHandle,
+    time::Duration,
+};
 use transform::TransformPlugin;
 
 use renderer::{GraphicsState, RenderResult, RendererPlugin};
@@ -97,6 +103,8 @@ pub struct App {
     stages: std::collections::BTreeMap<Stage, SystemStage<'static>>,
     startup_systems: SystemStage<'static>,
     plugins: HashSet<TypeId>,
+
+    pub render_app: Option<Box<App>>,
 }
 
 /// The main reason behind requiring types instead of just functions is that a plugin may only be
@@ -121,14 +129,9 @@ impl std::ops::DerefMut for App {
 
 impl Default for App {
     fn default() -> Self {
-        let mut world = World::new(1024);
-        world.insert_resource(WindowDescriptor::default());
-        Self {
-            world,
-            stages: Default::default(),
-            startup_systems: SystemStage::new("startup"),
-            plugins: Default::default(),
-        }
+        let mut app = App::empty();
+        app.render_app = Some(Box::new(App::empty()));
+        app
     }
 }
 
@@ -136,7 +139,11 @@ pub struct Window(pub Arc<winit::window::Window>);
 
 enum RunningApp {
     Pending(App),
-    Initialized(World),
+    Initialized {
+        render_world: World,
+        game_world: Arc<Mutex<World>>,
+        game_thread: JoinHandle<()>,
+    },
 }
 
 impl RunningApp {
@@ -151,7 +158,7 @@ impl RunningApp {
     fn world_mut(&mut self) -> &mut World {
         match self {
             RunningApp::Pending(app) => &mut app.world,
-            RunningApp::Initialized(w) => w,
+            RunningApp::Initialized { render_world, .. } => render_world,
         }
     }
 }
@@ -178,7 +185,27 @@ impl ApplicationHandler for RunningApp {
             })
             .unwrap();
 
-        *self = RunningApp::Initialized(std::mem::take(app).build());
+        let InitializedWorlds {
+            game_world,
+            render_world,
+        } = std::mem::take(app).build();
+        let game_world = Arc::new(Mutex::new(game_world));
+        let game_thread = std::thread::spawn({
+            let game_world = game_world.clone();
+            move || loop {
+                {
+                    let mut game_world = game_world.lock().unwrap();
+                    game_world.tick();
+                }
+                // FIXME:
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        });
+        *self = RunningApp::Initialized {
+            render_world,
+            game_world,
+            game_thread,
+        };
     }
 
     fn window_event(
@@ -188,9 +215,9 @@ impl ApplicationHandler for RunningApp {
         event: WindowEvent,
     ) {
         tracing::trace!(?event, "Event received");
-        let world = match self {
+        let render_world = match self {
             RunningApp::Pending(_) => return,
-            RunningApp::Initialized(w) => w,
+            RunningApp::Initialized { render_world, .. } => render_world,
         };
         match event {
             #[cfg(not(target_family = "wasm"))]
@@ -207,7 +234,7 @@ impl ApplicationHandler for RunningApp {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
-                world
+                render_world
                     .run_system(move |mut state: ResMut<GraphicsState>| {
                         state.resize(size);
                     })
@@ -215,16 +242,18 @@ impl ApplicationHandler for RunningApp {
             }
 
             WindowEvent::KeyboardInput { event, .. } => {
-                world
-                    .get_resource_mut::<KeyBoardInputs>()
-                    .unwrap()
-                    .next
-                    .push(event.clone());
+                // FIXME:
+                // world
+                //     .get_resource_mut::<KeyBoardInputs>()
+                //     .unwrap()
+                //     .next
+                //     .push(event.clone());
             }
             WindowEvent::RedrawRequested => {
-                world.tick();
+                // TODO: run extract
+                render_world.tick();
 
-                let result = world.get_resource::<RenderResult>();
+                let result = render_world.get_resource::<RenderResult>();
                 if let Some(result) = result {
                     match result {
                         Ok(_) => {}
@@ -256,6 +285,26 @@ impl ApplicationHandler for RunningApp {
 }
 
 impl App {
+    pub fn render_app(&self) -> &App {
+        self.render_app.as_ref().unwrap()
+    }
+
+    pub fn render_app_mut(&mut self) -> &mut App {
+        self.render_app.as_mut().unwrap()
+    }
+
+    fn empty() -> Self {
+        let mut world = World::new(1024);
+        world.insert_resource(WindowDescriptor::default());
+        Self {
+            world,
+            stages: Default::default(),
+            startup_systems: SystemStage::new("startup"),
+            plugins: Default::default(),
+            render_app: None,
+        }
+    }
+
     pub fn add_plugin<T: Plugin + 'static>(&mut self, plugin: T) -> &mut Self {
         let id = TypeId::of::<T>();
         assert!(
@@ -310,7 +359,7 @@ impl App {
         Ok(())
     }
 
-    fn build(self) -> World {
+    fn _build(self) -> World {
         let mut world = self.world;
         for (_, stage) in self.stages {
             world.add_stage(stage);
@@ -319,6 +368,24 @@ impl App {
         world.vacuum();
         world
     }
+
+    fn build(mut self) -> InitializedWorlds {
+        let rw = self
+            .render_app
+            .take()
+            .map(|a| a._build())
+            .unwrap_or_else(|| World::new(4));
+        let w = self._build();
+        InitializedWorlds {
+            game_world: w,
+            render_world: rw,
+        }
+    }
+}
+
+struct InitializedWorlds {
+    pub game_world: World,
+    pub render_world: World,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

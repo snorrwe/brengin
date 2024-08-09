@@ -524,11 +524,14 @@ impl Plugin for SpriteRendererPlugin {
                 .add_system(insert_missing_cull)
                 .add_system(update_visible)
                 .add_system(update_invisible);
-        })
-        .with_stage(crate::Stage::PreUpdate, |s| {
+        });
+        app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(clear_pipeline_instances);
         });
-        app.add_startup_system(setup);
-        app.insert_resource(SpritePipelineInstances::default())
+        app.insert_resource(SpritePipelineInstances::default());
+
+        if let Some(ref mut app) = app.render_app {
+            app.add_startup_system(setup);
+        }
     }
 }
