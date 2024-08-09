@@ -163,7 +163,7 @@ impl ApplicationHandler for RunningApp {
             return;
         };
         let attributes = app.world.get_resource_or_default::<WindowAttributes>();
-        let window = event_loop.create_window(attributes.clone()).unwrap();
+        let window = event_loop.create_window(attributes.clone()).expect("Failed to create window");
         let window = Arc::new(window);
         // FIXME:
         // do not block here
