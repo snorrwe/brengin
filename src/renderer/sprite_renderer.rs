@@ -502,6 +502,11 @@ const VERTICES: &[Vertex] = &[
 
 const INDICES: &[u16] = &[3, 2, 1, 3, 1, 0];
 
+fn setup(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
+    let sprite_pipeline = SpritePipeline::new(&graphics_state);
+    cmd.insert_resource(sprite_pipeline);
+}
+
 pub struct SpriteRendererPlugin;
 
 impl Plugin for SpriteRendererPlugin {
@@ -523,6 +528,7 @@ impl Plugin for SpriteRendererPlugin {
         .with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(clear_pipeline_instances);
         });
+        app.add_startup_system(setup);
         app.insert_resource(SpritePipelineInstances::default())
     }
 }

@@ -174,10 +174,6 @@ impl ApplicationHandler for RunningApp {
         app.world
             .run_system(|mut cmd: Commands| {
                 cmd.spawn().insert(Window(Arc::clone(&window)));
-
-                let sprite_pipeline =
-                    renderer::sprite_renderer::SpritePipeline::new(&graphics_state);
-                cmd.insert_resource(sprite_pipeline);
                 cmd.insert_resource(graphics_state);
             })
             .unwrap();
