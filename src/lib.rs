@@ -450,7 +450,6 @@ impl Plugin for DefaultPlugins {
             s.add_system(update_time).add_system(update_inputs);
         });
 
-        app.add_plugin(assets::AssetsPlugin::<renderer::sprite_renderer::SpriteSheet>::default());
         app.add_plugin(TransformPlugin);
         app.add_plugin(RendererPlugin);
 

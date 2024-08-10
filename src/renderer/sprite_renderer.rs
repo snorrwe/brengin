@@ -516,6 +516,7 @@ pub struct SpriteRendererPlugin;
 
 impl Plugin for SpriteRendererPlugin {
     fn build(self, app: &mut crate::App) {
+        app.add_plugin(crate::assets::AssetsPlugin::<SpriteSheet>::default());
         // putting this system in update means that the last frame's data is presented
         app.with_stage(crate::Stage::Update, |s| {
             s.add_system(compute_sprite_instances)
