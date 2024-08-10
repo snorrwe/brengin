@@ -1,3 +1,4 @@
+use image::{DynamicImage, GenericImageView};
 use std::collections::{BTreeMap, HashMap};
 
 use cecs::prelude::*;
@@ -92,19 +93,19 @@ pub struct SpriteSheet {
     pub box_size: Vec2,
     /// Number of boxes in a row
     pub num_cols: u32,
-    pub texture: Texture,
+    pub image: DynamicImage,
     /// Size of the entire sheet
     pub size: Vec2,
 }
 
 impl SpriteSheet {
-    pub fn from_texture(padding: Vec2, box_size: Vec2, num_cols: u32, texture: Texture) -> Self {
+    pub fn from_image(padding: Vec2, box_size: Vec2, num_cols: u32, image: DynamicImage) -> Self {
         Self {
             padding,
             box_size,
             num_cols,
-            size: Vec2::new(texture.size.0 as f32, texture.size.1 as f32),
-            texture,
+            size: Vec2::new(image.width() as f32, image.height() as f32),
+            image,
         }
     }
 
@@ -222,6 +223,7 @@ pub struct SpriteRenderingData {
     instance_gpu: wgpu::Buffer,
     spritesheet_gpu: wgpu::BindGroup,
     spritesheet_bind_group: wgpu::BindGroup,
+    texture: Texture,
 }
 
 pub struct SpritePipeline {
@@ -250,8 +252,10 @@ impl SpritePipeline {
     }
 
     pub fn add_sheet(&mut self, id: AssetId, sheet: &SpriteSheet, renderer: &GraphicsState) {
-        let (_, spritesheet_bind_group) =
-            super::texture_to_bindings(&renderer.device, &sheet.texture);
+        let texture = Texture::from_image(renderer.device(), renderer.queue(), &sheet.image, None)
+            .expect("Failed to create texture");
+
+        let (_, spritesheet_bind_group) = super::texture_to_bindings(&renderer.device, &texture);
         let sheet_gpu = sheet.extract();
 
         let spritesheet_buffer =
@@ -286,6 +290,7 @@ impl SpritePipeline {
                 }),
                 spritesheet_gpu,
                 spritesheet_bind_group,
+                texture,
             },
         );
     }
