@@ -1,4 +1,4 @@
-use image::{DynamicImage, GenericImageView};
+use image::DynamicImage;
 use std::collections::{BTreeMap, HashMap};
 
 use cecs::prelude::*;
@@ -219,11 +219,11 @@ fn update_sprite_pipelines(
 
 pub struct SpriteRenderingData {
     // per spritesheet
-    count: usize,
-    instance_gpu: wgpu::Buffer,
-    spritesheet_gpu: wgpu::BindGroup,
-    spritesheet_bind_group: wgpu::BindGroup,
-    texture: Texture,
+    pub count: usize,
+    pub instance_gpu: wgpu::Buffer,
+    pub spritesheet_gpu: wgpu::BindGroup,
+    pub spritesheet_bind_group: wgpu::BindGroup,
+    pub texture: Texture,
 }
 
 pub struct SpritePipeline {
@@ -518,14 +518,7 @@ impl Plugin for SpriteRendererPlugin {
     fn build(self, app: &mut crate::App) {
         // putting this system in update means that the last frame's data is presented
         app.with_stage(crate::Stage::Update, |s| {
-            s.add_system(add_missing_sheets)
-                .add_system(compute_sprite_instances)
-                .add_system(
-                    update_sprite_pipelines
-                        .after(compute_sprite_instances)
-                        .after(add_missing_sheets),
-                )
-                .add_system(unload_sheets)
+            s.add_system(compute_sprite_instances)
                 .add_system(insert_missing_cull)
                 .add_system(update_visible)
                 .add_system(update_invisible);
@@ -537,6 +530,12 @@ impl Plugin for SpriteRendererPlugin {
 
         if let Some(ref mut app) = app.render_app {
             app.add_startup_system(setup);
+            app.insert_resource(SpritePipelineInstances::default());
+            app.with_stage(crate::Stage::Update, |s| {
+                s.add_system(add_missing_sheets)
+                    .add_system(unload_sheets)
+                    .add_system(update_sprite_pipelines.after(compute_sprite_instances));
+            });
         }
     }
 }
