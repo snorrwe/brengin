@@ -20,7 +20,11 @@
           xorg.libXi
           xorg.libXrandr
           libxkbcommon
+          libGL
+
           vulkan-loader
+          vulkan-extension-layer
+          vulkan-validation-layers # don't need them *strictly* but immensely helpful
         ];
       in
       with pkgs;
