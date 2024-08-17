@@ -9,6 +9,7 @@ edition = "2021"
 default = ["audio", "parallel"]
 audio = ["dep:kira"]
 parallel = ["cecs/parallel"]
+# FIXME: wasm feature currently broken
 wasm = ["wgpu/webgl", "dep:web-sys", "instant/stdweb", "instant/wasm-bindgen"]
 
 [dependencies]
