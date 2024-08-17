@@ -21,6 +21,7 @@
           xorg.libXrandr
           libxkbcommon
           libGL
+          udev
 
           vulkan-loader
           vulkan-extension-layer
