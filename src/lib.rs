@@ -244,7 +244,10 @@ impl ApplicationHandler for RunningApp {
                         jb.enqueue_future(async move {
                             // TODO: use a future lock?
                             let mut w = w.lock().unwrap();
-                            w.insert_resource(WindowSize(size));
+                            w.insert_resource(WindowSize {
+                                width: size.width,
+                                height: size.height,
+                            });
                         });
 
                         state.resize(size);

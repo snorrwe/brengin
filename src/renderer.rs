@@ -33,7 +33,11 @@ pub struct GraphicsState {
     depth_texture: texture::Texture,
 }
 
-pub struct WindowSize(pub PhysicalSize<u32>);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WindowSize {
+    pub width: u32,
+    pub height: u32,
+}
 
 impl GraphicsState {
     pub async fn new(window: Arc<Window>) -> Self {
@@ -253,10 +257,10 @@ impl Plugin for RendererPlugin {
         app.render_app_mut().with_stage(crate::Stage::Render, |s| {
             s.add_system(render_system);
         });
-        app.insert_resource(WindowSize(PhysicalSize {
+        app.insert_resource(WindowSize {
             width: 0,
             height: 0,
-        }));
+        });
         app.add_plugin(CameraPlugin);
         app.add_plugin(SpriteRendererPlugin);
     }

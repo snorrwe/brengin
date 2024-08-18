@@ -27,7 +27,7 @@ pub struct Camera3d {
 pub struct WindowCamera;
 
 fn update_camera_aspect(gs: Res<WindowSize>, mut q: Query<&mut Camera3d, With<WindowCamera>>) {
-    let size = gs.0;
+    let size = *gs;
     let aspect = size.width as f32 / size.height as f32;
     q.par_for_each_mut(move |cam| {
         cam.aspect = aspect;
