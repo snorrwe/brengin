@@ -32,7 +32,7 @@ use std::{
 };
 use transform::TransformPlugin;
 
-use renderer::{GraphicsState, RenderResult, RendererPlugin};
+use renderer::{GraphicsState, RenderResult, RendererPlugin, WindowSize};
 
 use winit::event_loop::EventLoop;
 
@@ -215,9 +215,13 @@ impl ApplicationHandler for RunningApp {
         event: WindowEvent,
     ) {
         tracing::trace!(?event, "Event received");
-        let render_world = match self {
-            RunningApp::Pending(_) => return,
-            RunningApp::Initialized { render_world, .. } => render_world,
+        let RunningApp::Initialized {
+            render_world,
+            game_world,
+            ..
+        } = self
+        else {
+            return;
         };
         match event {
             #[cfg(not(target_family = "wasm"))]
@@ -234,8 +238,15 @@ impl ApplicationHandler for RunningApp {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
+                let w = Arc::clone(game_world);
                 render_world
-                    .run_system(move |mut state: ResMut<GraphicsState>| {
+                    .run_system(move |mut state: ResMut<GraphicsState>, jb: Res<JobPool>| {
+                        jb.enqueue_future(async move {
+                            // TODO: use a future lock?
+                            let mut w = w.lock().unwrap();
+                            w.insert_resource(WindowSize(size));
+                        });
+
                         state.resize(size);
                     })
                     .unwrap();

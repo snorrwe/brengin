@@ -6,14 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["audio", "parallel"]
+default = ["audio", "parallel", "tracing"]
 audio = ["dep:kira"]
 parallel = ["cecs/parallel"]
 # FIXME: wasm feature currently broken
 wasm = ["wgpu/webgl", "dep:web-sys", "instant/stdweb", "instant/wasm-bindgen"]
+tracing = ["dep:tracing", "cecs/tracing"]
 
 [dependencies]
-tracing = { version = "0.1.40" }
+tracing = { version = "0.1.40", optional = true }
 cecs = { git = "https://github.com/caolo-game/cecs", default-features = false }
 anyhow = "1.0.86"
 bytemuck = { version = "1.16.3", features = ["derive"] }

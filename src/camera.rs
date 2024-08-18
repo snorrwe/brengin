@@ -1,7 +1,11 @@
 use cecs::prelude::*;
 use glam::{Mat4, Vec3, Vec4};
 
-use crate::{renderer::GraphicsState, transform::GlobalTransform, Plugin, Stage};
+use crate::{
+    renderer::{GraphicsState, WindowSize},
+    transform::GlobalTransform,
+    Plugin, Stage,
+};
 
 #[derive(Default)]
 pub struct ViewFrustum {
@@ -22,8 +26,8 @@ pub struct Camera3d {
 /// Camera entities do not have this component by default
 pub struct WindowCamera;
 
-fn update_camera_aspect(gs: Res<GraphicsState>, mut q: Query<&mut Camera3d, With<WindowCamera>>) {
-    let size = gs.size();
+fn update_camera_aspect(gs: Res<WindowSize>, mut q: Query<&mut Camera3d, With<WindowCamera>>) {
+    let size = gs.0;
     let aspect = size.width as f32 / size.height as f32;
     q.par_for_each_mut(move |cam| {
         cam.aspect = aspect;
@@ -154,9 +158,11 @@ impl Plugin for CameraPlugin {
         })
         .with_stage(Stage::Update, |s| {
             s.add_system(update_view_projections)
-                .add_system(insert_missing_camera_buffers.after(update_view_projections))
-                .add_system(update_camera_buffers.after(update_view_projections))
                 .add_system(update_frustum.after(update_view_projections));
+        });
+        app.render_app_mut().with_stage(Stage::Update, |s| {
+            s.add_system(insert_missing_camera_buffers)
+                .add_system(update_camera_buffers);
         });
     }
 }

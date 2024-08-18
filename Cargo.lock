@@ -337,6 +337,7 @@ dependencies = [
  "rustc-hash",
  "smallvec",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
