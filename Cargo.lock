@@ -325,8 +325,8 @@ dependencies = [
 
 [[package]]
 name = "cecs"
-version = "0.1.5"
-source = "git+https://github.com/caolo-game/cecs#3793cf2966a040722f647018c243e3f1fdbe3415"
+version = "0.1.6"
+source = "git+https://github.com/caolo-game/cecs#307bd88fea4c76452002420839bf0d8eefca1d42"
 dependencies = [
  "cache-padded",
  "cfg-if",
@@ -1046,7 +1046,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
