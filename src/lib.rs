@@ -193,11 +193,14 @@ impl ApplicationHandler for RunningApp {
         let game_thread = std::thread::spawn({
             let game_world = game_world.clone();
             move || loop {
+                // FIXME:
+                // - compute delta time after acquiring the world
+                // - insert delta time
+                // - sleep based on target tick frequency
                 {
                     let mut game_world = game_world.lock().unwrap();
                     game_world.tick();
                 }
-                // FIXME:
                 std::thread::sleep(Duration::from_millis(10));
             }
         });
