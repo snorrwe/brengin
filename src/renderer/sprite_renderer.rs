@@ -12,7 +12,10 @@ use crate::{
     Plugin,
 };
 
-use super::{texture::Texture, GraphicsState, Vertex};
+use super::{
+    texture::{self, Texture},
+    GraphicsState, Vertex,
+};
 
 pub fn sprite_sheet_bundle(
     handle: Handle<SpriteSheet>,
@@ -255,7 +258,7 @@ impl SpritePipeline {
         let texture = Texture::from_image(renderer.device(), renderer.queue(), &sheet.image, None)
             .expect("Failed to create texture");
 
-        let (_, spritesheet_bind_group) = super::texture_to_bindings(&renderer.device, &texture);
+        let (_, spritesheet_bind_group) = texture_to_bindings(&renderer.device, &texture);
         let sheet_gpu = sheet.extract();
 
         let spritesheet_buffer =
@@ -317,7 +320,7 @@ impl SpritePipeline {
             .create_shader_module(include_wgsl!("sprite-shader.wgsl"));
 
         let texture_bind_group_layout =
-            super::texture_bind_group_layout(&renderer.device, "sprite-texture-layout");
+            texture_bind_group_layout(&renderer.device, "sprite-texture-layout");
 
         let render_pipeline_layout =
             renderer
@@ -539,4 +542,52 @@ impl Plugin for SpriteRendererPlugin {
             });
         }
     }
+}
+
+fn texture_bind_group_layout(device: &wgpu::Device, label: &str) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                // This should match the filterable field of the
+                // corresponding Texture entry above.
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+        label: Some(label),
+    })
+}
+
+fn texture_to_bindings(
+    device: &wgpu::Device,
+    texture: &texture::Texture,
+) -> (wgpu::BindGroupLayout, wgpu::BindGroup) {
+    let texture_bind_group_layout = texture_bind_group_layout(device, "texture_bind_group_layout");
+    let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &texture_bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&texture.view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(&texture.sampler),
+            },
+        ],
+        label: Some("diffuse_bind_group"),
+    });
+    (texture_bind_group_layout, diffuse_bind_group)
 }
