@@ -316,6 +316,7 @@ impl ApplicationHandler for RunningApp {
             }
 
             WindowEvent::KeyboardInput { event, .. } => {
+                // TODO: have a shared lock-free input queue to get rid of this lock
                 game_world
                     .lock()
                     .unwrap()
