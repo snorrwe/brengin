@@ -195,16 +195,20 @@ fn game_thread(game_world: Arc<Mutex<World>>) {
     // TODO: should_run flag to terminate the loop at shutdown
     if let Err(err) = panic::catch_unwind(|| loop {
         let start = Instant::now();
-        {
-            let mut game_world = game_world.lock().unwrap();
-            game_world.tick();
-        }
+
+        let mut game_world = game_world.lock().unwrap();
+        game_world.tick();
+        drop(game_world);
+
         let end = Instant::now();
         let frame_duration = end - start;
-        if frame_duration < target_frame_latency {
-            let sleep = target_frame_latency - frame_duration;
-            std::thread::sleep(sleep);
-        }
+        let sleep = if frame_duration < target_frame_latency {
+            target_frame_latency - frame_duration
+        } else {
+            // leave time for the render thread to extract even if we're behind schedule
+            Duration::from_micros(500)
+        };
+        std::thread::sleep(sleep);
     }) {
         tracing::error!(?err, "Game thread paniced!")
     }
