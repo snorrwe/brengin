@@ -539,12 +539,12 @@ impl Plugin for SpriteRendererPlugin {
         app.extact_stage.add_system(add_missing_sheets);
 
         if let Some(ref mut app) = app.render_app {
-            app.with_stage(crate::Stage::PreUpdate, |s| {
-                s.add_system(clear_pipeline_instances);
-            });
             app.add_startup_system(setup);
             app.insert_resource(SpritePipelineInstances::default());
             app.insert_resource(RenderSpritesheetHandles::default());
+            app.with_stage(crate::Stage::PreUpdate, |s| {
+                s.add_system(clear_pipeline_instances);
+            });
             app.with_stage(crate::Stage::Update, |s| {
                 s.add_system(unload_sheets)
                     .add_system(update_sprite_pipelines);
