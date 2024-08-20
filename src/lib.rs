@@ -13,6 +13,7 @@ use anyhow::Context;
 pub use cecs;
 pub use glam;
 pub use image;
+use instant::Instant;
 pub use wgpu;
 pub use winit;
 
@@ -156,6 +157,7 @@ enum RunningApp {
     Pending(App),
     Initialized {
         render_world: World,
+        render_extract: SystemStage<'static>,
         game_world: Arc<Mutex<World>>,
         game_thread: JoinHandle<()>,
     },
@@ -204,26 +206,35 @@ impl ApplicationHandler for RunningApp {
         let InitializedWorlds {
             game_world,
             render_world,
+            render_extract,
         } = std::mem::take(app).build();
         let game_world = Arc::new(Mutex::new(game_world));
         let game_thread = std::thread::spawn({
-            let game_world = game_world.clone();
-            move || loop {
-                // FIXME:
-                // - compute delta time after acquiring the world
-                // - insert delta time
-                // - sleep based on target tick frequency
-                {
-                    let mut game_world = game_world.lock().unwrap();
-                    game_world.tick();
+            let game_world = Arc::clone(&game_world);
+            move || {
+                // TODO: take from resource
+                let target_frame_latency: Duration = Duration::from_millis(15);
+                loop {
+                    let start = Instant::now();
+                    {
+                        let mut game_world = game_world.lock().unwrap();
+                        game_world.tick();
+                    }
+                    let end = Instant::now();
+                    let frame_duration = end - start;
+                    if frame_duration >= target_frame_latency {
+                        continue;
+                    }
+                    let sleep = target_frame_latency - frame_duration;
+                    std::thread::sleep(sleep);
                 }
-                std::thread::sleep(Duration::from_millis(10));
             }
         });
         *self = RunningApp::Initialized {
             render_world,
             game_world,
             game_thread,
+            render_extract,
         };
     }
 
@@ -237,6 +248,7 @@ impl ApplicationHandler for RunningApp {
         let RunningApp::Initialized {
             render_world,
             game_world,
+            render_extract,
             ..
         } = self
         else {
@@ -283,7 +295,16 @@ impl ApplicationHandler for RunningApp {
                 //     .push(event.clone());
             }
             WindowEvent::RedrawRequested => {
-                // TODO: run extract
+                {
+                    // extraction
+                    let mut gw = game_world.lock().unwrap();
+                    render_world.insert_resource(GameWorld {
+                        world: NonNull::from(&mut *gw),
+                    });
+                    render_world.run_stage(render_extract.clone()).unwrap();
+                    render_world.remove_resource::<GameWorld>();
+                }
+
                 render_world.tick();
 
                 let result = render_world.get_resource::<RenderResult>();
@@ -421,10 +442,12 @@ impl App {
             .take()
             .map(|a| a._build())
             .unwrap_or_else(|| World::new(4));
+        let render_extract = std::mem::replace(&mut self.extact_stage, SystemStage::new("nil"));
         let w = self._build();
         InitializedWorlds {
             game_world: w,
             render_world: rw,
+            render_extract,
         }
     }
 }
@@ -432,6 +455,7 @@ impl App {
 struct InitializedWorlds {
     pub game_world: World,
     pub render_world: World,
+    pub render_extract: SystemStage<'static>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
