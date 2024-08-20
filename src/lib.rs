@@ -184,6 +184,32 @@ impl RunningApp {
     }
 }
 
+fn game_thread(game_world: Arc<Mutex<World>>) {
+    // TODO: take from resource
+    let target_frame_latency: Duration = Duration::from_millis(15);
+    // reset Time so the first DT isn't outragous
+    game_world
+        .lock()
+        .unwrap()
+        .insert_resource(Time(instant::Instant::now()));
+    // TODO: should_run flag to terminate the loop at shutdown
+    if let Err(err) = panic::catch_unwind(|| loop {
+        let start = Instant::now();
+        {
+            let mut game_world = game_world.lock().unwrap();
+            game_world.tick();
+        }
+        let end = Instant::now();
+        let frame_duration = end - start;
+        if frame_duration < target_frame_latency {
+            let sleep = target_frame_latency - frame_duration;
+            std::thread::sleep(sleep);
+        }
+    }) {
+        tracing::error!(?err, "Game thread paniced!")
+    }
+}
+
 impl ApplicationHandler for RunningApp {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         let Some(app) = self.as_pending() else {
@@ -215,31 +241,7 @@ impl ApplicationHandler for RunningApp {
         let game_world = Arc::new(Mutex::new(game_world));
         let game_thread = std::thread::spawn({
             let game_world = Arc::clone(&game_world);
-            // TODO: move to its own function pls
-            move || {
-                // TODO: take from resource
-                let target_frame_latency: Duration = Duration::from_millis(15);
-                // reset Time so the first DT isn't outragous
-                game_world
-                    .lock()
-                    .unwrap()
-                    .insert_resource(Time(instant::Instant::now()));
-                if let Err(err) = panic::catch_unwind(|| loop {
-                    let start = Instant::now();
-                    {
-                        let mut game_world = game_world.lock().unwrap();
-                        game_world.tick();
-                    }
-                    let end = Instant::now();
-                    let frame_duration = end - start;
-                    if frame_duration < target_frame_latency {
-                        let sleep = target_frame_latency - frame_duration;
-                        std::thread::sleep(sleep);
-                    }
-                }) {
-                    tracing::error!(?err, "Game thread paniced!")
-                }
-            }
+            move || game_thread(game_world)
         });
         *self = RunningApp::Initialized {
             render_world,
