@@ -6,15 +6,15 @@ use glam::Vec2;
 use wgpu::{include_wgsl, util::DeviceExt};
 
 use crate::{
-    assets::{AssetId, Assets, Handle, WeakHandle},
+    assets::{AssetId, Assets, AssetsPlugin, Handle, WeakHandle},
     camera::ViewFrustum,
     transform::GlobalTransform,
-    GameWorld, Plugin,
+    GameWorld, Plugin, Stage,
 };
 
 use super::{
     texture::{self, Texture},
-    GraphicsState, Vertex,
+    Extract, ExtractionPlugin, GraphicsState, Vertex,
 };
 
 pub fn sprite_sheet_bundle(
@@ -191,9 +191,23 @@ fn clear_pipeline_instances(mut instances: ResMut<SpritePipelineInstances>) {
     }
 }
 
+impl Extract for SpriteInstanceRaw {
+    type QueryItem = (&'static Handle<SpriteSheet>, &'static SpriteInstanceRaw);
+
+    type Filter = With<Visible>;
+
+    type Out = (WeakHandle<SpriteSheet>, SpriteInstanceRaw, Visible);
+
+    fn extract<'a>(
+        (handle, instance): <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
+    ) -> Option<Self::Out> {
+        Some((handle.downgrade(), *instance, Visible))
+    }
+}
+
 fn update_sprite_pipelines(
     renderer: Res<GraphicsState>,
-    q: Query<(&Handle<SpriteSheet>, &SpriteInstanceRaw), With<Visible>>,
+    q: Query<(&WeakHandle<SpriteSheet>, &SpriteInstanceRaw)>,
     mut pipeline: ResMut<SpritePipeline>,
     mut instances: ResMut<SpritePipelineInstances>,
 ) {
@@ -202,7 +216,9 @@ fn update_sprite_pipelines(
     }
 
     for (id, cpu) in instances.0.iter() {
-        let sprite_rendering_data = pipeline.sheets.get_mut(&id).unwrap();
+        let Some(sprite_rendering_data) = pipeline.sheets.get_mut(&id) else {
+            continue;
+        };
 
         let instance_data_bytes = bytemuck::cast_slice::<_, u8>(&cpu);
         let size = instance_data_bytes.len() as u64;
@@ -228,8 +244,8 @@ fn update_sprite_pipelines(
 #[derive(Default)]
 struct RenderSpritesheetHandles(pub HashMap<AssetId, WeakHandle<SpriteSheet>>);
 
+// per spritesheet
 pub struct SpriteRenderingData {
-    // per spritesheet
     pub count: usize,
     pub instance_gpu: wgpu::Buffer,
     pub spritesheet_gpu: wgpu::BindGroup,
@@ -527,8 +543,9 @@ pub struct SpriteRendererPlugin;
 
 impl Plugin for SpriteRendererPlugin {
     fn build(self, app: &mut crate::App) {
-        app.add_plugin(crate::assets::AssetsPlugin::<SpriteSheet>::default());
-        app.with_stage(crate::Stage::Update, |s| {
+        app.add_plugin(AssetsPlugin::<SpriteSheet>::default());
+        app.add_plugin(ExtractionPlugin::<SpriteInstanceRaw>::default());
+        app.with_stage(Stage::Update, |s| {
             // putting this system in update means that the last frame's data will be presented
             s.add_system(compute_sprite_instances)
                 .add_system(insert_missing_cull)
@@ -542,10 +559,10 @@ impl Plugin for SpriteRendererPlugin {
             app.add_startup_system(setup);
             app.insert_resource(SpritePipelineInstances::default());
             app.insert_resource(RenderSpritesheetHandles::default());
-            app.with_stage(crate::Stage::PreUpdate, |s| {
+            app.with_stage(Stage::PreUpdate, |s| {
                 s.add_system(clear_pipeline_instances);
             });
-            app.with_stage(crate::Stage::Update, |s| {
+            app.with_stage(Stage::Update, |s| {
                 s.add_system(unload_sheets)
                     .add_system(update_sprite_pipelines);
             });
