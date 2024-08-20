@@ -225,6 +225,7 @@ fn update_sprite_pipelines(
     }
 }
 
+#[derive(Default)]
 struct RenderSpritesheetHandles(pub HashMap<AssetId, WeakHandle<SpriteSheet>>);
 
 pub struct SpriteRenderingData {
@@ -543,6 +544,7 @@ impl Plugin for SpriteRendererPlugin {
             });
             app.add_startup_system(setup);
             app.insert_resource(SpritePipelineInstances::default());
+            app.insert_resource(RenderSpritesheetHandles::default());
             app.with_stage(crate::Stage::Update, |s| {
                 s.add_system(unload_sheets)
                     .add_system(update_sprite_pipelines);

@@ -193,7 +193,8 @@ impl ApplicationHandler for RunningApp {
         // do not block here
         let graphics_state = pollster::block_on(GraphicsState::new(Arc::clone(&window)));
 
-        app.world
+        app.render_app_mut()
+            .world
             .run_system(|mut cmd: Commands| {
                 cmd.spawn().insert(Window(Arc::clone(&window)));
                 cmd.insert_resource(graphics_state);
