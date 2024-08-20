@@ -52,6 +52,7 @@
             # tools
             cargo-nextest
             cargo-edit
+            cargo-flamegraph
             just
             renderdoc
           ];
