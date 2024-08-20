@@ -232,7 +232,6 @@ impl ApplicationHandler for RunningApp {
                     }
                     let end = Instant::now();
                     let frame_duration = end - start;
-                    tracing::info!(?frame_duration, ?target_frame_latency, "????");
                     if frame_duration < target_frame_latency {
                         let sleep = target_frame_latency - frame_duration;
                         std::thread::sleep(sleep);
