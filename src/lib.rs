@@ -27,6 +27,7 @@ use winit::{
 use std::{
     any::TypeId,
     collections::HashSet,
+    panic,
     ptr::NonNull,
     sync::{Arc, Mutex},
     thread::JoinHandle,
@@ -214,10 +215,16 @@ impl ApplicationHandler for RunningApp {
         let game_world = Arc::new(Mutex::new(game_world));
         let game_thread = std::thread::spawn({
             let game_world = Arc::clone(&game_world);
+            // TODO: move to its own function pls
             move || {
                 // TODO: take from resource
                 let target_frame_latency: Duration = Duration::from_millis(15);
-                loop {
+                // reset Time so the first DT isn't outragous
+                game_world
+                    .lock()
+                    .unwrap()
+                    .insert_resource(Time(instant::Instant::now()));
+                if let Err(err) = panic::catch_unwind(|| loop {
                     let start = Instant::now();
                     {
                         let mut game_world = game_world.lock().unwrap();
@@ -225,11 +232,13 @@ impl ApplicationHandler for RunningApp {
                     }
                     let end = Instant::now();
                     let frame_duration = end - start;
-                    if frame_duration >= target_frame_latency {
-                        continue;
+                    tracing::info!(?frame_duration, ?target_frame_latency, "????");
+                    if frame_duration < target_frame_latency {
+                        let sleep = target_frame_latency - frame_duration;
+                        std::thread::sleep(sleep);
                     }
-                    let sleep = target_frame_latency - frame_duration;
-                    std::thread::sleep(sleep);
+                }) {
+                    tracing::error!(?err, "Game thread paniced!")
                 }
             }
         });
