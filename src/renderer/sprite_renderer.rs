@@ -520,25 +520,24 @@ pub struct SpriteRendererPlugin;
 impl Plugin for SpriteRendererPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(crate::assets::AssetsPlugin::<SpriteSheet>::default());
-        // putting this system in update means that the last frame's data is presented
         app.with_stage(crate::Stage::Update, |s| {
+            // putting this system in update means that the last frame's data will be presented
             s.add_system(compute_sprite_instances)
                 .add_system(insert_missing_cull)
                 .add_system(update_visible)
                 .add_system(update_invisible);
         });
-        app.with_stage(crate::Stage::PreUpdate, |s| {
-            s.add_system(clear_pipeline_instances);
-        });
-        app.insert_resource(SpritePipelineInstances::default());
 
         if let Some(ref mut app) = app.render_app {
+            app.with_stage(crate::Stage::PreUpdate, |s| {
+                s.add_system(clear_pipeline_instances);
+            });
             app.add_startup_system(setup);
             app.insert_resource(SpritePipelineInstances::default());
             app.with_stage(crate::Stage::Update, |s| {
                 s.add_system(add_missing_sheets)
                     .add_system(unload_sheets)
-                    .add_system(update_sprite_pipelines.after(compute_sprite_instances));
+                    .add_system(update_sprite_pipelines);
             });
         }
     }
