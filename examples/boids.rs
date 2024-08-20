@@ -6,9 +6,8 @@ use brengin::{
     glam::{Quat, Vec2, Vec3},
     prelude::*,
     renderer::{
-        self, camera_bundle,
+        camera_bundle,
         sprite_renderer::{self, SpriteSheet},
-        GraphicsState,
     },
     transform::{self, transform_bundle, Transform},
     App, DefaultPlugins, DeltaTime, Plugin, Stage,
@@ -86,11 +85,7 @@ fn update_boids_pos(mut q: Query<(&mut LastPos, &Pos)>) {
     });
 }
 
-fn setup_boids(
-    mut cmd: Commands,
-    graphics_state: Res<GraphicsState>,
-    mut assets: ResMut<assets::Assets<SpriteSheet>>,
-) {
+fn setup_boids(mut cmd: Commands, mut assets: ResMut<assets::Assets<SpriteSheet>>) {
     //camera
     cmd.spawn()
         .insert(WindowCamera)
@@ -106,11 +101,9 @@ fn setup_boids(
         .insert_bundle(transform_bundle(transform::Transform::default()));
 
     let boid = load_sprite_sheet(
-        &graphics_state,
         include_bytes!("assets/boid.png"),
         Vec2::splat(32.0),
         1,
-        "boid",
         &mut assets,
     );
 
@@ -138,21 +131,13 @@ fn setup_boids(
 }
 
 fn load_sprite_sheet(
-    graphics_state: &GraphicsState,
     bytes: &[u8],
     box_size: Vec2,
     num_cols: u32,
-    label: &str,
     assets: &mut Assets<SpriteSheet>,
 ) -> Handle<SpriteSheet> {
-    let texture = renderer::texture::Texture::from_bytes(
-        graphics_state.device(),
-        graphics_state.queue(),
-        bytes,
-        label,
-    )
-    .unwrap();
-    let sprite_sheet = SpriteSheet::from_texture(Vec2::ZERO, box_size, num_cols, texture);
+    let image = image::load_from_memory(bytes).expect("Failed to load spritesheet");
+    let sprite_sheet = SpriteSheet::from_image(Vec2::ZERO, box_size, num_cols, image);
 
     assets.insert(sprite_sheet)
 }

@@ -1,7 +1,11 @@
 use cecs::prelude::*;
 use glam::{Mat4, Vec3, Vec4};
 
-use crate::{renderer::GraphicsState, transform::GlobalTransform, Plugin, Stage};
+use crate::{
+    renderer::{ExtractionPlugin, GraphicsState, WindowSize},
+    transform::GlobalTransform,
+    Plugin, Stage,
+};
 
 #[derive(Default)]
 pub struct ViewFrustum {
@@ -22,8 +26,8 @@ pub struct Camera3d {
 /// Camera entities do not have this component by default
 pub struct WindowCamera;
 
-fn update_camera_aspect(gs: Res<GraphicsState>, mut q: Query<&mut Camera3d, With<WindowCamera>>) {
-    let size = gs.size();
+fn update_camera_aspect(gs: Res<WindowSize>, mut q: Query<&mut Camera3d, With<WindowCamera>>) {
+    let size = *gs;
     let aspect = size.width as f32 / size.height as f32;
     q.par_for_each_mut(move |cam| {
         cam.aspect = aspect;
@@ -74,6 +78,20 @@ impl CameraUniform {
 fn update_view_projections(mut q: Query<(&GlobalTransform, &Camera3d, &mut CameraUniform)>) {
     for (tr, cam, uni) in q.iter_mut() {
         uni.view_proj = cam.view_projection() * tr.0.inverse().compute_matrix();
+    }
+}
+
+impl crate::renderer::Extract for CameraUniform {
+    type QueryItem = &'static CameraUniform;
+
+    type Filter = ();
+
+    type Out = (Self,);
+
+    fn extract<'a>(
+        it: <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
+    ) -> Option<Self::Out> {
+        Some((*it,))
     }
 }
 
@@ -154,9 +172,18 @@ impl Plugin for CameraPlugin {
         })
         .with_stage(Stage::Update, |s| {
             s.add_system(update_view_projections)
-                .add_system(insert_missing_camera_buffers.after(update_view_projections))
-                .add_system(update_camera_buffers.after(update_view_projections))
                 .add_system(update_frustum.after(update_view_projections));
         });
+
+        app.add_plugin(ExtractionPlugin::<CameraUniform>::default());
+
+        app.render_app_mut().with_stage(Stage::Update, |s| {
+            s.add_system(insert_missing_camera_buffers)
+                .add_system(update_camera_buffers);
+        });
     }
+}
+
+pub fn camera_bundle(camera: Camera3d) -> impl cecs::bundle::Bundle {
+    (camera, CameraUniform::default(), ViewFrustum::default())
 }

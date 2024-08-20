@@ -1,23 +1,24 @@
 pub mod sprite_renderer;
 pub mod texture;
 
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
-use cecs::prelude::*;
+use cecs::{
+    prelude::*,
+    query::{filters::Filter, QueryFragment},
+    Component,
+};
 use tracing::debug;
 use wgpu::{Backends, InstanceFlags, StoreOp};
 use winit::{dpi::PhysicalSize, window::Window};
 
+pub use crate::camera::camera_bundle;
 use crate::{
-    camera::{Camera3d, CameraBuffer, CameraPlugin, CameraUniform, ViewFrustum},
-    Plugin,
+    camera::{CameraBuffer, CameraPlugin, CameraUniform},
+    ExtractionTick, GameWorld, Plugin,
 };
 
 use self::sprite_renderer::SpriteRendererPlugin;
-
-pub fn camera_bundle(camera: Camera3d) -> impl cecs::bundle::Bundle {
-    (camera, CameraUniform::default(), ViewFrustum::default())
-}
 
 pub struct GraphicsState {
     pub clear_color: wgpu::Color,
@@ -31,6 +32,12 @@ pub struct GraphicsState {
     camera_bind_group_layout: wgpu::BindGroupLayout,
 
     depth_texture: texture::Texture,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WindowSize {
+    pub width: u32,
+    pub height: u32,
 }
 
 impl GraphicsState {
@@ -248,8 +255,12 @@ pub struct RendererPlugin;
 
 impl Plugin for RendererPlugin {
     fn build(self, app: &mut crate::App) {
-        app.with_stage(crate::Stage::Render, |s| {
+        app.render_app_mut().with_stage(crate::Stage::Render, |s| {
             s.add_system(render_system);
+        });
+        app.insert_resource(WindowSize {
+            width: 0,
+            height: 0,
         });
         app.add_plugin(CameraPlugin);
         app.add_plugin(SpriteRendererPlugin);
@@ -271,50 +282,113 @@ fn render_system(
     cmd.insert_resource(result);
 }
 
-fn texture_bind_group_layout(device: &wgpu::Device, label: &str) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    multisampled: false,
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                // This should match the filterable field of the
-                // corresponding Texture entry above.
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                count: None,
-            },
-        ],
-        label: Some(label),
-    })
+pub trait Extract: Component {
+    type QueryItem: QueryFragment + 'static;
+    type Filter: Filter + 'static;
+    type Out: Bundle;
+
+    fn extract<'a>(it: <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out>;
 }
 
-fn texture_to_bindings(
-    device: &wgpu::Device,
-    texture: &texture::Texture,
-) -> (wgpu::BindGroupLayout, wgpu::BindGroup) {
-    let texture_bind_group_layout = texture_bind_group_layout(device, "texture_bind_group_layout");
-    let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &texture_bind_group_layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&texture.view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::Sampler(&texture.sampler),
-            },
-        ],
-        label: Some("diffuse_bind_group"),
-    });
-    (texture_bind_group_layout, diffuse_bind_group)
+fn extractor_system<T: Extract>(
+    mut cmd: Commands,
+    game_world: Res<GameWorld>,
+    tick: Res<ExtractionTick>,
+) where
+    Query<'static, (EntityId, T::QueryItem), T::Filter>: cecs::query::WorldQuery<'static>,
+{
+    game_world
+        .world()
+        .run_view_system(|q: Query<(EntityId, T::QueryItem), T::Filter>| {
+            for (id, q) in q.iter() {
+                if let Some(out) = <T as Extract>::extract(q) {
+                    cmd.insert_id(id).insert(*tick).insert_bundle(out);
+                }
+            }
+        });
+}
+
+fn gc_system<T: Extract>(
+    mut cmd: Commands,
+    q: Query<(EntityId, &ExtractionTick)>,
+    tick: Res<ExtractionTick>,
+) {
+    for (id, t) in q.iter() {
+        if t != &*tick {
+            cmd.delete(id);
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct ExtractionPlugin<T> {
+    _m: PhantomData<T>,
+}
+
+impl<T> Plugin for ExtractionPlugin<T>
+where
+    T: Extract,
+{
+    fn build(self, app: &mut crate::App) {
+        app.add_extract_system(extractor_system::<T>);
+        app.render_app_mut().with_stage(crate::Stage::Update, |s| {
+            s.add_system(gc_system::<T>);
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ptr::NonNull;
+
+    use super::*;
+
+    struct TestRenderComponent {
+        pub i: i32,
+        pub j: u32,
+    }
+
+    impl Extract for TestRenderComponent {
+        type QueryItem = (&'static i32, &'static u32);
+
+        type Filter = ();
+
+        type Out = (Self,);
+
+        fn extract<'a>((i, j): <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out> {
+            Some((Self { i: *i, j: *j },))
+        }
+    }
+
+    #[test]
+    fn test_extract_basic() {
+        let mut game_world = World::new(4);
+        game_world
+            .run_system(|mut cmd: Commands| {
+                cmd.spawn().insert_bundle((42i32, 32u32));
+            })
+            .unwrap();
+
+        let mut render_world = World::new(4);
+        render_world.insert_resource(GameWorld {
+            world: NonNull::new(&mut game_world).unwrap(),
+        });
+
+        // inserts should be idempotent
+        for _ in 0..5 {
+            render_world
+                .run_system(extractor_system::<TestRenderComponent>)
+                .unwrap();
+        }
+
+        render_world.run_view_system(|q: Query<&TestRenderComponent>| {
+            let mut n = 0;
+            for i in q.iter() {
+                assert_eq!(i.i, 42);
+                assert_eq!(i.j, 32);
+                n += 1
+            }
+            assert_eq!(n, 1);
+        });
+    }
 }

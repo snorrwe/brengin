@@ -1,3 +1,4 @@
+use image::DynamicImage;
 use std::collections::{BTreeMap, HashMap};
 
 use cecs::prelude::*;
@@ -5,13 +6,16 @@ use glam::Vec2;
 use wgpu::{include_wgsl, util::DeviceExt};
 
 use crate::{
-    assets::{AssetId, Assets, Handle},
+    assets::{AssetId, Assets, AssetsPlugin, Handle, WeakHandle},
     camera::ViewFrustum,
     transform::GlobalTransform,
-    Plugin,
+    GameWorld, Plugin, Stage,
 };
 
-use super::{texture::Texture, GraphicsState, Vertex};
+use super::{
+    texture::{self, Texture},
+    Extract, ExtractionPlugin, GraphicsState, Vertex,
+};
 
 pub fn sprite_sheet_bundle(
     handle: Handle<SpriteSheet>,
@@ -92,19 +96,19 @@ pub struct SpriteSheet {
     pub box_size: Vec2,
     /// Number of boxes in a row
     pub num_cols: u32,
-    pub texture: Texture,
+    pub image: DynamicImage,
     /// Size of the entire sheet
     pub size: Vec2,
 }
 
 impl SpriteSheet {
-    pub fn from_texture(padding: Vec2, box_size: Vec2, num_cols: u32, texture: Texture) -> Self {
+    pub fn from_image(padding: Vec2, box_size: Vec2, num_cols: u32, image: DynamicImage) -> Self {
         Self {
             padding,
             box_size,
             num_cols,
-            size: Vec2::new(texture.size.0 as f32, texture.size.1 as f32),
-            texture,
+            size: Vec2::new(image.width() as f32, image.height() as f32),
+            image,
         }
     }
 
@@ -127,30 +131,35 @@ pub struct SpriteInstance {
 
 pub fn add_missing_sheets(
     mut pipeline: ResMut<SpritePipeline>,
-    sheets: Res<crate::assets::Assets<SpriteSheet>>,
     renderer: Res<GraphicsState>,
+    game_world: Res<GameWorld>,
 ) {
-    for (id, sheet) in sheets.iter() {
-        if !pipeline.sheets.contains_key(&id) {
-            pipeline.add_sheet(id, sheet, &renderer);
-        }
-    }
+    game_world
+        .world()
+        .run_view_system(|sheets: Res<crate::assets::Assets<SpriteSheet>>| {
+            for (id, sheet) in sheets.iter() {
+                if !pipeline.sheets.contains_key(&id) {
+                    pipeline.add_sheet(id, sheet, &renderer);
+                }
+            }
+        });
 }
 
 fn unload_sheets(
+    mut handles: ResMut<RenderSpritesheetHandles>,
     mut pipeline: ResMut<SpritePipeline>,
-    sheets: Res<crate::assets::Assets<SpriteSheet>>,
     mut instances: ResMut<SpritePipelineInstances>,
 ) {
-    let unloaded = pipeline
-        .sheets
-        .keys()
-        .filter(|id| !sheets.contains(**id))
-        .copied()
+    let unloaded = handles
+        .0
+        .iter()
+        .filter(|(_, h)| h.upgrade().is_none())
+        .map(|(id, _)| *id)
         .collect::<Vec<_>>();
     for id in unloaded {
         pipeline.unload_sheet(id);
         instances.0.remove(&id);
+        handles.0.remove(&id);
     }
 }
 
@@ -182,9 +191,23 @@ fn clear_pipeline_instances(mut instances: ResMut<SpritePipelineInstances>) {
     }
 }
 
+impl Extract for SpriteInstanceRaw {
+    type QueryItem = (&'static Handle<SpriteSheet>, &'static SpriteInstanceRaw);
+
+    type Filter = With<Visible>;
+
+    type Out = (WeakHandle<SpriteSheet>, SpriteInstanceRaw, Visible);
+
+    fn extract<'a>(
+        (handle, instance): <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
+    ) -> Option<Self::Out> {
+        Some((handle.downgrade(), *instance, Visible))
+    }
+}
+
 fn update_sprite_pipelines(
     renderer: Res<GraphicsState>,
-    q: Query<(&Handle<SpriteSheet>, &SpriteInstanceRaw), With<Visible>>,
+    q: Query<(&WeakHandle<SpriteSheet>, &SpriteInstanceRaw)>,
     mut pipeline: ResMut<SpritePipeline>,
     mut instances: ResMut<SpritePipelineInstances>,
 ) {
@@ -193,7 +216,9 @@ fn update_sprite_pipelines(
     }
 
     for (id, cpu) in instances.0.iter() {
-        let sprite_rendering_data = pipeline.sheets.get_mut(&id).unwrap();
+        let Some(sprite_rendering_data) = pipeline.sheets.get_mut(&id) else {
+            continue;
+        };
 
         let instance_data_bytes = bytemuck::cast_slice::<_, u8>(&cpu);
         let size = instance_data_bytes.len() as u64;
@@ -216,12 +241,16 @@ fn update_sprite_pipelines(
     }
 }
 
+#[derive(Default)]
+struct RenderSpritesheetHandles(pub HashMap<AssetId, WeakHandle<SpriteSheet>>);
+
+// per spritesheet
 pub struct SpriteRenderingData {
-    // per spritesheet
-    count: usize,
-    instance_gpu: wgpu::Buffer,
-    spritesheet_gpu: wgpu::BindGroup,
-    spritesheet_bind_group: wgpu::BindGroup,
+    pub count: usize,
+    pub instance_gpu: wgpu::Buffer,
+    pub spritesheet_gpu: wgpu::BindGroup,
+    pub spritesheet_bind_group: wgpu::BindGroup,
+    pub texture: Texture,
 }
 
 pub struct SpritePipeline {
@@ -250,8 +279,10 @@ impl SpritePipeline {
     }
 
     pub fn add_sheet(&mut self, id: AssetId, sheet: &SpriteSheet, renderer: &GraphicsState) {
-        let (_, spritesheet_bind_group) =
-            super::texture_to_bindings(&renderer.device, &sheet.texture);
+        let texture = Texture::from_image(renderer.device(), renderer.queue(), &sheet.image, None)
+            .expect("Failed to create texture");
+
+        let (_, spritesheet_bind_group) = texture_to_bindings(&renderer.device, &texture);
         let sheet_gpu = sheet.extract();
 
         let spritesheet_buffer =
@@ -286,6 +317,7 @@ impl SpritePipeline {
                 }),
                 spritesheet_gpu,
                 spritesheet_bind_group,
+                texture,
             },
         );
     }
@@ -312,7 +344,7 @@ impl SpritePipeline {
             .create_shader_module(include_wgsl!("sprite-shader.wgsl"));
 
         let texture_bind_group_layout =
-            super::texture_bind_group_layout(&renderer.device, "sprite-texture-layout");
+            texture_bind_group_layout(&renderer.device, "sprite-texture-layout");
 
         let render_pipeline_layout =
             renderer
@@ -511,24 +543,77 @@ pub struct SpriteRendererPlugin;
 
 impl Plugin for SpriteRendererPlugin {
     fn build(self, app: &mut crate::App) {
-        // putting this system in update means that the last frame's data is presented
-        app.with_stage(crate::Stage::Update, |s| {
-            s.add_system(add_missing_sheets)
-                .add_system(compute_sprite_instances)
-                .add_system(
-                    update_sprite_pipelines
-                        .after(compute_sprite_instances)
-                        .after(add_missing_sheets),
-                )
-                .add_system(unload_sheets)
+        app.add_plugin(AssetsPlugin::<SpriteSheet>::default());
+        app.add_plugin(ExtractionPlugin::<SpriteInstanceRaw>::default());
+        app.with_stage(Stage::Update, |s| {
+            // putting this system in update means that the last frame's data will be presented
+            s.add_system(compute_sprite_instances)
                 .add_system(insert_missing_cull)
                 .add_system(update_visible)
                 .add_system(update_invisible);
-        })
-        .with_stage(crate::Stage::PreUpdate, |s| {
-            s.add_system(clear_pipeline_instances);
         });
-        app.add_startup_system(setup);
-        app.insert_resource(SpritePipelineInstances::default())
+
+        app.extact_stage.add_system(add_missing_sheets);
+
+        if let Some(ref mut app) = app.render_app {
+            app.add_startup_system(setup);
+            app.insert_resource(SpritePipelineInstances::default());
+            app.insert_resource(RenderSpritesheetHandles::default());
+            app.with_stage(Stage::PreUpdate, |s| {
+                s.add_system(clear_pipeline_instances);
+            });
+            app.with_stage(Stage::Update, |s| {
+                s.add_system(unload_sheets)
+                    .add_system(update_sprite_pipelines);
+            });
+        }
     }
+}
+
+fn texture_bind_group_layout(device: &wgpu::Device, label: &str) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                // This should match the filterable field of the
+                // corresponding Texture entry above.
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+        label: Some(label),
+    })
+}
+
+fn texture_to_bindings(
+    device: &wgpu::Device,
+    texture: &texture::Texture,
+) -> (wgpu::BindGroupLayout, wgpu::BindGroup) {
+    let texture_bind_group_layout = texture_bind_group_layout(device, "texture_bind_group_layout");
+    let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &texture_bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&texture.view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(&texture.sampler),
+            },
+        ],
+        label: Some("diffuse_bind_group"),
+    });
+    (texture_bind_group_layout, diffuse_bind_group)
 }

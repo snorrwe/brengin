@@ -13,6 +13,7 @@ use anyhow::Context;
 pub use cecs;
 pub use glam;
 pub use image;
+use instant::Instant;
 pub use wgpu;
 pub use winit;
 
@@ -23,10 +24,18 @@ use winit::{
     window::{Theme, WindowAttributes},
 };
 
-use std::{any::TypeId, collections::HashSet, sync::Arc};
+use std::{
+    any::TypeId,
+    collections::HashSet,
+    panic,
+    ptr::NonNull,
+    sync::{atomic::AtomicBool, Arc, Mutex},
+    thread::JoinHandle,
+    time::Duration,
+};
 use transform::TransformPlugin;
 
-use renderer::{GraphicsState, RenderResult, RendererPlugin};
+use renderer::{GraphicsState, RenderResult, RendererPlugin, WindowSize};
 
 use winit::event_loop::EventLoop;
 
@@ -46,6 +55,22 @@ pub struct Timer {
     elapsed: std::time::Duration,
     repeat: bool,
     just_finished: bool,
+}
+
+pub struct GameWorld {
+    world: NonNull<World>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExtractionTick(pub u32);
+
+unsafe impl Send for GameWorld {}
+unsafe impl Sync for GameWorld {}
+
+impl GameWorld {
+    pub fn world(&self) -> &World {
+        unsafe { self.world.as_ref() }
+    }
 }
 
 impl Timer {
@@ -97,6 +122,9 @@ pub struct App {
     stages: std::collections::BTreeMap<Stage, SystemStage<'static>>,
     startup_systems: SystemStage<'static>,
     plugins: HashSet<TypeId>,
+
+    extact_stage: SystemStage<'static>,
+    pub render_app: Option<Box<App>>,
 }
 
 /// The main reason behind requiring types instead of just functions is that a plugin may only be
@@ -121,14 +149,9 @@ impl std::ops::DerefMut for App {
 
 impl Default for App {
     fn default() -> Self {
-        let mut world = World::new(1024);
-        world.insert_resource(WindowDescriptor::default());
-        Self {
-            world,
-            stages: Default::default(),
-            startup_systems: SystemStage::new("startup"),
-            plugins: Default::default(),
-        }
+        let mut app = App::empty();
+        app.render_app = Some(Box::new(App::empty()));
+        app
     }
 }
 
@@ -136,7 +159,14 @@ pub struct Window(pub Arc<winit::window::Window>);
 
 enum RunningApp {
     Pending(App),
-    Initialized(World),
+    Initialized {
+        render_world: World,
+        render_extract: SystemStage<'static>,
+        game_world: Arc<Mutex<World>>,
+        game_thread: JoinHandle<()>,
+        enabled: Arc<AtomicBool>,
+    },
+    Terminated,
 }
 
 impl RunningApp {
@@ -151,8 +181,41 @@ impl RunningApp {
     fn world_mut(&mut self) -> &mut World {
         match self {
             RunningApp::Pending(app) => &mut app.world,
-            RunningApp::Initialized(w) => w,
+            RunningApp::Initialized { render_world, .. } => render_world,
+            RunningApp::Terminated => unreachable!(),
         }
+    }
+}
+
+fn game_thread(game_world: Arc<Mutex<World>>, enabled: Arc<AtomicBool>) {
+    // TODO: take from resource
+    let target_frame_latency: Duration = Duration::from_millis(15);
+    // reset Time so the first DT isn't outragous
+    game_world
+        .lock()
+        .unwrap()
+        .insert_resource(Time(instant::Instant::now()));
+    // TODO: should_run flag to terminate the loop at shutdown
+    if let Err(err) = panic::catch_unwind(|| {
+        while enabled.load(std::sync::atomic::Ordering::Relaxed) {
+            let start = Instant::now();
+
+            let mut game_world = game_world.lock().unwrap();
+            game_world.tick();
+            drop(game_world);
+
+            let end = Instant::now();
+            let frame_duration = end - start;
+            let sleep = if frame_duration < target_frame_latency {
+                target_frame_latency - frame_duration
+            } else {
+                // leave time for the render thread to extract even if we're behind schedule
+                Duration::from_micros(500)
+            };
+            std::thread::sleep(sleep);
+        }
+    }) {
+        tracing::error!(?err, "Game thread paniced!")
     }
 }
 
@@ -171,14 +234,33 @@ impl ApplicationHandler for RunningApp {
         // do not block here
         let graphics_state = pollster::block_on(GraphicsState::new(Arc::clone(&window)));
 
-        app.world
+        app.render_app_mut()
+            .world
             .run_system(|mut cmd: Commands| {
                 cmd.spawn().insert(Window(Arc::clone(&window)));
                 cmd.insert_resource(graphics_state);
             })
             .unwrap();
 
-        *self = RunningApp::Initialized(std::mem::take(app).build());
+        let InitializedWorlds {
+            game_world,
+            render_world,
+            render_extract,
+        } = std::mem::take(app).build();
+        let game_world = Arc::new(Mutex::new(game_world));
+        let enabled = Arc::new(AtomicBool::new(true));
+        let game_thread = std::thread::spawn({
+            let game_world = Arc::clone(&game_world);
+            let enabled = Arc::clone(&enabled);
+            move || game_thread(game_world, enabled)
+        });
+        *self = RunningApp::Initialized {
+            render_world,
+            game_world,
+            game_thread,
+            render_extract,
+            enabled,
+        };
     }
 
     fn window_event(
@@ -188,9 +270,15 @@ impl ApplicationHandler for RunningApp {
         event: WindowEvent,
     ) {
         tracing::trace!(?event, "Event received");
-        let world = match self {
-            RunningApp::Pending(_) => return,
-            RunningApp::Initialized(w) => w,
+        let RunningApp::Initialized {
+            render_world,
+            game_world,
+            render_extract,
+            enabled,
+            ..
+        } = self
+        else {
+            return;
         };
         match event {
             #[cfg(not(target_family = "wasm"))]
@@ -204,27 +292,60 @@ impl ApplicationHandler for RunningApp {
                     },
                 ..
             } => {
+                enabled.store(false, std::sync::atomic::Ordering::Relaxed);
+                if let RunningApp::Initialized { game_thread, .. } =
+                    std::mem::replace(self, RunningApp::Terminated)
+                {
+                    game_thread.join().expect("Failed to join game thread");
+                }
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
-                world
+                let w = Arc::clone(game_world);
+                render_world
                     .run_system(move |mut state: ResMut<GraphicsState>| {
+                        let mut w = w.lock().unwrap();
+                        w.insert_resource(WindowSize {
+                            width: size.width,
+                            height: size.height,
+                        });
+
                         state.resize(size);
                     })
                     .unwrap();
             }
 
             WindowEvent::KeyboardInput { event, .. } => {
-                world
+                game_world
+                    .lock()
+                    .unwrap()
                     .get_resource_mut::<KeyBoardInputs>()
                     .unwrap()
                     .next
                     .push(event.clone());
             }
             WindowEvent::RedrawRequested => {
-                world.tick();
+                {
+                    // extraction
+                    let mut gw = game_world.lock().unwrap();
+                    render_world.insert_resource(GameWorld {
+                        world: NonNull::from(&mut *gw),
+                    });
+                    render_world
+                        .run_system(|mut cmd: Commands, tick: Option<ResMut<ExtractionTick>>| {
+                            match tick {
+                                Some(mut t) => t.0 += 1,
+                                None => cmd.insert_resource(ExtractionTick(0)),
+                            }
+                        })
+                        .unwrap();
+                    render_world.run_stage(render_extract.clone()).unwrap();
+                    render_world.remove_resource::<GameWorld>();
+                }
 
-                let result = world.get_resource::<RenderResult>();
+                render_world.tick();
+
+                let result = render_world.get_resource::<RenderResult>();
                 if let Some(result) = result {
                     match result {
                         Ok(_) => {}
@@ -245,6 +366,9 @@ impl ApplicationHandler for RunningApp {
     }
 
     fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        if let RunningApp::Terminated = self {
+            return;
+        }
         self.world_mut()
             .run_system(|q: Query<&Window>| {
                 for Window(window) in q.iter() {
@@ -256,6 +380,27 @@ impl ApplicationHandler for RunningApp {
 }
 
 impl App {
+    pub fn render_app(&self) -> &App {
+        self.render_app.as_ref().unwrap()
+    }
+
+    pub fn render_app_mut(&mut self) -> &mut App {
+        self.render_app.as_mut().unwrap()
+    }
+
+    fn empty() -> Self {
+        let mut world = World::new(1024);
+        world.insert_resource(WindowDescriptor::default());
+        Self {
+            world,
+            stages: Default::default(),
+            startup_systems: SystemStage::new("startup"),
+            extact_stage: SystemStage::new("extract"),
+            plugins: Default::default(),
+            render_app: None,
+        }
+    }
+
     pub fn add_plugin<T: Plugin + 'static>(&mut self, plugin: T) -> &mut Self {
         let id = TypeId::of::<T>();
         assert!(
@@ -292,6 +437,14 @@ impl App {
         self
     }
 
+    pub fn add_extract_system<P>(
+        &mut self,
+        sys: impl cecs::systems::IntoSystem<'static, P, ()>,
+    ) -> &mut Self {
+        self.extact_stage.add_system(sys);
+        self
+    }
+
     pub async fn run(mut self) -> anyhow::Result<()> {
         let event_loop = EventLoop::new().context("Failed to initialize EventLoop")?;
 
@@ -310,15 +463,40 @@ impl App {
         Ok(())
     }
 
-    fn build(self) -> World {
+    fn _build(self) -> World {
         let mut world = self.world;
-        for (_, stage) in self.stages {
+        for (_, stage) in self
+            .stages
+            .into_iter()
+            .filter(|(_, stage)| !stage.is_empty())
+        {
             world.add_stage(stage);
         }
         world.run_stage(self.startup_systems).unwrap();
         world.vacuum();
         world
     }
+
+    fn build(mut self) -> InitializedWorlds {
+        let rw = self
+            .render_app
+            .take()
+            .map(|a| a._build())
+            .unwrap_or_else(|| World::new(4));
+        let render_extract = std::mem::replace(&mut self.extact_stage, SystemStage::new("nil"));
+        let w = self._build();
+        InitializedWorlds {
+            game_world: w,
+            render_world: rw,
+            render_extract,
+        }
+    }
+}
+
+struct InitializedWorlds {
+    pub game_world: World,
+    pub render_world: World,
+    pub render_extract: SystemStage<'static>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -383,7 +561,6 @@ impl Plugin for DefaultPlugins {
             s.add_system(update_time).add_system(update_inputs);
         });
 
-        app.add_plugin(assets::AssetsPlugin::<renderer::sprite_renderer::SpriteSheet>::default());
         app.add_plugin(TransformPlugin);
         app.add_plugin(RendererPlugin);
 

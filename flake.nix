@@ -2,7 +2,7 @@
   description = "brengin devshell";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/master";
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
@@ -20,7 +20,12 @@
           xorg.libXi
           xorg.libXrandr
           libxkbcommon
+          libGL
+          udev
+
           vulkan-loader
+          vulkan-extension-layer
+          vulkan-validation-layers # don't need them *strictly* but immensely helpful
         ];
       in
       with pkgs;
@@ -31,6 +36,7 @@
             # rust deps
             mold
             llvmPackages_latest.clang
+            llvmPackages_latest.lldb
             stdenv
             (rust-bin.nightly.latest.default.override {
               extensions = [ "rust-src" "rust-analyzer" "rustfmt" ];
@@ -47,6 +53,7 @@
             # tools
             cargo-nextest
             cargo-edit
+            cargo-flamegraph
             just
             renderdoc
           ];
