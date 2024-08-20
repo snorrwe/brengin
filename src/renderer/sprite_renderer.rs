@@ -9,7 +9,7 @@ use crate::{
     assets::{AssetId, Assets, Handle},
     camera::ViewFrustum,
     transform::GlobalTransform,
-    Plugin,
+    GameWorld, Plugin,
 };
 
 use super::{
@@ -131,14 +131,18 @@ pub struct SpriteInstance {
 
 pub fn add_missing_sheets(
     mut pipeline: ResMut<SpritePipeline>,
-    sheets: Res<crate::assets::Assets<SpriteSheet>>,
     renderer: Res<GraphicsState>,
+    game_world: Res<GameWorld>,
 ) {
-    for (id, sheet) in sheets.iter() {
-        if !pipeline.sheets.contains_key(&id) {
-            pipeline.add_sheet(id, sheet, &renderer);
-        }
-    }
+    game_world
+        .world()
+        .run_view_system(|sheets: Res<crate::assets::Assets<SpriteSheet>>| {
+            for (id, sheet) in sheets.iter() {
+                if !pipeline.sheets.contains_key(&id) {
+                    pipeline.add_sheet(id, sheet, &renderer);
+                }
+            }
+        });
 }
 
 fn unload_sheets(
@@ -528,6 +532,8 @@ impl Plugin for SpriteRendererPlugin {
                 .add_system(update_invisible);
         });
 
+        app.extact_stage.add_system(add_missing_sheets);
+
         if let Some(ref mut app) = app.render_app {
             app.with_stage(crate::Stage::PreUpdate, |s| {
                 s.add_system(clear_pipeline_instances);
@@ -535,8 +541,7 @@ impl Plugin for SpriteRendererPlugin {
             app.add_startup_system(setup);
             app.insert_resource(SpritePipelineInstances::default());
             app.with_stage(crate::Stage::Update, |s| {
-                s.add_system(add_missing_sheets)
-                    .add_system(unload_sheets)
+                s.add_system(unload_sheets)
                     .add_system(update_sprite_pipelines);
             });
         }
