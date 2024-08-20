@@ -29,7 +29,7 @@ use std::{
     collections::HashSet,
     panic,
     ptr::NonNull,
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc, Mutex},
     thread::JoinHandle,
     time::Duration,
 };
@@ -164,7 +164,9 @@ enum RunningApp {
         render_extract: SystemStage<'static>,
         game_world: Arc<Mutex<World>>,
         game_thread: JoinHandle<()>,
+        enabled: Arc<AtomicBool>,
     },
+    Terminated,
 }
 
 impl RunningApp {
@@ -180,11 +182,12 @@ impl RunningApp {
         match self {
             RunningApp::Pending(app) => &mut app.world,
             RunningApp::Initialized { render_world, .. } => render_world,
+            RunningApp::Terminated => unreachable!(),
         }
     }
 }
 
-fn game_thread(game_world: Arc<Mutex<World>>) {
+fn game_thread(game_world: Arc<Mutex<World>>, enabled: Arc<AtomicBool>) {
     // TODO: take from resource
     let target_frame_latency: Duration = Duration::from_millis(15);
     // reset Time so the first DT isn't outragous
@@ -193,22 +196,24 @@ fn game_thread(game_world: Arc<Mutex<World>>) {
         .unwrap()
         .insert_resource(Time(instant::Instant::now()));
     // TODO: should_run flag to terminate the loop at shutdown
-    if let Err(err) = panic::catch_unwind(|| loop {
-        let start = Instant::now();
+    if let Err(err) = panic::catch_unwind(|| {
+        while enabled.load(std::sync::atomic::Ordering::Relaxed) {
+            let start = Instant::now();
 
-        let mut game_world = game_world.lock().unwrap();
-        game_world.tick();
-        drop(game_world);
+            let mut game_world = game_world.lock().unwrap();
+            game_world.tick();
+            drop(game_world);
 
-        let end = Instant::now();
-        let frame_duration = end - start;
-        let sleep = if frame_duration < target_frame_latency {
-            target_frame_latency - frame_duration
-        } else {
-            // leave time for the render thread to extract even if we're behind schedule
-            Duration::from_micros(500)
-        };
-        std::thread::sleep(sleep);
+            let end = Instant::now();
+            let frame_duration = end - start;
+            let sleep = if frame_duration < target_frame_latency {
+                target_frame_latency - frame_duration
+            } else {
+                // leave time for the render thread to extract even if we're behind schedule
+                Duration::from_micros(500)
+            };
+            std::thread::sleep(sleep);
+        }
     }) {
         tracing::error!(?err, "Game thread paniced!")
     }
@@ -243,15 +248,18 @@ impl ApplicationHandler for RunningApp {
             render_extract,
         } = std::mem::take(app).build();
         let game_world = Arc::new(Mutex::new(game_world));
+        let enabled = Arc::new(AtomicBool::new(true));
         let game_thread = std::thread::spawn({
             let game_world = Arc::clone(&game_world);
-            move || game_thread(game_world)
+            let enabled = Arc::clone(&enabled);
+            move || game_thread(game_world, enabled)
         });
         *self = RunningApp::Initialized {
             render_world,
             game_world,
             game_thread,
             render_extract,
+            enabled,
         };
     }
 
@@ -266,6 +274,7 @@ impl ApplicationHandler for RunningApp {
             render_world,
             game_world,
             render_extract,
+            enabled,
             ..
         } = self
         else {
@@ -283,6 +292,12 @@ impl ApplicationHandler for RunningApp {
                     },
                 ..
             } => {
+                enabled.store(false, std::sync::atomic::Ordering::Relaxed);
+                if let RunningApp::Initialized { game_thread, .. } =
+                    std::mem::replace(self, RunningApp::Terminated)
+                {
+                    game_thread.join().expect("Failed to join game thread");
+                }
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
@@ -350,6 +365,9 @@ impl ApplicationHandler for RunningApp {
     }
 
     fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        if let RunningApp::Terminated = self {
+            return;
+        }
         self.world_mut()
             .run_system(|q: Query<&Window>| {
                 for Window(window) in q.iter() {
