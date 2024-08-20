@@ -36,6 +36,7 @@
             # rust deps
             mold
             llvmPackages_latest.clang
+            llvmPackages_latest.lldb
             stdenv
             (rust-bin.nightly.latest.default.override {
               extensions = [ "rust-src" "rust-analyzer" "rustfmt" ];
