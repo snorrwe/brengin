@@ -185,6 +185,18 @@ impl RunningApp {
             RunningApp::Terminated => unreachable!(),
         }
     }
+
+    fn stop(&mut self) {
+        if let RunningApp::Initialized {
+            game_thread,
+            enabled,
+            ..
+        } = std::mem::replace(self, RunningApp::Terminated)
+        {
+            enabled.store(false, std::sync::atomic::Ordering::Relaxed);
+            game_thread.join().expect("Failed to join game thread");
+        }
+    }
 }
 
 fn game_thread(game_world: Arc<Mutex<World>>, enabled: Arc<AtomicBool>) {
@@ -274,7 +286,6 @@ impl ApplicationHandler for RunningApp {
             render_world,
             game_world,
             render_extract,
-            enabled,
             ..
         } = self
         else {
@@ -292,12 +303,7 @@ impl ApplicationHandler for RunningApp {
                     },
                 ..
             } => {
-                enabled.store(false, std::sync::atomic::Ordering::Relaxed);
-                if let RunningApp::Initialized { game_thread, .. } =
-                    std::mem::replace(self, RunningApp::Terminated)
-                {
-                    game_thread.join().expect("Failed to join game thread");
-                }
+                self.stop();
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
@@ -355,6 +361,7 @@ impl ApplicationHandler for RunningApp {
                         // The system is out of memory, we should probably quit
                         Err(wgpu::SurfaceError::OutOfMemory) => {
                             error!("gpu out of memory");
+                            self.stop();
                             event_loop.exit();
                         }
                         // All other errors (Outdated, Timeout) should be resolved by the next frame
