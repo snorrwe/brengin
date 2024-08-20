@@ -1,9 +1,13 @@
 pub mod sprite_renderer;
 pub mod texture;
 
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
-use cecs::{prelude::*, query::QueryFragment};
+use cecs::{
+    prelude::*,
+    query::{filters::Filter, QueryFragment},
+    Component,
+};
 use tracing::debug;
 use wgpu::{Backends, InstanceFlags, StoreOp};
 use winit::{dpi::PhysicalSize, window::Window};
@@ -281,9 +285,9 @@ fn render_system(
     cmd.insert_resource(result);
 }
 
-pub trait Extract: Sized {
-    type QueryItem: QueryFragment;
-    type Filter;
+pub trait Extract: Component {
+    type QueryItem: QueryFragment + 'static;
+    type Filter: Filter + 'static;
     type Out: Bundle;
 
     fn extract<'a>(it: <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out>;
@@ -292,8 +296,6 @@ pub trait Extract: Sized {
 fn extractor_system<T: Extract>(mut cmd: Commands, game_world: Res<GameWorld>)
 where
     Query<'static, (EntityId, T::QueryItem), T::Filter>: cecs::query::WorldQuery<'static>,
-    <T as Extract>::QueryItem: 'static + cecs::query::QueryFragment,
-    <T as Extract>::Filter: 'static + cecs::query::filters::Filter,
 {
     game_world
         .world()
@@ -304,6 +306,19 @@ where
                 }
             }
         });
+}
+
+pub struct ExtractionPlugin<T> {
+    _m: PhantomData<T>,
+}
+
+impl<T> Plugin for ExtractionPlugin<T>
+where
+    T: Extract,
+{
+    fn build(self, app: &mut crate::App) {
+        app.add_extract_system(extractor_system::<T>);
+    }
 }
 
 #[cfg(test)]

@@ -118,6 +118,7 @@ pub struct App {
     startup_systems: SystemStage<'static>,
     plugins: HashSet<TypeId>,
 
+    extact_stage: SystemStage<'static>,
     pub render_app: Option<Box<App>>,
 }
 
@@ -331,6 +332,7 @@ impl App {
             world,
             stages: Default::default(),
             startup_systems: SystemStage::new("startup"),
+            extact_stage: SystemStage::new("extract"),
             plugins: Default::default(),
             render_app: None,
         }
@@ -369,6 +371,14 @@ impl App {
         sys: impl cecs::systems::IntoSystem<'static, P, ()>,
     ) -> &mut Self {
         self.startup_systems.add_system(sys);
+        self
+    }
+
+    pub fn add_extract_system<P>(
+        &mut self,
+        sys: impl cecs::systems::IntoSystem<'static, P, ()>,
+    ) -> &mut Self {
+        self.extact_stage.add_system(sys);
         self
     }
 
