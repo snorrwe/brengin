@@ -59,6 +59,10 @@ impl<T> WeakHandle<T> {
             });
         }
     }
+
+    pub fn id(&self) -> AssetId {
+        self.id
+    }
 }
 
 unsafe impl<T> Send for Handle<T> {}

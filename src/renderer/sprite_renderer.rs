@@ -6,7 +6,7 @@ use glam::Vec2;
 use wgpu::{include_wgsl, util::DeviceExt};
 
 use crate::{
-    assets::{AssetId, Assets, Handle},
+    assets::{AssetId, Assets, Handle, WeakHandle},
     camera::ViewFrustum,
     transform::GlobalTransform,
     GameWorld, Plugin,
@@ -146,19 +146,20 @@ pub fn add_missing_sheets(
 }
 
 fn unload_sheets(
+    mut handles: ResMut<RenderSpritesheetHandles>,
     mut pipeline: ResMut<SpritePipeline>,
-    sheets: Res<crate::assets::Assets<SpriteSheet>>,
     mut instances: ResMut<SpritePipelineInstances>,
 ) {
-    let unloaded = pipeline
-        .sheets
-        .keys()
-        .filter(|id| !sheets.contains(**id))
-        .copied()
+    let unloaded = handles
+        .0
+        .iter()
+        .filter(|(_, h)| h.upgrade().is_none())
+        .map(|(id, _)| *id)
         .collect::<Vec<_>>();
     for id in unloaded {
         pipeline.unload_sheet(id);
         instances.0.remove(&id);
+        handles.0.remove(&id);
     }
 }
 
@@ -223,6 +224,8 @@ fn update_sprite_pipelines(
         sprite_rendering_data.count = cpu.len();
     }
 }
+
+struct RenderSpritesheetHandles(pub HashMap<AssetId, WeakHandle<SpriteSheet>>);
 
 pub struct SpriteRenderingData {
     // per spritesheet
