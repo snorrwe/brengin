@@ -548,18 +548,31 @@ fn update_inputs(mut k: ResMut<KeyBoardInputs>) {
     k.update();
 }
 
-pub struct DefaultPlugins;
-
-impl Plugin for DefaultPlugins {
+pub struct InputPlugin;
+impl Plugin for InputPlugin {
     fn build(self, app: &mut App) {
-        // TODO: input plugin, time plugin
-        app.insert_resource(Time(instant::Instant::now()));
-        app.insert_resource(DeltaTime(std::time::Duration::default()));
         app.insert_resource(KeyBoardInputs::default());
 
         app.with_stage(Stage::PreUpdate, |s| {
             s.add_system(update_time).add_system(update_inputs);
         });
+    }
+}
+
+pub struct TimePlugin;
+impl Plugin for TimePlugin {
+    fn build(self, app: &mut App) {
+        app.insert_resource(Time(instant::Instant::now()));
+        app.insert_resource(DeltaTime(std::time::Duration::default()));
+    }
+}
+
+pub struct DefaultPlugins;
+
+impl Plugin for DefaultPlugins {
+    fn build(self, app: &mut App) {
+        app.add_plugin(TimePlugin);
+        app.add_plugin(InputPlugin);
 
         app.add_plugin(TransformPlugin);
         app.add_plugin(RendererPlugin);
