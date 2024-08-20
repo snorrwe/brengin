@@ -402,7 +402,11 @@ impl App {
 
     fn _build(self) -> World {
         let mut world = self.world;
-        for (_, stage) in self.stages {
+        for (_, stage) in self
+            .stages
+            .into_iter()
+            .filter(|(_, stage)| !stage.is_empty())
+        {
             world.add_stage(stage);
         }
         world.run_stage(self.startup_systems).unwrap();
