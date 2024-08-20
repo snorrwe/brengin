@@ -2,7 +2,7 @@ use cecs::prelude::*;
 use glam::{Mat4, Vec3, Vec4};
 
 use crate::{
-    renderer::{GraphicsState, WindowSize},
+    renderer::{ExtractionPlugin, GraphicsState, WindowSize},
     transform::GlobalTransform,
     Plugin, Stage,
 };
@@ -78,6 +78,20 @@ impl CameraUniform {
 fn update_view_projections(mut q: Query<(&GlobalTransform, &Camera3d, &mut CameraUniform)>) {
     for (tr, cam, uni) in q.iter_mut() {
         uni.view_proj = cam.view_projection() * tr.0.inverse().compute_matrix();
+    }
+}
+
+impl crate::renderer::Extract for CameraUniform {
+    type QueryItem = &'static CameraUniform;
+
+    type Filter = ();
+
+    type Out = (Self,);
+
+    fn extract<'a>(
+        it: <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
+    ) -> Option<Self::Out> {
+        Some((*it,))
     }
 }
 
@@ -160,9 +174,16 @@ impl Plugin for CameraPlugin {
             s.add_system(update_view_projections)
                 .add_system(update_frustum.after(update_view_projections));
         });
+
+        app.add_plugin(ExtractionPlugin::<CameraUniform>::default());
+
         app.render_app_mut().with_stage(Stage::Update, |s| {
             s.add_system(insert_missing_camera_buffers)
                 .add_system(update_camera_buffers);
         });
     }
+}
+
+pub fn camera_bundle(camera: Camera3d) -> impl cecs::bundle::Bundle {
+    (camera, CameraUniform::default(), ViewFrustum::default())
 }

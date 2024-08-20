@@ -12,16 +12,13 @@ use tracing::debug;
 use wgpu::{Backends, InstanceFlags, StoreOp};
 use winit::{dpi::PhysicalSize, window::Window};
 
+pub use crate::camera::camera_bundle;
 use crate::{
-    camera::{Camera3d, CameraBuffer, CameraPlugin, CameraUniform, ViewFrustum},
+    camera::{CameraBuffer, CameraPlugin, CameraUniform},
     GameWorld, Plugin,
 };
 
 use self::sprite_renderer::SpriteRendererPlugin;
-
-pub fn camera_bundle(camera: Camera3d) -> impl cecs::bundle::Bundle {
-    (camera, CameraUniform::default(), ViewFrustum::default())
-}
 
 pub struct GraphicsState {
     pub clear_color: wgpu::Color,
@@ -308,6 +305,7 @@ where
         });
 }
 
+#[derive(Default)]
 pub struct ExtractionPlugin<T> {
     _m: PhantomData<T>,
 }
