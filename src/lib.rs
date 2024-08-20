@@ -26,6 +26,7 @@ use winit::{
 use std::{
     any::TypeId,
     collections::HashSet,
+    ptr::NonNull,
     sync::{Arc, Mutex},
     thread::JoinHandle,
     time::Duration,
@@ -52,6 +53,19 @@ pub struct Timer {
     elapsed: std::time::Duration,
     repeat: bool,
     just_finished: bool,
+}
+
+pub struct GameWorld {
+    world: NonNull<World>,
+}
+
+unsafe impl Send for GameWorld {}
+unsafe impl Sync for GameWorld {}
+
+impl GameWorld {
+    pub fn world(&self) -> &World {
+        unsafe { self.world.as_ref() }
+    }
 }
 
 impl Timer {

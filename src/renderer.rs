@@ -3,14 +3,14 @@ pub mod texture;
 
 use std::sync::Arc;
 
-use cecs::prelude::*;
+use cecs::{prelude::*, query::QueryFragment};
 use tracing::debug;
 use wgpu::{Backends, InstanceFlags, StoreOp};
 use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::{
     camera::{Camera3d, CameraBuffer, CameraPlugin, CameraUniform, ViewFrustum},
-    Plugin,
+    GameWorld, Plugin,
 };
 
 use self::sprite_renderer::SpriteRendererPlugin;
@@ -279,4 +279,85 @@ fn render_system(
         state.resize(size);
     }
     cmd.insert_resource(result);
+}
+
+pub trait Extract: Sized {
+    type QueryItem: QueryFragment;
+    type Filter;
+    type Out: Bundle;
+
+    fn extract<'a>(it: <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out>;
+}
+
+fn extractor_system<T: Extract>(mut cmd: Commands, game_world: Res<GameWorld>)
+where
+    Query<'static, (EntityId, T::QueryItem), T::Filter>: cecs::query::WorldQuery<'static>,
+    <T as Extract>::QueryItem: 'static + cecs::query::QueryFragment,
+    <T as Extract>::Filter: 'static + cecs::query::filters::Filter,
+{
+    game_world
+        .world()
+        .run_view_system(|q: Query<(EntityId, T::QueryItem), T::Filter>| {
+            for (id, q) in q.iter() {
+                if let Some(out) = <T as Extract>::extract(q) {
+                    cmd.insert_id(id).insert_bundle(out);
+                }
+            }
+        });
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ptr::NonNull;
+
+    use super::*;
+
+    struct TestRenderComponent {
+        pub i: i32,
+        pub j: u32,
+    }
+
+    impl Extract for TestRenderComponent {
+        type QueryItem = (&'static i32, &'static u32);
+
+        type Filter = ();
+
+        type Out = (Self,);
+
+        fn extract<'a>((i, j): <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out> {
+            Some((Self { i: *i, j: *j },))
+        }
+    }
+
+    #[test]
+    fn test_extract_basic() {
+        let mut game_world = World::new(4);
+        game_world
+            .run_system(|mut cmd: Commands| {
+                cmd.spawn().insert_bundle((42i32, 32u32));
+            })
+            .unwrap();
+
+        let mut render_world = World::new(4);
+        render_world.insert_resource(GameWorld {
+            world: NonNull::new(&mut game_world).unwrap(),
+        });
+
+        // inserts should be idempotent
+        for _ in 0..5 {
+            render_world
+                .run_system(extractor_system::<TestRenderComponent>)
+                .unwrap();
+        }
+
+        render_world.run_view_system(|q: Query<&TestRenderComponent>| {
+            let mut n = 0;
+            for i in q.iter() {
+                assert_eq!(i.i, 42);
+                assert_eq!(i.j, 32);
+                n += 1
+            }
+            assert_eq!(n, 1);
+        });
+    }
 }
