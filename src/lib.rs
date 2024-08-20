@@ -283,14 +283,11 @@ impl ApplicationHandler for RunningApp {
             WindowEvent::Resized(size) => {
                 let w = Arc::clone(game_world);
                 render_world
-                    .run_system(move |mut state: ResMut<GraphicsState>, jb: Res<JobPool>| {
-                        jb.enqueue_future(async move {
-                            // TODO: use a future lock?
-                            let mut w = w.lock().unwrap();
-                            w.insert_resource(WindowSize {
-                                width: size.width,
-                                height: size.height,
-                            });
+                    .run_system(move |mut state: ResMut<GraphicsState>| {
+                        let mut w = w.lock().unwrap();
+                        w.insert_resource(WindowSize {
+                            width: size.width,
+                            height: size.height,
                         });
 
                         state.resize(size);
