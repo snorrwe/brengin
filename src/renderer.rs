@@ -373,6 +373,7 @@ mod tests {
         render_world.insert_resource(GameWorld {
             world: NonNull::new(&mut game_world).unwrap(),
         });
+        render_world.insert_resource(ExtractionTick(0));
 
         // inserts should be idempotent
         for _ in 0..5 {
