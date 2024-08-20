@@ -60,6 +60,9 @@ pub struct GameWorld {
     world: NonNull<World>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExtractionTick(pub u32);
+
 unsafe impl Send for GameWorld {}
 unsafe impl Sync for GameWorld {}
 
@@ -301,6 +304,14 @@ impl ApplicationHandler for RunningApp {
                     render_world.insert_resource(GameWorld {
                         world: NonNull::from(&mut *gw),
                     });
+                    render_world
+                        .run_system(|mut cmd: Commands, tick: Option<ResMut<ExtractionTick>>| {
+                            match tick {
+                                Some(mut t) => t.0 += 1,
+                                None => cmd.insert_resource(ExtractionTick(0)),
+                            }
+                        })
+                        .unwrap();
                     render_world.run_stage(render_extract.clone()).unwrap();
                     render_world.remove_resource::<GameWorld>();
                 }

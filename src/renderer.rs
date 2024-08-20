@@ -15,7 +15,7 @@ use winit::{dpi::PhysicalSize, window::Window};
 pub use crate::camera::camera_bundle;
 use crate::{
     camera::{CameraBuffer, CameraPlugin, CameraUniform},
-    GameWorld, Plugin,
+    ExtractionTick, GameWorld, Plugin,
 };
 
 use self::sprite_renderer::SpriteRendererPlugin;
@@ -290,8 +290,11 @@ pub trait Extract: Component {
     fn extract<'a>(it: <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out>;
 }
 
-fn extractor_system<T: Extract>(mut cmd: Commands, game_world: Res<GameWorld>)
-where
+fn extractor_system<T: Extract>(
+    mut cmd: Commands,
+    game_world: Res<GameWorld>,
+    tick: Res<ExtractionTick>,
+) where
     Query<'static, (EntityId, T::QueryItem), T::Filter>: cecs::query::WorldQuery<'static>,
 {
     game_world
@@ -299,10 +302,22 @@ where
         .run_view_system(|q: Query<(EntityId, T::QueryItem), T::Filter>| {
             for (id, q) in q.iter() {
                 if let Some(out) = <T as Extract>::extract(q) {
-                    cmd.insert_id(id).insert_bundle(out);
+                    cmd.insert_id(id).insert(*tick).insert_bundle(out);
                 }
             }
         });
+}
+
+fn gc_system<T: Extract>(
+    mut cmd: Commands,
+    q: Query<(EntityId, &ExtractionTick)>,
+    tick: Res<ExtractionTick>,
+) {
+    for (id, t) in q.iter() {
+        if t != &*tick {
+            cmd.delete(id);
+        }
+    }
 }
 
 #[derive(Default)]
@@ -316,6 +331,9 @@ where
 {
     fn build(self, app: &mut crate::App) {
         app.add_extract_system(extractor_system::<T>);
+        app.render_app_mut().with_stage(crate::Stage::Update, |s| {
+            s.add_system(gc_system::<T>);
+        });
     }
 }
 
