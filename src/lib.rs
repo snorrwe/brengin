@@ -316,12 +316,13 @@ impl ApplicationHandler for RunningApp {
             }
 
             WindowEvent::KeyboardInput { event, .. } => {
-                // FIXME:
-                // world
-                //     .get_resource_mut::<KeyBoardInputs>()
-                //     .unwrap()
-                //     .next
-                //     .push(event.clone());
+                game_world
+                    .lock()
+                    .unwrap()
+                    .get_resource_mut::<KeyBoardInputs>()
+                    .unwrap()
+                    .next
+                    .push(event.clone());
             }
             WindowEvent::RedrawRequested => {
                 {
