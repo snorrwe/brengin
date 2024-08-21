@@ -2,6 +2,7 @@ struct Camera {
     view_proj: mat4x4<f32>,
     view: mat4x4<f32>,
     proj: mat4x4<f32>,
+    view_inv: mat4x4<f32>,
 }
 
 @group(0) @binding(0)
@@ -28,12 +29,9 @@ struct Vertex {
 }
 
 struct Instance {
-    @location(2) sprite_index: u32,
-    @location(3) model_matrix_0: vec4<f32>,
-    @location(4) model_matrix_1: vec4<f32>,
-    @location(5) model_matrix_2: vec4<f32>,
-    @location(6) model_matrix_3: vec4<f32>,
-    @location(7) flip: u32,
+    @location(2) pos_scale: vec4<f32>,
+    @location(3) sprite_index: u32,
+    @location(4) flip: u32,
 }
 
 struct VertexOutput {
@@ -64,28 +62,29 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
 
-    let model_matrix = mat4x4<f32>(
-        instance.model_matrix_0,
-        instance.model_matrix_1,
-        instance.model_matrix_2,
-        instance.model_matrix_3,
-    );
-
     let row: u32 = instance.sprite_index / sprite_sheet.num_cols;
     let col: u32 = instance.sprite_index - sprite_sheet.num_cols * row;
 
     let offset = sprite_sheet.box_size.xy * vec2<f32>(f32(col), f32(row)) + sprite_sheet.padding;
 
     var uv = model.uv;
-    if (instance.flip != 0u) {
+    if instance.flip != 0u {
         uv.x = 1.0 - uv.x;
     }
     let box_uv = lerp_vec2(vec2(0.0), sprite_sheet.box_size - sprite_sheet.padding * 2.0, uv) + offset;
     let total_uv = inv_lerp_vec2(vec2(0.0), sprite_sheet.image_size, box_uv);
-
-    let pos = camera.view_proj * model_matrix * vec4<f32>(model.pos, 1.0);
-    out.clip_position = pos;
     out.uv = total_uv;
+
+    // billboarding
+    let scale = instance.pos_scale.w;
+    var pos = vec4<f32>(instance.pos_scale.xyz, 1.0);
+    let up: vec4<f32> = camera.view_inv[1];
+    let right: vec4<f32> = camera.view_inv[0];
+
+    pos += right * model.pos.x * scale;
+    pos += up * model.pos.y * scale;
+
+    out.clip_position = camera.view_proj * pos;
     return out;
 }
 

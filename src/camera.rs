@@ -49,6 +49,7 @@ pub struct CameraUniform {
     pub view_proj: Mat4,
     pub view: Mat4,
     pub proj: Mat4,
+    pub view_inv: Mat4,
 }
 
 impl Default for CameraUniform {
@@ -57,6 +58,7 @@ impl Default for CameraUniform {
             view_proj: Mat4::IDENTITY,
             view: Mat4::IDENTITY,
             proj: Mat4::IDENTITY,
+            view_inv: Mat4::IDENTITY,
         }
     }
 }
@@ -66,7 +68,7 @@ impl CameraUniform {
         wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -82,6 +84,7 @@ impl CameraUniform {
 fn update_view_projections(mut q: Query<(&GlobalTransform, &Camera3d, &mut CameraUniform)>) {
     for (tr, cam, uni) in q.iter_mut() {
         uni.view = tr.0.inverse().compute_matrix();
+        uni.view_inv = uni.view.inverse();
         uni.proj = cam.view_projection();
         uni.view_proj = uni.proj * uni.view;
     }
@@ -101,6 +104,14 @@ impl crate::renderer::Extract for CameraUniform {
     }
 }
 
+fn upload_camera_uniform(queue: &wgpu::Queue, buffer: &wgpu::Buffer, uni: &CameraUniform) {
+    queue.write_buffer(
+        &buffer,
+        0,
+        bytemuck::cast_ref::<_, [u8; std::mem::size_of::<CameraUniform>()]>(uni),
+    );
+}
+
 fn insert_missing_camera_buffers(
     renderer: Res<GraphicsState>,
     q_new: Query<(EntityId, &CameraUniform), WithOut<CameraBuffer>>,
@@ -113,9 +124,7 @@ fn insert_missing_camera_buffers(
             size: std::mem::size_of::<CameraUniform>() as u64,
             mapped_at_creation: false,
         });
-        renderer
-            .queue()
-            .write_buffer(&buffer, 0, bytemuck::cast_slice(&[uni.view_proj]));
+        upload_camera_uniform(renderer.queue(), &buffer, uni);
         cmd.entity(id).insert(CameraBuffer(buffer));
     }
 }
@@ -125,9 +134,7 @@ fn update_camera_buffers(
     q: Query<(&CameraUniform, &mut CameraBuffer)>,
 ) {
     for (uni, CameraBuffer(buffer)) in q.iter() {
-        renderer
-            .queue()
-            .write_buffer(buffer, 0, bytemuck::cast_slice(&[uni.view_proj]));
+        upload_camera_uniform(renderer.queue(), &buffer, uni);
     }
 }
 

@@ -174,9 +174,11 @@ fn compute_sprite_instances(
     >,
 ) {
     q.par_for_each_mut(|(tr, i, instance)| {
+        let pos = tr.0.pos;
+        let scale = tr.0.scale;
         *instance = SpriteInstanceRaw {
             index: i.index,
-            model: tr.0.compute_matrix().to_cols_array_2d(),
+            pos_scale: [pos.x, pos.y, pos.z, scale.x],
             flip: i.flip as u32,
         };
     });
@@ -457,8 +459,8 @@ impl SpritePipeline {
 #[repr(C)]
 #[derive(Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct SpriteInstanceRaw {
+    pos_scale: [f32; 4],
     index: u32,
-    model: [[f32; 4]; 4],
     /// bool
     flip: u32,
 }
@@ -474,34 +476,16 @@ impl SpriteInstanceRaw {
                 wgpu::VertexAttribute {
                     offset: 0,
                     shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: ROW_SIZE,
+                    shader_location: 3,
                     format: wgpu::VertexFormat::Uint32,
                 },
                 wgpu::VertexAttribute {
-                    offset: 4,
-                    shader_location: 3,
-                    format: wgpu::VertexFormat::Float32x4,
-                },
-                // A mat4 takes up 4 vertex slots as it is technically 4 vec4s. We need to define a slot
-                // for each vec4. We'll have to reassemble the mat4 in
-                // the shader.
-                wgpu::VertexAttribute {
-                    offset: 4 + ROW_SIZE,
+                    offset: ROW_SIZE + 4,
                     shader_location: 4,
-                    format: wgpu::VertexFormat::Float32x4,
-                },
-                wgpu::VertexAttribute {
-                    offset: 4 + ROW_SIZE * 2,
-                    shader_location: 5,
-                    format: wgpu::VertexFormat::Float32x4,
-                },
-                wgpu::VertexAttribute {
-                    offset: 4 + ROW_SIZE * 3,
-                    shader_location: 6,
-                    format: wgpu::VertexFormat::Float32x4,
-                },
-                wgpu::VertexAttribute {
-                    offset: 4 + ROW_SIZE * 4,
-                    shader_location: 7,
                     format: wgpu::VertexFormat::Uint32,
                 },
             ],
