@@ -240,6 +240,7 @@ dependencies = [
  "image",
  "instant",
  "kira",
+ "parking_lot",
  "pollster",
  "smallvec",
  "tracing",

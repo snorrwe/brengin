@@ -24,12 +24,12 @@ use winit::{
     window::{Theme, WindowAttributes},
 };
 
+use parking_lot::Mutex;
 use std::{
     any::TypeId,
     collections::HashSet,
-    panic,
     ptr::NonNull,
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc},
     thread::JoinHandle,
     time::Duration,
 };
@@ -205,29 +205,23 @@ fn game_thread(game_world: Arc<Mutex<World>>, enabled: Arc<AtomicBool>) {
     // reset Time so the first DT isn't outragous
     game_world
         .lock()
-        .unwrap()
         .insert_resource(Time(instant::Instant::now()));
-    // TODO: should_run flag to terminate the loop at shutdown
-    if let Err(err) = panic::catch_unwind(|| {
-        while enabled.load(std::sync::atomic::Ordering::Relaxed) {
-            let start = Instant::now();
+    while enabled.load(std::sync::atomic::Ordering::Relaxed) {
+        let start = Instant::now();
 
-            let mut game_world = game_world.lock().unwrap();
-            game_world.tick();
-            drop(game_world);
+        let mut game_world = game_world.lock();
+        game_world.tick();
+        drop(game_world);
 
-            let end = Instant::now();
-            let frame_duration = end - start;
-            let sleep = if frame_duration < target_frame_latency {
-                target_frame_latency - frame_duration
-            } else {
-                // leave time for the render thread to extract even if we're behind schedule
-                Duration::from_micros(500)
-            };
-            std::thread::sleep(sleep);
-        }
-    }) {
-        tracing::error!(?err, "Game thread paniced!")
+        let end = Instant::now();
+        let frame_duration = end - start;
+        let sleep = if frame_duration < target_frame_latency {
+            target_frame_latency - frame_duration
+        } else {
+            // leave time for the render thread to extract even if we're behind schedule
+            Duration::from_micros(500)
+        };
+        std::thread::sleep(sleep);
     }
 }
 
@@ -310,7 +304,7 @@ impl ApplicationHandler for RunningApp {
                 let w = Arc::clone(game_world);
                 render_world
                     .run_system(move |mut state: ResMut<GraphicsState>| {
-                        let mut w = w.lock().unwrap();
+                        let mut w = w.lock();
                         w.insert_resource(WindowSize {
                             width: size.width,
                             height: size.height,
@@ -325,7 +319,6 @@ impl ApplicationHandler for RunningApp {
                 // TODO: have a shared lock-free input queue to get rid of this lock
                 game_world
                     .lock()
-                    .unwrap()
                     .get_resource_mut::<KeyBoardInputs>()
                     .unwrap()
                     .next
@@ -334,7 +327,7 @@ impl ApplicationHandler for RunningApp {
             WindowEvent::RedrawRequested => {
                 {
                     // extraction
-                    let mut gw = game_world.lock().unwrap();
+                    let mut gw = game_world.lock();
                     render_world.insert_resource(GameWorld {
                         world: NonNull::from(&mut *gw),
                     });

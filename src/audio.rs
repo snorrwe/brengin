@@ -1,7 +1,5 @@
-use std::{
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use parking_lot::Mutex;
+use std::{path::Path, sync::Arc};
 
 use kira::{
     manager::backend::{cpal::CpalBackend, DefaultBackend},
@@ -31,7 +29,7 @@ impl AudioManager {
     }
 
     pub fn play(&self, audio: &Audio) -> Sound {
-        let mut manager = self.manager.lock().unwrap();
+        let mut manager = self.manager.lock();
         let sound = manager
             .play(audio.data.clone())
             .expect("Failed to play audio");
