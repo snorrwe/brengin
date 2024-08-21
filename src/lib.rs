@@ -117,6 +117,30 @@ fn update_time(mut time: ResMut<Time>, mut dt: ResMut<DeltaTime>) {
     time.0 = now;
 }
 
+/// extraction
+fn extract_render_data(
+    game_world: &Mutex<World>,
+    render_world: &mut World,
+    render_extract: &SystemStage,
+) {
+    render_world
+        .run_system(
+            |mut cmd: Commands, tick: Option<ResMut<ExtractionTick>>| match tick {
+                Some(mut t) => t.0 += 1,
+                None => cmd.insert_resource(ExtractionTick(0)),
+            },
+        )
+        .unwrap();
+    let Some(mut gw) = game_world.try_lock_for(Duration::from_millis(1)) else {
+        return;
+    };
+    render_world.insert_resource(GameWorld {
+        world: NonNull::from(&mut *gw),
+    });
+    render_world.run_stage(render_extract.clone()).unwrap();
+    render_world.remove_resource::<GameWorld>();
+}
+
 pub struct App {
     world: World,
     stages: std::collections::BTreeMap<Stage, SystemStage<'static>>,
@@ -325,23 +349,7 @@ impl ApplicationHandler for RunningApp {
                     .push(event.clone());
             }
             WindowEvent::RedrawRequested => {
-                {
-                    // extraction
-                    let mut gw = game_world.lock();
-                    render_world.insert_resource(GameWorld {
-                        world: NonNull::from(&mut *gw),
-                    });
-                    render_world
-                        .run_system(|mut cmd: Commands, tick: Option<ResMut<ExtractionTick>>| {
-                            match tick {
-                                Some(mut t) => t.0 += 1,
-                                None => cmd.insert_resource(ExtractionTick(0)),
-                            }
-                        })
-                        .unwrap();
-                    render_world.run_stage(render_extract.clone()).unwrap();
-                    render_world.remove_resource::<GameWorld>();
-                }
+                extract_render_data(&game_world, render_world, render_extract);
 
                 render_world.tick();
 
