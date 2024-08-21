@@ -1,6 +1,9 @@
 boids flags="":
     cargo r --example=boids {{flags}}
 
+sprites flags="":
+    cargo r --example=sprites {{flags}}
+
 
 update:
     # update the index
