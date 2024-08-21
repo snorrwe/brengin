@@ -95,7 +95,7 @@ impl Transform {
     }
 
     pub fn inverse(&self) -> Self {
-        debug_assert!(self.rot.length() == 1.0);
+        debug_assert!(self.rot.is_normalized());
         Self {
             pos: -self.pos,
             scale: 1.0 / self.scale,
