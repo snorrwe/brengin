@@ -56,10 +56,11 @@ fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
         &mut assets,
     );
 
+    const CUBE_SIDE: f32 = 100.0;
     for _ in 0..N {
-        let x = fastrand::f32() * 50.0 - 25.0;
-        let y = fastrand::f32() * 50.0 - 25.0;
-        let z = fastrand::f32() * 50.0 - 25.0;
+        let x = fastrand::f32() * CUBE_SIDE - CUBE_SIDE / 2.0;
+        let y = fastrand::f32() * CUBE_SIDE - CUBE_SIDE / 2.0;
+        let z = fastrand::f32() * CUBE_SIDE - CUBE_SIDE / 2.0;
 
         cmd.spawn()
             .insert_bundle(transform_bundle(Transform::from_position(Vec3::new(
