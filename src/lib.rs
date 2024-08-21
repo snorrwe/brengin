@@ -486,6 +486,15 @@ impl App {
     }
 
     fn build(mut self) -> InitializedWorlds {
+        #[cfg(feature = "tracing")]
+        if self
+            .stages
+            .get(&Stage::Render)
+            .map(|s| s.is_empty())
+            .unwrap_or(false)
+        {
+            tracing::warn!("Rendering is performed in a sub-app not the main app. But the main app's Render stage is non-empty.");
+        }
         let rw = self
             .render_app
             .take()
