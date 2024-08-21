@@ -47,12 +47,14 @@ impl Camera3d {
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniform {
     pub view_proj: Mat4,
+    pub view: Mat4,
 }
 
 impl Default for CameraUniform {
     fn default() -> Self {
         Self {
             view_proj: Mat4::IDENTITY,
+            view: Mat4::IDENTITY,
         }
     }
 }
@@ -77,7 +79,9 @@ impl CameraUniform {
 
 fn update_view_projections(mut q: Query<(&GlobalTransform, &Camera3d, &mut CameraUniform)>) {
     for (tr, cam, uni) in q.iter_mut() {
-        uni.view_proj = cam.view_projection() * tr.0.inverse().compute_matrix();
+        let view = tr.0.inverse().compute_matrix();
+        uni.view = view;
+        uni.view_proj = cam.view_projection() * view;
     }
 }
 
