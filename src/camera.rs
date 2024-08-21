@@ -48,6 +48,7 @@ impl Camera3d {
 pub struct CameraUniform {
     pub view_proj: Mat4,
     pub view: Mat4,
+    pub proj: Mat4,
 }
 
 impl Default for CameraUniform {
@@ -55,6 +56,7 @@ impl Default for CameraUniform {
         Self {
             view_proj: Mat4::IDENTITY,
             view: Mat4::IDENTITY,
+            proj: Mat4::IDENTITY,
         }
     }
 }
@@ -79,9 +81,9 @@ impl CameraUniform {
 
 fn update_view_projections(mut q: Query<(&GlobalTransform, &Camera3d, &mut CameraUniform)>) {
     for (tr, cam, uni) in q.iter_mut() {
-        let view = tr.0.inverse().compute_matrix();
-        uni.view = view;
-        uni.view_proj = cam.view_projection() * view;
+        uni.view = tr.0.inverse().compute_matrix();
+        uni.proj = cam.view_projection();
+        uni.view_proj = uni.proj * uni.view;
     }
 }
 
