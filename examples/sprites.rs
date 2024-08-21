@@ -12,12 +12,12 @@ const N: usize = 10000;
 
 fn animation_system(dt: Res<DeltaTime>, mut q: Query<(&mut SpriteInstance, &mut Timer)>) {
     let dt = dt.0;
-    for (i, t) in q.iter_mut() {
+    q.par_for_each_mut(move |(i, t)| {
         t.update(dt);
         if t.just_finished() {
             i.index = (i.index + 1) % 64;
         }
-    }
+    });
 }
 
 fn camera_rotation_system(dt: Res<DeltaTime>, mut q: Query<&mut Transform, With<WindowCamera>>) {
