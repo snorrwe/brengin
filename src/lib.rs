@@ -41,8 +41,6 @@ use winit::event_loop::EventLoop;
 
 use cecs::prelude::*;
 
-use tracing::{debug, error};
-
 #[derive(Clone, Copy, Debug)]
 pub struct Time(pub instant::Instant);
 
@@ -204,7 +202,7 @@ impl RunningApp {
 
     fn world_mut(&mut self) -> &mut World {
         match self {
-            RunningApp::Pending(app) => &mut app.world,
+            RunningApp::Pending(app) => &mut app.render_app_mut().world,
             RunningApp::Initialized { render_world, .. } => render_world,
             RunningApp::Terminated => unreachable!(),
         }
@@ -252,7 +250,6 @@ fn game_thread(game_world: Arc<Mutex<World>>, enabled: Arc<AtomicBool>) {
 impl ApplicationHandler for RunningApp {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         let Some(app) = self.as_pending() else {
-            debug!("App resumed");
             return;
         };
         let attributes = app.world.get_resource_or_default::<WindowAttributes>();
@@ -358,15 +355,17 @@ impl ApplicationHandler for RunningApp {
                     match result {
                         Ok(_) => {}
                         // handled by the renderer system
-                        Err(wgpu::SurfaceError::Lost) => {}
+                        Err(wgpu::SurfaceError::Lost) => {
+                            tracing::info!("Surface lost")
+                        }
                         // The system is out of memory, we should probably quit
                         Err(wgpu::SurfaceError::OutOfMemory) => {
-                            error!("gpu out of memory");
+                            tracing::error!("gpu out of memory");
                             self.stop();
                             event_loop.exit();
                         }
                         // All other errors (Outdated, Timeout) should be resolved by the next frame
-                        Err(e) => debug!("rendering failed: {:?}", e),
+                        Err(e) => tracing::info!("rendering failed: {:?}", e),
                     }
                 }
             }
@@ -375,16 +374,20 @@ impl ApplicationHandler for RunningApp {
     }
 
     fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        tracing::trace!("• about_to_wait");
         if let RunningApp::Terminated = self {
+            tracing::trace!("x about_to_wait");
             return;
         }
         self.world_mut()
             .run_system(|q: Query<&Window>| {
                 for Window(window) in q.iter() {
+                    tracing::trace!("redraw {window:?}");
                     window.request_redraw();
                 }
             })
             .unwrap();
+        tracing::trace!("✓ about_to_wait");
     }
 }
 
