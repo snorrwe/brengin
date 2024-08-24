@@ -320,9 +320,14 @@ fn gc_system<T: Extract>(
     }
 }
 
-#[derive(Default)]
 pub struct ExtractionPlugin<T> {
     _m: PhantomData<T>,
+}
+
+impl<T> Default for ExtractionPlugin<T> {
+    fn default() -> Self {
+        Self { _m: PhantomData }
+    }
 }
 
 impl<T> Plugin for ExtractionPlugin<T>

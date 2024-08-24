@@ -35,7 +35,9 @@ use std::{
 };
 use transform::TransformPlugin;
 
-use renderer::{GraphicsState, RenderResult, RendererPlugin, WindowSize};
+use renderer::{
+    Extract, ExtractionPlugin, GraphicsState, RenderResult, RendererPlugin, WindowSize,
+};
 
 use winit::event_loop::EventLoop;
 
@@ -177,7 +179,22 @@ impl Default for App {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Window(pub Arc<winit::window::Window>);
+
+impl Extract for Window {
+    type QueryItem = &'static Self;
+
+    type Filter = ();
+
+    type Out = (Self,);
+
+    fn extract<'a>(
+        it: <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
+    ) -> Option<Self::Out> {
+        Some((it.clone(),))
+    }
+}
 
 enum RunningApp {
     Pending(App),
@@ -261,19 +278,18 @@ impl ApplicationHandler for RunningApp {
         // do not block here
         let graphics_state = pollster::block_on(GraphicsState::new(Arc::clone(&window)));
 
-        app.render_app_mut()
-            .world
-            .run_system(|mut cmd: Commands| {
-                cmd.spawn().insert(Window(Arc::clone(&window)));
-                cmd.insert_resource(graphics_state);
-            })
-            .unwrap();
+        app.render_app_mut().insert_resource(graphics_state);
 
         let InitializedWorlds {
-            game_world,
+            mut game_world,
             render_world,
             render_extract,
         } = std::mem::take(app).build();
+        game_world
+            .run_system(move |mut cmd: Commands| {
+                cmd.spawn().insert(Window(Arc::clone(&window)));
+            })
+            .unwrap();
         let game_world = Arc::new(Mutex::new(game_world));
         let enabled = Arc::new(AtomicBool::new(true));
         let game_thread = std::thread::spawn({
@@ -597,6 +613,8 @@ impl Plugin for DefaultPlugins {
 
         app.add_plugin(TransformPlugin);
         app.add_plugin(RendererPlugin);
+
+        app.add_plugin(ExtractionPlugin::<Window>::default());
 
         #[cfg(feature = "audio")]
         app.add_plugin(audio::AudioPlugin);
