@@ -23,6 +23,7 @@ use self::sprite_renderer::SpriteRendererPlugin;
 pub struct GraphicsState {
     pub clear_color: wgpu::Color,
 
+    window: Arc<Window>,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -56,7 +57,7 @@ impl GraphicsState {
             gles_minor_version: Default::default(),
         });
         let surface = instance
-            .create_surface(window)
+            .create_surface(Arc::clone(&window))
             .expect("Failed to create surface");
 
         let adapter = instance
@@ -123,6 +124,7 @@ impl GraphicsState {
                 b: 0.451,
                 a: 1.0,
             },
+            window,
         }
     }
 
@@ -217,6 +219,10 @@ impl GraphicsState {
 
     pub fn size_mut(&mut self) -> &mut PhysicalSize<u32> {
         &mut self.size
+    }
+
+    pub fn window(&self) -> &Window {
+        &self.window
     }
 }
 
