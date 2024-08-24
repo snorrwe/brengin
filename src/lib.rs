@@ -282,11 +282,18 @@ impl ApplicationHandler for RunningApp {
 
         let InitializedWorlds {
             mut game_world,
-            render_world,
+            mut render_world,
             render_extract,
         } = std::mem::take(app).build();
         game_world
-            .run_system(move |mut cmd: Commands| {
+            .run_system(|mut cmd: Commands| {
+                cmd.spawn().insert(Window(Arc::clone(&window)));
+            })
+            .unwrap();
+        // also insert into render world, so it's available if about_to_wait fires before the first
+        // extraction
+        render_world
+            .run_system(|mut cmd: Commands| {
                 cmd.spawn().insert(Window(Arc::clone(&window)));
             })
             .unwrap();
