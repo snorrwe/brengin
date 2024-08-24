@@ -1,3 +1,5 @@
+export CARGO_PROFILE_RELEASE_DEBUG:="true"
+
 boids flags="":
     cargo r --example=boids {{flags}}
 
