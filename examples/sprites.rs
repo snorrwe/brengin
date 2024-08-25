@@ -9,7 +9,7 @@ use tracing::info;
 
 struct GamePlugin;
 
-const N: usize = 10000;
+const N: usize = 5000;
 
 fn animation_system(dt: Res<DeltaTime>, mut q: Query<(&mut SpriteInstance, &mut Timer)>) {
     let dt = dt.0;
