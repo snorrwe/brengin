@@ -14,7 +14,7 @@ use crate::{
 
 use super::{
     texture::{self, Texture},
-    Extract, ExtractionPlugin, GraphicsState, Vertex,
+    Extract, ExtractionPlugin, GraphicsState, RenderPassInput, Vertex,
 };
 
 pub fn sprite_sheet_bundle(
@@ -439,8 +439,10 @@ impl SpritePipeline {
 
     pub fn render<'a>(
         &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        camera: &'a wgpu::BindGroup,
+        RenderPassInput {
+            render_pass,
+            camera,
+        }: RenderPassInput<'a>,
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
         for (_, sheet) in self.sheets.iter() {

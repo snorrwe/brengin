@@ -41,6 +41,12 @@ pub struct WindowSize {
     pub height: u32,
 }
 
+#[derive(Debug)]
+pub struct RenderPassInput<'a> {
+    render_pass: &'a mut wgpu::RenderPass<'a>,
+    camera: &'a wgpu::BindGroup,
+}
+
 impl GraphicsState {
     pub async fn new(window: Arc<Window>) -> Self {
         #[cfg(not(debug_assertions))]
@@ -186,7 +192,10 @@ impl GraphicsState {
                     timestamp_writes: None,
                     occlusion_query_set: None,
                 });
-                sprite_pipeline.render(&mut render_pass, &camera_bind_group);
+                sprite_pipeline.render(RenderPassInput {
+                    render_pass: &mut render_pass,
+                    camera: &camera_bind_group,
+                });
             }
         }
 
