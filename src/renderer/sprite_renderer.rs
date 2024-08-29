@@ -442,7 +442,7 @@ impl SpritePipeline {
         RenderCommandInput {
             render_pass,
             camera,
-        }: RenderCommandInput,
+        }: &mut RenderCommandInput,
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
         for (_, sheet) in self.sheets.iter() {
@@ -460,11 +460,11 @@ impl SpritePipeline {
 
 struct SpriteRenderCommand;
 
-impl RenderCommand for SpriteRenderCommand {
-    type Parameters = Res<'static, SpritePipeline>;
+impl<'a> RenderCommand<'a> for SpriteRenderCommand {
+    type Parameters = Res<'a, SpritePipeline>;
 
-    fn render<'a>(input: RenderCommandInput<'a>, pipeline: Self::Parameters) {
-        pipeline.render(input);
+    fn render<'r>(input: &'r mut RenderCommandInput<'a>, pipeline: &'r Self::Parameters) {
+        pipeline.render(input)
     }
 }
 
@@ -533,6 +533,7 @@ const INDICES: &[u16] = &[3, 2, 1, 3, 1, 0];
 fn setup(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
     let sprite_pipeline = SpritePipeline::new(&graphics_state);
     cmd.insert_resource(sprite_pipeline);
+    cmd.spawn().insert(SpriteRenderCommand);
 }
 
 pub struct SpriteRendererPlugin;
@@ -549,6 +550,7 @@ impl Plugin for SpriteRendererPlugin {
                 .add_system(update_invisible);
         });
 
+        app.add_plugin(super::RenderCommandPlugin::<SpriteRenderCommand>::default());
         app.extact_stage.add_system(add_missing_sheets);
 
         if let Some(ref mut app) = app.render_app {
