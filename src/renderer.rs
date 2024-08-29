@@ -5,7 +5,7 @@ use std::{marker::PhantomData, sync::Arc};
 
 use cecs::{
     prelude::*,
-    query::{filters::Filter, QueryFragment},
+    query::{filters::Filter, QueryFragment, WorldQuery},
     Component,
 };
 use tracing::debug;
@@ -42,9 +42,15 @@ pub struct WindowSize {
 }
 
 #[derive(Debug)]
-pub struct RenderPassInput<'a> {
+pub struct RenderCommandInput<'a> {
     render_pass: &'a mut wgpu::RenderPass<'a>,
     camera: &'a wgpu::BindGroup,
+}
+
+pub trait RenderCommand {
+    type Parameters: WorldQuery<'static>;
+
+    fn render<'a>(input: RenderCommandInput<'a>, params: Self::Parameters);
 }
 
 impl GraphicsState {
@@ -192,7 +198,7 @@ impl GraphicsState {
                     timestamp_writes: None,
                     occlusion_query_set: None,
                 });
-                sprite_pipeline.render(RenderPassInput {
+                sprite_pipeline.render(RenderCommandInput {
                     render_pass: &mut render_pass,
                     camera: &camera_bind_group,
                 });

@@ -14,7 +14,7 @@ use crate::{
 
 use super::{
     texture::{self, Texture},
-    Extract, ExtractionPlugin, GraphicsState, RenderPassInput, Vertex,
+    Extract, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput, Vertex,
 };
 
 pub fn sprite_sheet_bundle(
@@ -437,12 +437,12 @@ impl SpritePipeline {
         }
     }
 
-    pub fn render<'a>(
-        &'a self,
-        RenderPassInput {
+    pub fn render(
+        &self,
+        RenderCommandInput {
             render_pass,
             camera,
-        }: RenderPassInput<'a>,
+        }: RenderCommandInput,
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
         for (_, sheet) in self.sheets.iter() {
@@ -455,6 +455,16 @@ impl SpritePipeline {
 
             render_pass.draw_indexed(0..self.num_indices, 0, 0..sheet.count as u32);
         }
+    }
+}
+
+struct SpriteRenderCommand;
+
+impl RenderCommand for SpriteRenderCommand {
+    type Parameters = Res<'static, SpritePipeline>;
+
+    fn render<'a>(input: RenderCommandInput<'a>, pipeline: Self::Parameters) {
+        pipeline.render(input);
     }
 }
 
