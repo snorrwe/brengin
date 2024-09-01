@@ -12,7 +12,7 @@ pub struct ViewFrustum {
     pub planes: [Vec4; 6],
 }
 
-pub struct Camera3d {
+pub struct PerspectiveCamera {
     pub eye: Vec3,
     pub target: Vec3,
     pub up: Vec3,
@@ -26,7 +26,10 @@ pub struct Camera3d {
 /// Camera entities do not have this component by default
 pub struct WindowCamera;
 
-fn update_camera_aspect(gs: Res<WindowSize>, mut q: Query<&mut Camera3d, With<WindowCamera>>) {
+fn update_camera_aspect(
+    gs: Res<WindowSize>,
+    mut q: Query<&mut PerspectiveCamera, With<WindowCamera>>,
+) {
     let size = *gs;
     let aspect = size.width as f32 / size.height as f32;
     q.par_for_each_mut(move |cam| {
@@ -34,7 +37,7 @@ fn update_camera_aspect(gs: Res<WindowSize>, mut q: Query<&mut Camera3d, With<Wi
     });
 }
 
-impl Camera3d {
+impl PerspectiveCamera {
     pub fn view_projection(&self) -> Mat4 {
         let view = Mat4::look_at_lh(self.eye, self.target, self.up);
         let proj = Mat4::perspective_lh(self.fovy, self.aspect, self.znear, self.zfar);
@@ -81,7 +84,9 @@ impl CameraUniform {
     }
 }
 
-fn update_view_projections(mut q: Query<(&GlobalTransform, &Camera3d, &mut CameraUniform)>) {
+fn update_view_projections(
+    mut q: Query<(&GlobalTransform, &PerspectiveCamera, &mut CameraUniform)>,
+) {
     for (tr, cam, uni) in q.iter_mut() {
         uni.view = tr.0.inverse().compute_matrix();
         uni.view_inv = uni.view.inverse();
@@ -197,6 +202,6 @@ impl Plugin for CameraPlugin {
     }
 }
 
-pub fn camera_bundle(camera: Camera3d) -> impl cecs::bundle::Bundle {
+pub fn camera_bundle(camera: PerspectiveCamera) -> impl cecs::bundle::Bundle {
     (camera, CameraUniform::default(), ViewFrustum::default())
 }

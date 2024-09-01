@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use brengin::camera::{camera_bundle, Camera3d, WindowCamera};
+use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
 use brengin::prelude::*;
 use brengin::renderer::sprite_renderer::{self, SpriteInstance, SpriteSheet};
 use brengin::{App, DefaultPlugins, Plugin};
@@ -39,7 +39,7 @@ fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
     //camera
     cmd.spawn()
         .insert(WindowCamera)
-        .insert_bundle(camera_bundle(Camera3d {
+        .insert_bundle(camera_bundle(PerspectiveCamera {
             eye: Vec3::new(0.0, 0.0, 50.0),
             target: Vec3::ZERO,
             up: Vec3::Y,

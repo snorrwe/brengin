@@ -2,7 +2,7 @@
 
 use brengin::{
     assets::{self, Assets, Handle},
-    camera::{Camera3d, WindowCamera},
+    camera::{PerspectiveCamera, WindowCamera},
     glam::{Quat, Vec2, Vec3},
     prelude::*,
     renderer::{
@@ -89,7 +89,7 @@ fn setup_boids(mut cmd: Commands, mut assets: ResMut<assets::Assets<SpriteSheet>
     //camera
     cmd.spawn()
         .insert(WindowCamera)
-        .insert_bundle(camera_bundle(Camera3d {
+        .insert_bundle(camera_bundle(PerspectiveCamera {
             eye: Vec3::new(0.0, 0.0, 100.0),
             target: Vec3::ZERO,
             up: Vec3::Y,
