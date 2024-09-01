@@ -4,7 +4,6 @@ pub mod texture;
 use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
 
 use cecs::{
-    commands::EntityCommands,
     prelude::*,
     query::{filters::Filter, QueryFragment, WorldQuery},
     Component,
@@ -58,17 +57,23 @@ pub trait RenderCommand<'a> {
 }
 
 #[derive(Clone)]
-struct RenderCommandInternal(pub Arc<dyn Fn(&World, &mut RenderCommandInput) + Send + Sync>);
+struct RenderCommandInternal {
+    pub render_cmd: Arc<dyn Fn(&World, &mut RenderCommandInput) + Send + Sync>,
+    pub pass: RenderPass,
+}
 
 impl RenderCommandInternal {
-    pub fn new<T: RenderCommand<'static> + 'static>() -> Self {
-        Self(Arc::new(move |world, input| {
-            world.run_view_system(move |q: T::Parameters| unsafe {
-                let q: &T::Parameters = std::mem::transmute(&q);
-                let input: &mut RenderCommandInput<'_> = std::mem::transmute(input);
-                T::render(input, q);
-            });
-        }))
+    pub fn new<T: RenderCommand<'static> + 'static>(pass: RenderPass) -> Self {
+        Self {
+            render_cmd: Arc::new(move |world, input| {
+                world.run_view_system(move |q: T::Parameters| unsafe {
+                    let q: &T::Parameters = std::mem::transmute(&q);
+                    let input: &mut RenderCommandInput<'_> = std::mem::transmute(input);
+                    T::render(input, q);
+                });
+            }),
+            pass,
+        }
     }
 }
 
@@ -107,8 +112,7 @@ where
             .insert(self.pass);
         let pass = self.pass;
         app.add_startup_system(move |mut cmd: Commands| {
-            let cmd = cmd.spawn().insert(RenderCommandInternal::new::<T>());
-            pass.insert_marker(cmd);
+            cmd.spawn().insert(RenderCommandInternal::new::<T>(pass));
         });
     }
 }
@@ -304,18 +308,7 @@ pub enum RenderPass {
     Transparent = 4,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RenderPassTransparentMarker;
-
 impl RenderPass {
-    pub fn insert_marker(self, cmd: &mut EntityCommands) {
-        match self {
-            RenderPass::Transparent => {
-                cmd.insert(RenderPassTransparentMarker);
-            }
-        }
-    }
-
     fn begin<'a>(
         self,
         view: &wgpu::TextureView,
@@ -397,8 +390,8 @@ fn render_system(mut world: WorldAccess) {
                         render_pass: &mut render_pass,
                         camera: &camera_bind_group,
                     };
-                    for cmd in render_commands.iter() {
-                        (cmd.0)(w, &mut input);
+                    for cmd in render_commands.iter().filter(|p| &p.pass == pass) {
+                        (cmd.render_cmd)(w, &mut input);
                     }
                 }
             }
