@@ -306,6 +306,7 @@ impl Plugin for RendererPlugin {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RenderPass {
     Transparent = 4,
+    Ui = 5,
 }
 
 impl RenderPass {
@@ -317,7 +318,30 @@ impl RenderPass {
     ) -> wgpu::RenderPass<'a> {
         match self {
             RenderPass::Transparent => self.begin_transparent(view, encoder, state),
+            RenderPass::Ui => self.begin_ui(view, encoder, state),
         }
+    }
+
+    fn begin_ui<'a>(
+        self,
+        view: &wgpu::TextureView,
+        encoder: &'a mut wgpu::CommandEncoder,
+        state: &GraphicsState,
+    ) -> wgpu::RenderPass<'a> {
+        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("UI Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(state.clear_color),
+                    store: StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        })
     }
 
     fn begin_transparent<'a>(
