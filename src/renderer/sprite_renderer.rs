@@ -14,7 +14,8 @@ use crate::{
 
 use super::{
     texture::{self, Texture},
-    Extract, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput, Vertex,
+    Extract, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput,
+    RenderCommandPlugin, RenderPass, Vertex,
 };
 
 pub fn sprite_sheet_bundle(
@@ -550,8 +551,8 @@ impl Plugin for SpriteRendererPlugin {
                 .add_system(update_invisible);
         });
 
-        app.add_plugin(super::RenderCommandPlugin::<SpriteRenderCommand>::new(
-            super::RenderPass::Transparent,
+        app.add_plugin(RenderCommandPlugin::<SpriteRenderCommand>::new(
+            RenderPass::Transparent,
         ));
         app.extact_stage.add_system(add_missing_sheets);
 
