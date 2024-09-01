@@ -550,7 +550,9 @@ impl Plugin for SpriteRendererPlugin {
                 .add_system(update_invisible);
         });
 
-        app.add_plugin(super::RenderCommandPlugin::<SpriteRenderCommand>::default());
+        app.add_plugin(super::RenderCommandPlugin::<SpriteRenderCommand>::new(
+            super::RenderPass::Transparent,
+        ));
         app.extact_stage.add_system(add_missing_sheets);
 
         if let Some(ref mut app) = app.render_app {

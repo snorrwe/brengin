@@ -1,9 +1,10 @@
 pub mod sprite_renderer;
 pub mod texture;
 
-use std::{marker::PhantomData, sync::Arc};
+use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
 
 use cecs::{
+    commands::EntityCommands,
     prelude::*,
     query::{filters::Filter, QueryFragment, WorldQuery},
     Component,
@@ -34,6 +35,9 @@ pub struct GraphicsState {
 
     depth_texture: texture::Texture,
 }
+
+#[derive(Debug, Default, Clone)]
+pub struct RenderPasses(pub BTreeSet<RenderPass>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WindowSize {
@@ -80,20 +84,17 @@ impl Extract for RenderCommandInternal {
 
 /// RenderCommands are ran on the Render World
 pub struct RenderCommandPlugin<T> {
+    pub pass: RenderPass,
     _m: PhantomData<T>,
 }
 
-impl<T> Default for RenderCommandPlugin<T> {
-    fn default() -> Self {
-        Self { _m: PhantomData }
+impl<T> RenderCommandPlugin<T> {
+    pub fn new(pass: RenderPass) -> Self {
+        Self {
+            pass,
+            _m: PhantomData,
+        }
     }
-}
-
-fn setup_render_cmd<T>(mut cmd: Commands)
-where
-    T: RenderCommand<'static> + 'static,
-{
-    cmd.spawn().insert(RenderCommandInternal::new::<T>());
 }
 
 impl<T> Plugin for RenderCommandPlugin<T>
@@ -101,7 +102,14 @@ where
     T: RenderCommand<'static> + 'static,
 {
     fn build(self, app: &mut crate::App) {
-        app.add_startup_system(setup_render_cmd::<T>);
+        app.get_resource_or_default::<RenderPasses>()
+            .0
+            .insert(self.pass);
+        let pass = self.pass;
+        app.add_startup_system(move |mut cmd: Commands| {
+            let cmd = cmd.spawn().insert(RenderCommandInternal::new::<T>());
+            pass.insert_marker(cmd);
+        });
     }
 }
 
@@ -265,6 +273,16 @@ pub type RenderResult = Result<(), wgpu::SurfaceError>;
 
 pub struct RendererPlugin;
 
+fn extract_passes(mut cmd: Commands, game_world: Res<GameWorld>) {
+    cmd.insert_resource(
+        game_world
+            .world()
+            .get_resource::<RenderPasses>()
+            .cloned()
+            .unwrap_or_default(),
+    )
+}
+
 impl Plugin for RendererPlugin {
     fn build(self, app: &mut crate::App) {
         app.render_app_mut().with_stage(crate::Stage::Render, |s| {
@@ -274,9 +292,68 @@ impl Plugin for RendererPlugin {
             width: 0,
             height: 0,
         });
+        app.add_extract_system(extract_passes);
         app.add_plugin(CameraPlugin);
         app.add_plugin(SpriteRendererPlugin);
         app.add_plugin(ExtractionPlugin::<RenderCommandInternal>::default());
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RenderPass {
+    Transparent = 4,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RenderPassTransparentMarker;
+
+impl RenderPass {
+    pub fn insert_marker(self, cmd: &mut EntityCommands) {
+        match self {
+            RenderPass::Transparent => {
+                cmd.insert(RenderPassTransparentMarker);
+            }
+        }
+    }
+
+    fn begin<'a>(
+        self,
+        view: &wgpu::TextureView,
+        encoder: &'a mut wgpu::CommandEncoder,
+        state: &GraphicsState,
+    ) -> wgpu::RenderPass<'a> {
+        match self {
+            RenderPass::Transparent => self.begin_transparent(view, encoder, state),
+        }
+    }
+
+    fn begin_transparent<'a>(
+        self,
+        view: &wgpu::TextureView,
+        encoder: &'a mut wgpu::CommandEncoder,
+        state: &GraphicsState,
+    ) -> wgpu::RenderPass<'a> {
+        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Transparent Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(state.clear_color),
+                    store: StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &state.depth_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        })
     }
 }
 
@@ -284,8 +361,13 @@ fn render_system(mut world: WorldAccess) {
     let w = world.world();
     let result = w.run_view_system(
         |state: Res<GraphicsState>,
+         render_passes: Option<Res<RenderPasses>>,
          cameras: Query<&CameraBuffer>,
          render_commands: Query<&RenderCommandInternal>| {
+            let Some(render_passes) = render_passes else {
+                tracing::trace!("No render pass has been registered");
+                return Ok(());
+            };
             let cameras = cameras.iter();
             let output = state.surface.get_current_texture()?;
             let view = output
@@ -309,28 +391,8 @@ fn render_system(mut world: WorldAccess) {
                         }],
                         label: Some("camera_bind_group"),
                     });
-                {
-                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("Transparent Render Pass"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(state.clear_color),
-                                store: StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                            view: &state.depth_texture.view,
-                            depth_ops: Some(wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(1.0),
-                                store: StoreOp::Store,
-                            }),
-                            stencil_ops: None,
-                        }),
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                    });
+                for pass in render_passes.0.iter() {
+                    let mut render_pass = pass.begin(&view, &mut encoder, &state);
                     let mut input = RenderCommandInput {
                         render_pass: &mut render_pass,
                         camera: &camera_bind_group,
