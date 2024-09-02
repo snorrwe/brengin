@@ -54,6 +54,7 @@
             cargo-nextest
             cargo-edit
             cargo-flamegraph
+            cargo-watch
             just
             renderdoc
           ];
