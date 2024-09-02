@@ -46,8 +46,8 @@ pub struct WindowSize {
 
 #[derive(Debug)]
 pub struct RenderCommandInput<'a> {
-    render_pass: &'a mut wgpu::RenderPass<'a>,
-    camera: &'a wgpu::BindGroup,
+    pub render_pass: &'a mut wgpu::RenderPass<'a>,
+    pub camera: &'a wgpu::BindGroup,
 }
 
 pub trait RenderCommand<'a> {
@@ -241,6 +241,14 @@ impl GraphicsState {
 
     pub fn window(&self) -> &Window {
         &self.window
+    }
+
+    pub fn camera_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        &self.camera_bind_group_layout
+    }
+
+    pub fn depth_texture(&self) -> &texture::Texture {
+        &self.depth_texture
     }
 }
 
