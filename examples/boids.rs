@@ -36,7 +36,7 @@ struct BoidConfig {
     min_vel: f32,
 }
 
-const N: usize = 10000;
+const N: usize = 1000;
 
 fn update_boids(
     mut q: Query<(&mut Pos, &mut Velocity, &LastVelocity), With<Boid>>,
