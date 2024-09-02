@@ -1,12 +1,8 @@
-use std::default;
-use std::time::Duration;
-
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
 use brengin::prelude::*;
 use brengin::renderer::{GraphicsState, RenderCommand, RenderCommandPlugin};
 use brengin::{App, DefaultPlugins, Plugin};
-use glam::{Quat, Vec2, Vec3};
-use tracing::info;
+use glam::Vec3;
 use wgpu::include_wgsl;
 
 struct GamePlugin;
