@@ -534,7 +534,6 @@ const INDICES: &[u16] = &[3, 2, 1, 3, 1, 0];
 fn setup(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
     let sprite_pipeline = SpritePipeline::new(&graphics_state);
     cmd.insert_resource(sprite_pipeline);
-    cmd.spawn().insert(SpriteRenderCommand);
 }
 
 pub struct SpriteRendererPlugin;
