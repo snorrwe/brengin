@@ -32,9 +32,9 @@ fn update_camera_aspect(
 ) {
     let size = *gs;
     let aspect = size.width as f32 / size.height as f32;
-    q.par_for_each_mut(move |cam| {
+    for cam in q.iter_mut() {
         cam.aspect = aspect;
-    });
+    }
 }
 
 impl PerspectiveCamera {
