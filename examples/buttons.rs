@@ -1,9 +1,7 @@
 use brengin::prelude::*;
 use brengin::ui::builder::Ui;
-use brengin::{App, DefaultPlugins, Plugin};
+use brengin::{App, DefaultPlugins};
 use tracing::info;
-
-struct GamePlugin;
 
 fn buttons_ui(mut ctx: ResMut<Ui>) {
     ctx.grid(4, |mut cols| {
@@ -19,18 +17,12 @@ fn buttons_ui(mut ctx: ResMut<Ui>) {
     });
 }
 
-impl Plugin for GamePlugin {
-    fn build(self, app: &mut brengin::App) {
-        app.with_stage(brengin::Stage::Update, |s| {
-            s.add_system(buttons_ui);
-        });
-    }
-}
-
 async fn game() {
     let mut app = App::default();
     app.add_plugin(DefaultPlugins);
-    app.add_plugin(GamePlugin);
+    app.with_stage(brengin::Stage::Update, |s| {
+        s.add_system(buttons_ui);
+    });
     app.run().await.unwrap();
 }
 
