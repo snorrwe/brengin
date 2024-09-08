@@ -87,10 +87,8 @@ impl Ui {
                 }
                 self.set_not_active(id);
             }
-        } else if self.is_hovered(id) {
-            if self.mouse_down() {
-                self.set_active(id);
-            }
+        } else if self.is_hovered(id) && self.mouse_down() {
+            self.set_active(id);
         }
         if self.contains_mouse(id) {
             self.set_hovered(id);
