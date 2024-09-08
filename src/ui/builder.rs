@@ -77,6 +77,12 @@ impl Ui {
         }
     }
 
+    pub fn grid<T>(&mut self, columns: u32, mut contents: impl FnMut(Columns)) {
+        self.id_stack.push(0);
+        contents(Columns { ctx: self, cols: columns });
+        self.id_stack.pop();
+    }
+
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
         let id = self.current_id();
         let mut pressed = false;
@@ -141,5 +147,18 @@ pub struct ButtonResponse {
 impl ButtonResponse {
     pub fn pressed(&self) -> bool {
         self.pressed
+    }
+}
+
+pub struct Columns<'a> {
+    ctx: &'a mut Ui,
+    cols: u32,
+}
+
+impl<'a> Columns<'a> {
+    pub fn column(&mut self, i: u32, mut contents: impl FnMut(&mut Ui)) {
+        assert!(i < self.cols);
+        *self.ctx.id_stack.last_mut().unwrap() = i;
+        contents(self.ctx);
     }
 }
