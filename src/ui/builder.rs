@@ -7,14 +7,17 @@ pub struct Ui {
 }
 
 impl Ui {
+    #[inline]
     fn set_hovered(&mut self, id: UiId) {
         self.hovered = id;
     }
 
+    #[inline]
     fn set_active(&mut self, id: UiId) {
         self.active = id;
     }
 
+    #[inline]
     fn parent(&self) -> IdType {
         if self.id_stack.len() >= 2 {
             self.id_stack[self.id_stack.len() - 2]
@@ -23,11 +26,13 @@ impl Ui {
         }
     }
 
+    #[inline]
     fn current_idx(&self) -> IdType {
         assert!(self.id_stack.len() >= 1);
         unsafe { *self.id_stack.last().unwrap_unchecked() }
     }
 
+    #[inline]
     fn current_id(&self) -> UiId {
         UiId {
             parent: self.parent(),
@@ -35,31 +40,37 @@ impl Ui {
         }
     }
 
+    #[inline]
     fn is_active(&self, id: UiId) -> bool {
         // TODO:
         false
     }
 
+    #[inline]
     fn is_hovered(&self, id: UiId) -> bool {
         // TODO:
         false
     }
 
+    #[inline]
     fn mouse_up(&self) -> bool {
         // TODO:
         false
     }
 
+    #[inline]
     fn mouse_down(&self) -> bool {
         // TODO:
         false
     }
 
+    #[inline]
     fn contains_mouse(&self, id: UiId) -> bool {
         // TODO:
         false
     }
 
+    #[inline]
     fn set_not_active(&mut self, id: UiId) {
         if self.active == id {
             self.active = UiId::SENTINEL;
