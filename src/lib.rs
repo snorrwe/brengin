@@ -7,6 +7,7 @@ pub mod transform;
 
 #[cfg(feature = "audio")]
 pub mod audio;
+pub mod ui;
 
 use anyhow::Context;
 // reexport
