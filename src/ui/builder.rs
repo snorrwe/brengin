@@ -77,9 +77,12 @@ impl Ui {
         }
     }
 
-    pub fn grid<T>(&mut self, columns: u32, mut contents: impl FnMut(Columns)) {
+    pub fn grid(&mut self, columns: u32, mut contents: impl FnMut(Columns)) {
         self.id_stack.push(0);
-        contents(Columns { ctx: self, cols: columns });
+        contents(Columns {
+            ctx: self,
+            cols: columns,
+        });
         self.id_stack.pop();
     }
 

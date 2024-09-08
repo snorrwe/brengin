@@ -6,6 +6,8 @@ sprites flags="": (_example "sprites" flags)
 
 mandelbrot flags="": (_example "mandelbrot" flags)
 
+buttons flags="": (_example "buttons" flags)
+
 update:
     # update the index
     cargo update --dry-run
