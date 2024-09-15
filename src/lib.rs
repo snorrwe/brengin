@@ -15,6 +15,7 @@ pub use cecs;
 pub use glam;
 pub use image;
 use instant::Instant;
+use ui::UiPlugin;
 pub use wgpu;
 pub use winit;
 
@@ -589,6 +590,8 @@ impl Plugin for DefaultPlugins {
 
         app.add_plugin(TransformPlugin);
         app.add_plugin(RendererPlugin);
+
+        app.add_plugin(UiPlugin);
 
         #[cfg(feature = "audio")]
         app.add_plugin(audio::AudioPlugin);

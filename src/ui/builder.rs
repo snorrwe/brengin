@@ -1,4 +1,7 @@
+use crate::Plugin;
+
 /// UI context object. Use this to builder your user interface
+#[derive(Debug, Default)]
 pub struct Ui {
     hovered: UiId,
     active: UiId,
@@ -163,5 +166,13 @@ impl<'a> Columns<'a> {
         assert!(i < self.cols);
         *self.ctx.id_stack.last_mut().unwrap() = i;
         contents(self.ctx);
+    }
+}
+
+pub struct UiBuilderPlugin;
+
+impl Plugin for UiBuilderPlugin {
+    fn build(self, app: &mut crate::App) {
+        app.insert_resource(Ui::default());
     }
 }
