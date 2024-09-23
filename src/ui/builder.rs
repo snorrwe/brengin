@@ -45,14 +45,12 @@ impl Ui {
 
     #[inline]
     fn is_active(&self, id: UiId) -> bool {
-        // TODO:
-        false
+        self.active == id
     }
 
     #[inline]
     fn is_hovered(&self, id: UiId) -> bool {
-        // TODO:
-        false
+        self.hovered == id
     }
 
     #[inline]
