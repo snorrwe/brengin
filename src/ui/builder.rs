@@ -31,7 +31,7 @@ impl Ui {
 
     #[inline]
     fn current_idx(&self) -> IdType {
-        assert!(self.id_stack.len() >= 1);
+        assert!(!self.id_stack.is_empty());
         unsafe { *self.id_stack.last().unwrap_unchecked() }
     }
 
