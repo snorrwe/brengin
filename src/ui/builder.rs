@@ -1,4 +1,8 @@
+use cecs::prelude::*;
+
 use crate::Plugin;
+
+use super::core::{DrawRect, RectRequests};
 
 /// UI context object. Use this to builder your user interface
 #[derive(Debug, Default)]
@@ -7,7 +11,11 @@ pub struct Ui {
     active: UiId,
     /// stack of parents in the ui tree
     id_stack: Vec<IdType>,
+
+    rects: Vec<DrawRect>,
 }
+
+const FONT_SIZE: u32 = 32;
 
 impl Ui {
     #[inline]
@@ -87,6 +95,16 @@ impl Ui {
         self.id_stack.pop();
     }
 
+    pub fn rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: u32) {
+        self.rects.push(DrawRect {
+            x,
+            y,
+            w: width,
+            h: height,
+            color,
+        })
+    }
+
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
         let id = self.current_id();
         let mut pressed = false;
@@ -104,6 +122,13 @@ impl Ui {
             self.set_hovered(id);
         }
         // TODO: render the button
+
+        let label = label.into();
+        let w = label.len() as u32 * FONT_SIZE;
+        let h = FONT_SIZE;
+
+        self.rect(20, 20, w, h, 0xFF00FF);
+
         ButtonResponse {
             inner: Response {
                 hovered: self.hovered == id,
@@ -167,10 +192,26 @@ impl<'a> Columns<'a> {
     }
 }
 
+fn begin_frame(mut ui: ResMut<Ui>) {
+    ui.rects.clear();
+}
+
+fn submit_frame(mut ui: ResMut<Ui>, mut rects: Query<&mut RectRequests>) {
+    if let Some(dst) = rects.single_mut() {
+        std::mem::swap(&mut ui.rects, &mut dst.0);
+    }
+}
+
 pub struct UiBuilderPlugin;
 
 impl Plugin for UiBuilderPlugin {
     fn build(self, app: &mut crate::App) {
         app.insert_resource(Ui::default());
+        app.with_stage(crate::Stage::PreUpdate, |s| {
+            s.add_system(begin_frame);
+        });
+        app.with_stage(crate::Stage::PostUpdate, |s| {
+            s.add_system(submit_frame);
+        });
     }
 }
