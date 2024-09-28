@@ -1,15 +1,20 @@
 use crate::renderer::{
-    texture, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput,
-    RenderCommandPlugin, RenderPass, Vertex,
+    ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin,
+    RenderPass,
 };
 use crate::wgpu::include_wgsl;
 use cecs::prelude::*;
-use wgpu::util::{DeviceExt as _, RenderEncoder};
+use wgpu::util::DeviceExt as _;
 
 use crate::{renderer::Extract, Plugin};
 
 #[derive(Default, Clone, Debug)]
 pub struct RectRequests(pub Vec<DrawRect>);
+
+struct RectInstanceBuffer {
+    buffer: wgpu::Buffer,
+    n: usize,
+}
 
 impl Extract for RectRequests {
     type QueryItem = &'static Self;
@@ -146,15 +151,20 @@ impl RectPipeline {
 struct RectRenderCommand;
 
 impl<'a> RenderCommand<'a> for RectRenderCommand {
-    type Parameters = (Query<'a, &'static RectRequests>, Res<'a, RectPipeline>);
+    type Parameters = (
+        Query<'a, &'static RectInstanceBuffer>,
+        Res<'a, RectPipeline>,
+    );
 
     fn render<'r>(input: &'r mut RenderCommandInput<'a>, (rects, pipeline): &'r Self::Parameters) {
         input.render_pass.set_pipeline(&pipeline.render_pipeline);
         for requests in rects.iter() {
-            input.render_pass.set_vertex_buffer(0, requests.0.slice(..));
             input
                 .render_pass
-                .draw_indexed(0..4, 0, 0..requests.0.len() as u32);
+                .set_vertex_buffer(0, requests.buffer.slice(..));
+            input
+                .render_pass
+                .draw_indexed(0..4, 0, 0..requests.n as u32);
         }
     }
 }
@@ -166,6 +176,26 @@ fn setup(mut cmd: Commands) {
 fn setup_renderer(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
     let pipeline = RectPipeline::new(&graphics_state);
     cmd.insert_resource(pipeline);
+}
+
+fn insert_missing_instances(
+    mut cmd: Commands,
+    q: Query<(EntityId, &RectRequests), WithOut<RectInstanceBuffer>>,
+    renderer: Res<GraphicsState>,
+) {
+    for (id, rects) in q.iter() {
+        let buffer = renderer
+            .device()
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("Rect Instance Buffer {}", id)),
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                contents: bytemuck::cast_slice(rects.0.as_slice()),
+            });
+        cmd.entity(id).insert(RectInstanceBuffer {
+            buffer,
+            n: rects.0.len(),
+        });
+    }
 }
 
 pub struct UiCorePlugin;
@@ -180,6 +210,9 @@ impl Plugin for UiCorePlugin {
         ));
         if let Some(ref mut renderer) = app.render_app {
             renderer.add_startup_system(setup_renderer);
+            renderer.with_stage(crate::Stage::Update, |s| {
+                s.add_system(insert_missing_instances);
+            });
         }
     }
 }

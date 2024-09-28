@@ -174,7 +174,7 @@ impl GraphicsState {
             width: size.width.max(1),
             height: size.height.max(1),
             // TODO: configure
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             // TODO: configure
             desired_maximum_frame_latency: 2,

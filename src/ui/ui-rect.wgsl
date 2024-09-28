@@ -1,9 +1,10 @@
 struct Vertex {
+    @builtin(vertex_index) vertex_index: u32,
 }
 
 struct Instance {
-    @location(2) xywh: vec4<u32>,
-    @location(3) color: u32,
+    @location(0) xywh: vec4<u32>,
+    @location(1) color: u32,
 }
 
 struct VertexOutput {
@@ -39,6 +40,5 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let color = textureSample(texture, texture_sampler, in.uv);
-    return color;
+    return in.color;
 }
