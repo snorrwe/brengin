@@ -1,8 +1,10 @@
 use crate::renderer::{
-    ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin,
-    RenderPass,
+    texture, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput,
+    RenderCommandPlugin, RenderPass, Vertex,
 };
+use crate::wgpu::include_wgsl;
 use cecs::prelude::*;
+use wgpu::util::{DeviceExt as _, RenderEncoder};
 
 use crate::{renderer::Extract, Plugin};
 
@@ -23,7 +25,8 @@ impl Extract for RectRequests {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
+#[repr(C)]
 pub struct DrawRect {
     pub x: u32,
     pub y: u32,
@@ -32,10 +35,111 @@ pub struct DrawRect {
     pub color: u32,
 }
 
-struct RectPipeline {}
+impl DrawRect {
+    pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            // attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2],
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Uint32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Uint32,
+                },
+            ],
+        }
+    }
+}
+
+struct RectPipeline {
+    render_pipeline: wgpu::RenderPipeline,
+    ui_rect_layout: wgpu::BindGroupLayout,
+}
+
 impl RectPipeline {
-    fn new(graphics_state: &GraphicsState) -> Self {
-        Self {}
+    fn new(renderer: &GraphicsState) -> Self {
+        let ui_rect_layout: wgpu::BindGroupLayout =
+            renderer
+                .device()
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Ui Rect Uniform Layout"),
+                    entries: &[wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::all(),
+                        count: None,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                    }],
+                });
+        let shader = renderer
+            .device()
+            .create_shader_module(include_wgsl!("ui-rect.wgsl"));
+
+        let render_pipeline_layout =
+            renderer
+                .device()
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Ui Rect Render Pipeline Layout"),
+                    bind_group_layouts: &[&ui_rect_layout],
+                    push_constant_ranges: &[],
+                });
+        let render_pipeline =
+            renderer
+                .device()
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("Ui Rect Render Pipeline"),
+                    layout: Some(&render_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &shader,
+                        entry_point: "vs_main",
+                        buffers: &[DrawRect::desc()],
+                        compilation_options: Default::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &shader,
+                        entry_point: "fs_main",
+                        compilation_options: Default::default(),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: renderer.config().format,
+                            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::TriangleList,
+                        strip_index_format: None,
+                        front_face: wgpu::FrontFace::Ccw,
+                        cull_mode: None,
+                        // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                        polygon_mode: wgpu::PolygonMode::Fill,
+                        // Requires Features::DEPTH_CLIP_CONTROL
+                        unclipped_depth: false,
+                        // Requires Features::CONSERVATIVE_RASTERIZATION
+                        conservative: false,
+                    },
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState {
+                        count: 1,
+                        mask: !0,
+                        alpha_to_coverage_enabled: true,
+                    },
+                    multiview: None,
+                    cache: None,
+                });
+
+        RectPipeline {
+            ui_rect_layout,
+            render_pipeline,
+        }
     }
 }
 
@@ -44,7 +148,15 @@ struct RectRenderCommand;
 impl<'a> RenderCommand<'a> for RectRenderCommand {
     type Parameters = (Query<'a, &'static RectRequests>, Res<'a, RectPipeline>);
 
-    fn render<'r>(input: &'r mut RenderCommandInput<'a>, pipeline: &'r Self::Parameters) {}
+    fn render<'r>(input: &'r mut RenderCommandInput<'a>, (rects, pipeline): &'r Self::Parameters) {
+        input.render_pass.set_pipeline(&pipeline.render_pipeline);
+        for requests in rects.iter() {
+            input.render_pass.set_vertex_buffer(0, requests.0.slice(..));
+            input
+                .render_pass
+                .draw_indexed(0..4, 0, 0..requests.0.len() as u32);
+        }
+    }
 }
 
 fn setup(mut cmd: Commands) {
