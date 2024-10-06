@@ -416,6 +416,25 @@ fn render_system(mut world: WorldAccess) {
                         }],
                         label: Some("camera_bind_group"),
                     });
+                // clear
+                {
+                    {
+                        let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: Some("Clear Pass"),
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(state.clear_color),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            occlusion_query_set: None,
+                            timestamp_writes: None,
+                        });
+                    }
+                }
                 for pass in render_passes.0.iter() {
                     let mut render_pass = pass.begin(&view, &mut encoder, &state);
                     let mut input = RenderCommandInput {
