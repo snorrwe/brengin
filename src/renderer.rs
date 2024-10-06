@@ -342,7 +342,7 @@ impl RenderPass {
                 view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(state.clear_color),
+                    load: wgpu::LoadOp::Load,
                     store: StoreOp::Store,
                 },
             })],
@@ -364,7 +364,7 @@ impl RenderPass {
                 view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(state.clear_color),
+                    load: wgpu::LoadOp::Load,
                     store: StoreOp::Store,
                 },
             })],
