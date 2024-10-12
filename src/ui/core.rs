@@ -45,7 +45,6 @@ impl DrawRect {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
-            // attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2],
             attributes: &[
                 wgpu::VertexAttribute {
                     offset: 0,
@@ -94,7 +93,7 @@ impl RectPipeline {
                 .device()
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Ui Rect Render Pipeline Layout"),
-                    bind_group_layouts: &[&ui_rect_layout],
+                    bind_group_layouts: &[],
                     push_constant_ranges: &[],
                 });
         let render_pipeline =
