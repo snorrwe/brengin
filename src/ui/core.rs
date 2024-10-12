@@ -168,10 +168,6 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
     }
 }
 
-fn setup(mut cmd: Commands) {
-    cmd.spawn().insert(RectRequests::default());
-}
-
 fn setup_renderer(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
     let pipeline = RectPipeline::new(&graphics_state);
     cmd.insert_resource(pipeline);
@@ -201,7 +197,7 @@ pub struct UiCorePlugin;
 
 impl Plugin for UiCorePlugin {
     fn build(self, app: &mut crate::App) {
-        app.add_startup_system(setup);
+        app.insert_resource(RectRequests::default());
         app.add_plugin(ExtractionPlugin::<RectRequests>::default());
 
         app.add_plugin(RenderCommandPlugin::<RectRenderCommand>::new(
