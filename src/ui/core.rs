@@ -52,7 +52,7 @@ impl DrawRect {
                     format: wgpu::VertexFormat::Uint32x4,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    offset: std::mem::size_of::<[u32; 4]>() as wgpu::BufferAddress,
                     shader_location: 1,
                     format: wgpu::VertexFormat::Uint32,
                 },
@@ -163,7 +163,7 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
                 .set_vertex_buffer(0, requests.buffer.slice(..));
             input
                 .render_pass
-                .draw_indexed(0..4, 0, 0..requests.n as u32);
+                .draw(0..6, 0..requests.n as u32);
         }
     }
 }
