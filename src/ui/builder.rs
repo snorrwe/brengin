@@ -122,6 +122,7 @@ impl Ui {
             self.set_hovered(id);
         }
         // TODO: render the button
+        self.rect(12, 12, 300, 100, 0xFF00AAFF);
 
         let label = label.into();
         let w = label.len() as u32 * FONT_SIZE;
@@ -202,11 +203,16 @@ fn submit_frame(mut ui: ResMut<Ui>, mut rects: Query<&mut RectRequests>) {
     }
 }
 
+fn setup(mut cmd: Commands) {
+    cmd.spawn().insert(RectRequests::default());
+}
+
 pub struct UiBuilderPlugin;
 
 impl Plugin for UiBuilderPlugin {
     fn build(self, app: &mut crate::App) {
         app.insert_resource(Ui::default());
+        app.add_startup_system(setup);
         app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(begin_frame);
         });
