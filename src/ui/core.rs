@@ -125,11 +125,8 @@ impl RectPipeline {
                         strip_index_format: None,
                         front_face: wgpu::FrontFace::Ccw,
                         cull_mode: None,
-                        // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
                         polygon_mode: wgpu::PolygonMode::Fill,
-                        // Requires Features::DEPTH_CLIP_CONTROL
                         unclipped_depth: false,
-                        // Requires Features::CONSERVATIVE_RASTERIZATION
                         conservative: false,
                     },
                     depth_stencil: None,

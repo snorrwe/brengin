@@ -121,14 +121,14 @@ impl Ui {
         if self.contains_mouse(id) {
             self.set_hovered(id);
         }
-        // TODO: render the button
-        self.rect(12, 12, 300, 100, 0xFF00AAFF);
 
         let label = label.into();
         let w = label.len() as u32 * FONT_SIZE;
         let h = FONT_SIZE;
 
-        self.rect(20, 20, w, h, 0xFF00FF);
+        // TODO: render the button
+        // TODO: width height from label content
+        self.rect(20, 20, w, h, 0xfab387ff);
 
         ButtonResponse {
             inner: Response {

@@ -38,23 +38,23 @@ fn vs_main(
     let c = instance.color;
     let xywh = instance.xywh;
     out.color = vec4<f32>(
-        f32((c >> 0) & 0xFF) / 255.0,
-        f32((c >> 8) & 0xFF) / 255.0,
-        f32((c >> 16) & 0xFF) / 255.0,
         f32((c >> 24) & 0xFF) / 255.0,
+        f32((c >> 16) & 0xFF) / 255.0,
+        f32((c >> 8) & 0xFF) / 255.0,
+        f32((c >> 0) & 0xFF) / 255.0,
     );
 
     var u = f32((model.vertex_index << 1) & 2);
     var v = f32(model.vertex_index & 2);
-    let flip = model.vertex_index > 3;
+    let flip = model.vertex_index > 2;
     if flip {
-        u = 2.0 - u;
         v = 2.0 - v;
     }
 
     var uv = vec2<f32>(u, v);
     out.uv = uv * 0.5;
     uv *= 0.2;
+    uv += 0.4;
     out.clip_position = vec4<f32>(uv * vec2(2, -2) + vec2(-1, 1), 0.0, 1.0);
     return out;
 }
