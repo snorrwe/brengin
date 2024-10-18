@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use crate::renderer::{
     ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin,
     RenderPass,
@@ -43,7 +45,7 @@ pub struct DrawRect {
 impl DrawRect {
     pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            array_stride: size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
                 wgpu::VertexAttribute {
@@ -52,7 +54,7 @@ impl DrawRect {
                     format: wgpu::VertexFormat::Uint32x4,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[u32; 4]>() as wgpu::BufferAddress,
+                    offset: size_of::<[u32; 4]>() as wgpu::BufferAddress,
                     shader_location: 1,
                     format: wgpu::VertexFormat::Uint32,
                 },
@@ -161,9 +163,7 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
             input
                 .render_pass
                 .set_vertex_buffer(0, requests.buffer.slice(..));
-            input
-                .render_pass
-                .draw(0..6, 0..requests.n as u32);
+            input.render_pass.draw(0..6, 0..requests.n as u32);
         }
     }
 }
