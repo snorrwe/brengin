@@ -44,17 +44,15 @@ fn vs_main(
         f32((c >> 0) & 0xFF) / 255.0,
     );
 
-    var u = f32((model.vertex_index << 1) & 2);
-    var v = f32(model.vertex_index & 2);
+    var u = f32(model.vertex_index & 1);
+    var v = f32((model.vertex_index >> 1) & 1);
     let flip = model.vertex_index > 2;
     if flip {
-        v = 2.0 - v;
+        v = 1.0 - v;
     }
 
     var uv = vec2<f32>(u, v);
-    out.uv = uv * 0.5;
-    uv *= 0.2;
-    uv += 0.4;
+    out.uv = uv;
     out.clip_position = vec4<f32>(uv * vec2(2, -2) + vec2(-1, 1), 0.0, 1.0);
     return out;
 }
