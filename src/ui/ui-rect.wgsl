@@ -57,7 +57,12 @@ fn vs_main(
     var vertex = uv * vec2(2, -2) + vec2(-1, 1);
     vertex *= xywh.zw;
 
-    out.clip_position = vec4<f32>(xywh.xy + vertex, 0.0, 1.0);
+    // pos is in 0..1
+    // remap to -1..1
+    var pos = xywh.xy;
+    pos = pos * 2 - 1;
+
+    out.clip_position = vec4<f32>(pos + vertex, 0.0, 1.0);
     return out;
 }
 
