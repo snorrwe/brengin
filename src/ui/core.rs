@@ -196,9 +196,11 @@ fn update_instances(
         buff.extend(rects.0.iter().map(|rect| {
             let ww = rect.w as f32 * 0.5;
             let hh = rect.h as f32 * 0.5;
+            // flip y
+            let y = h - rect.y as f32;
             DrawRectInstance {
                 x: (rect.x as f32 + ww) / w,
-                y: (rect.y as f32 + hh) / h,
+                y: (y + hh) / h,
                 w: ww / w,
                 h: hh / h,
                 color: rect.color,
