@@ -17,6 +17,7 @@ pub struct Ui {
 }
 
 const FONT_SIZE: u32 = 32;
+const PADDING: u32 = 5;
 
 impl Ui {
     #[inline]
@@ -111,7 +112,8 @@ impl Ui {
         let w = label.len() as u32 * FONT_SIZE;
         let h = FONT_SIZE;
         let [x, y] = self.anchor;
-        self.anchor[1] += h;
+        let [x, y] = [x + PADDING, y + PADDING];
+        self.anchor[1] += h + 2 * PADDING;
 
         let id = self.current_id();
         let mut pressed = false;
