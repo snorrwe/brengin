@@ -13,6 +13,7 @@ pub struct Ui {
     id_stack: Vec<IdType>,
 
     rects: Vec<DrawRect>,
+    anchor: [u32; 2],
 }
 
 const FONT_SIZE: u32 = 32;
@@ -106,6 +107,12 @@ impl Ui {
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
+        let label = label.into();
+        let w = label.len() as u32 * FONT_SIZE;
+        let h = FONT_SIZE;
+        let [x, y] = self.anchor;
+        self.anchor[1] += h;
+
         let id = self.current_id();
         let mut pressed = false;
         if self.is_active(id) {
@@ -122,19 +129,16 @@ impl Ui {
             self.set_hovered(id);
         }
 
-        let label = label.into();
-        let w = label.len() as u32 * FONT_SIZE;
-        let h = FONT_SIZE;
-
         // TODO: render the button
         // TODO: width height from label content
-        self.rect(20, 20, w, h, 0xfab387ff);
+        self.rect(x, y, w, h, 0xfab387ff);
 
         ButtonResponse {
             inner: Response {
                 hovered: self.hovered == id,
                 active: self.active == id,
                 inner: (),
+                rect: Aabb { x, y, w, h },
             },
             pressed,
         }
@@ -166,7 +170,16 @@ impl Default for UiId {
 pub struct Response<T> {
     pub hovered: bool,
     pub active: bool,
+    pub rect: Aabb,
     pub inner: T,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Aabb {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
 }
 
 pub struct ButtonResponse {
