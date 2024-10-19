@@ -191,12 +191,16 @@ fn update_instances(
     for (id, rects, buffer) in q.iter() {
         buff.clear();
         buff.reserve(rects.0.len());
-        buff.extend(rects.0.iter().map(|rect| DrawRectInstance {
-            x: rect.x as f32 / w,
-            y: rect.y as f32 / h,
-            w: rect.w as f32 / w,
-            h: rect.h as f32 / h,
-            color: rect.color,
+        buff.extend(rects.0.iter().map(|rect| {
+            let ww = rect.w as f32 * 0.5;
+            let hh = rect.h as f32 * 0.5;
+            DrawRectInstance {
+                x: (rect.x as f32 + ww) / w,
+                y: (rect.y as f32 + hh) / h,
+                w: ww / w,
+                h: hh / h,
+                color: rect.color,
+            }
         }));
 
         match buffer {
