@@ -200,14 +200,14 @@ fn update_instances(
         }));
 
         match buffer {
-            Some(buffer) => {
+            Some(buffer) if rects.0.len() <= buffer.n => {
                 renderer.queue().write_buffer(
                     &buffer.buffer,
                     0,
                     bytemuck::cast_slice(buff.as_slice()),
                 );
             }
-            None => {
+            _ => {
                 let buffer =
                     renderer
                         .device()
