@@ -32,8 +32,7 @@ impl Extract for RectRequests {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
-#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct DrawRect {
     pub x: u32,
     pub y: u32,
@@ -42,7 +41,17 @@ pub struct DrawRect {
     pub color: u32,
 }
 
-impl DrawRect {
+#[derive(Debug, Default, Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
+#[repr(C)]
+pub struct DrawRectInstance {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub color: u32,
+}
+
+impl DrawRectInstance {
     pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
             array_stride: size_of::<Self>() as wgpu::BufferAddress,
@@ -51,7 +60,7 @@ impl DrawRect {
                 wgpu::VertexAttribute {
                     offset: 0,
                     shader_location: 0,
-                    format: wgpu::VertexFormat::Uint32x4,
+                    format: wgpu::VertexFormat::Float32x4,
                 },
                 wgpu::VertexAttribute {
                     offset: size_of::<[u32; 4]>() as wgpu::BufferAddress,
@@ -107,7 +116,7 @@ impl RectPipeline {
                     vertex: wgpu::VertexState {
                         module: &shader,
                         entry_point: "vs_main",
-                        buffers: &[DrawRect::desc()],
+                        buffers: &[DrawRectInstance::desc()],
                         compilation_options: Default::default(),
                     },
                     fragment: Some(wgpu::FragmentState {
@@ -170,23 +179,49 @@ fn setup_renderer(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
     cmd.insert_resource(pipeline);
 }
 
-fn insert_missing_instances(
-    mut cmd: Commands,
-    q: Query<(EntityId, &RectRequests), WithOut<RectInstanceBuffer>>,
+fn update_instances(
+    q: Query<(EntityId, &RectRequests, Option<&RectInstanceBuffer>)>,
     renderer: Res<GraphicsState>,
+    mut cmd: Commands,
 ) {
-    for (id, rects) in q.iter() {
-        let buffer = renderer
-            .device()
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("Rect Instance Buffer {}", id)),
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                contents: bytemuck::cast_slice(rects.0.as_slice()),
-            });
-        cmd.entity(id).insert(RectInstanceBuffer {
-            buffer,
-            n: rects.0.len(),
-        });
+    // TODO: retain buffer
+    let mut buff = Vec::new();
+    let w = renderer.size().width as f32;
+    let h = renderer.size().height as f32;
+    for (id, rects, buffer) in q.iter() {
+        buff.clear();
+        buff.reserve(rects.0.len());
+        buff.extend(rects.0.iter().map(|rect| DrawRectInstance {
+            x: rect.x as f32 / w,
+            y: rect.y as f32 / h,
+            w: rect.w as f32 / w,
+            h: rect.h as f32 / h,
+            color: rect.color,
+        }));
+
+        match buffer {
+            Some(buffer) => {
+                renderer.queue().write_buffer(
+                    &buffer.buffer,
+                    0,
+                    bytemuck::cast_slice(buff.as_slice()),
+                );
+            }
+            None => {
+                let buffer =
+                    renderer
+                        .device()
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some(&format!("Rect Instance Buffer {}", id)),
+                            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                            contents: bytemuck::cast_slice(buff.as_slice()),
+                        });
+                cmd.entity(id).insert(RectInstanceBuffer {
+                    buffer,
+                    n: rects.0.len(),
+                });
+            }
+        }
     }
 }
 
@@ -203,7 +238,7 @@ impl Plugin for UiCorePlugin {
         if let Some(ref mut renderer) = app.render_app {
             renderer.add_startup_system(setup_renderer);
             renderer.with_stage(crate::Stage::Update, |s| {
-                s.add_system(insert_missing_instances);
+                s.add_system(update_instances);
             });
         }
     }

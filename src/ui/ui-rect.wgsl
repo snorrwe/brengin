@@ -3,7 +3,7 @@ struct Vertex {
 }
 
 struct Instance {
-    @location(0) xywh: vec4<u32>,
+    @location(0) xywh: vec4<f32>,
     @location(1) color: u32,
 }
 
@@ -53,7 +53,11 @@ fn vs_main(
 
     var uv = vec2<f32>(u, v);
     out.uv = uv;
-    out.clip_position = vec4<f32>(uv * vec2(2, -2) + vec2(-1, 1), 0.0, 1.0);
+
+    var vertex = uv * vec2(2, -2) + vec2(-1, 1);
+    vertex *= xywh.zw;
+
+    out.clip_position = vec4<f32>(xywh.xy + vertex, 0.0, 1.0);
     return out;
 }
 
