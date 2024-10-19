@@ -32,6 +32,7 @@ impl Extract for RectRequests {
     }
 }
 
+/// XY are top-left corner, WH are full-extents
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DrawRect {
     pub x: u32,
@@ -41,6 +42,7 @@ pub struct DrawRect {
     pub color: u32,
 }
 
+/// XY is the center, WH are half-extents
 #[derive(Debug, Default, Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C)]
 pub struct DrawRectInstance {
