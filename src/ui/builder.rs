@@ -208,6 +208,7 @@ impl<'a> Columns<'a> {
 
 fn begin_frame(mut ui: ResMut<Ui>) {
     ui.rects.clear();
+    ui.anchor = [0, 0];
 }
 
 fn submit_frame(mut ui: ResMut<Ui>, mut rects: Query<&mut RectRequests>) {
