@@ -13,7 +13,7 @@ pub struct Ui {
     id_stack: Vec<IdType>,
 
     rects: Vec<DrawRect>,
-    anchor: [u32; 2],
+    bounds: Aabb,
 }
 
 const FONT_SIZE: u32 = 32;
@@ -90,9 +90,17 @@ impl Ui {
 
     pub fn grid(&mut self, columns: u32, mut contents: impl FnMut(Columns)) {
         self.id_stack.push(0);
+        let bounds = self.bounds;
+        let width = bounds.w / columns + 1;
+
+        let dims = (0..columns)
+            .map(|i| [bounds.x + i * width, bounds.x + (i + 1) * width])
+            .collect();
+
         contents(Columns {
             ctx: self,
             cols: columns,
+            dims,
         });
         self.id_stack.pop();
     }
@@ -111,9 +119,10 @@ impl Ui {
         let label = label.into();
         let w = label.len() as u32 * FONT_SIZE;
         let h = FONT_SIZE;
-        let [x, y] = self.anchor;
+        let x = self.bounds.x;
+        let y = self.bounds.y;
         let [x, y] = [x + PADDING, y + PADDING];
-        self.anchor[1] += h + 2 * PADDING;
+        self.bounds.y += h + 2 * PADDING;
 
         let id = self.current_id();
         let mut pressed = false;
@@ -176,7 +185,7 @@ pub struct Response<T> {
     pub inner: T,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Aabb {
     pub x: u32,
     pub y: u32,
@@ -198,19 +207,40 @@ impl ButtonResponse {
 pub struct Columns<'a> {
     ctx: &'a mut Ui,
     cols: u32,
+    dims: Vec<[u32; 2]>,
 }
 
 impl<'a> Columns<'a> {
     pub fn column(&mut self, i: u32, mut contents: impl FnMut(&mut Ui)) {
         assert!(i < self.cols);
+        let idx = i as usize;
+        let bounds = self.ctx.bounds;
+        self.ctx.bounds.x = self.dims[idx][0];
+        self.ctx.bounds.w = self.dims[idx][1] - self.dims[idx][0];
+        let w = self.ctx.bounds.w;
         *self.ctx.id_stack.last_mut().unwrap() = i;
         contents(self.ctx);
+        let rect = self.ctx.bounds;
+        self.ctx.bounds.y = bounds.y;
+        self.ctx.bounds.h = bounds.h;
+        if rect.w > w && i + 1 < self.cols {
+            let diff = rect.w - w;
+            for d in &mut self.dims[idx + 1..] {
+                d[0] += diff;
+                d[1] += diff;
+            }
+        }
     }
 }
 
-fn begin_frame(mut ui: ResMut<Ui>) {
+fn begin_frame(mut ui: ResMut<Ui>, size: Res<crate::renderer::WindowSize>) {
     ui.rects.clear();
-    ui.anchor = [0, 0];
+    ui.bounds = Aabb {
+        x: 0,
+        y: 0,
+        w: size.width,
+        h: size.height,
+    };
 }
 
 fn submit_frame(mut ui: ResMut<Ui>, mut rects: Query<&mut RectRequests>) {
