@@ -466,7 +466,7 @@ pub trait Extract: Component {
     type Filter: Filter + 'static;
     type Out: Bundle;
 
-    fn extract<'a>(it: <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out>;
+    fn extract(it: <Self::QueryItem as QueryFragment>::Item<'_>) -> Option<Self::Out>;
 }
 
 fn extractor_system<T: Extract>(
@@ -539,7 +539,7 @@ mod tests {
 
         type Out = (Self,);
 
-        fn extract<'a>((i, j): <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out> {
+        fn extract((i, j): <Self::QueryItem as QueryFragment>::Item<'_>) -> Option<Self::Out> {
             Some((Self { i: *i, j: *j },))
         }
     }
