@@ -44,14 +44,14 @@ fn vs_main(
         f32((c >> 0) & 0xFF) / 255.0,
     );
 
-    var u = f32(model.vertex_index & 1);
+    let u = f32(model.vertex_index & 1);
     var v = f32((model.vertex_index >> 1) & 1);
     let flip = model.vertex_index > 2;
     if flip {
         v = 1.0 - v;
     }
 
-    var uv = vec2<f32>(u, v);
+    let uv = vec2<f32>(u, v);
     out.uv = uv;
 
     var vertex = uv * vec2(2, -2) + vec2(-1, 1);
@@ -59,8 +59,7 @@ fn vs_main(
 
     // pos is in 0..1
     // remap to -1..1
-    var pos = xywh.xy;
-    pos = pos * 2 - 1;
+    let pos = xywh.xy * 2 - 1;
 
     out.clip_position = vec4<f32>(pos + vertex, 0.0, 1.0);
     return out;
