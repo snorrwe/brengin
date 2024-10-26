@@ -142,7 +142,19 @@ impl Ui {
 
         // TODO: render the button
         // TODO: width height from label content
-        self.rect(x, y, w, h, 0xfab387ff);
+
+        // test color
+        let color = {
+            let mut hash = 0x81aaaaaau32;
+            for byte in label.as_bytes() {
+                hash ^= *byte as u32;
+                hash = hash.wrapping_mul(0x1000193);
+            }
+            hash |= 0xFF;
+            hash
+        };
+
+        self.rect(x, y, w, h, color);
 
         ButtonResponse {
             inner: Response {
