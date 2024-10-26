@@ -10,7 +10,7 @@ fn buttons_ui(mut ctx: ResMut<Ui>) {
         for col in 0..4 {
             cols.column(col, |ui| {
                 for row in 0..4 {
-                    let fill = row * 10;
+                    let fill = row * 2;
                     let label = format!("Poggies {:0>fill$} {row} {col}", "");
                     if ui.button(label).pressed {
                         info!("Poggies {row} {col}")
