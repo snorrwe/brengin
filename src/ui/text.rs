@@ -159,6 +159,7 @@ pub fn draw_glyph_buffer(
             &mut builder,
         );
         builder.xoffset += pos.x_advance as f32 * builder.scaling_factor;
+        builder.yoffset += pos.y_advance as f32 * builder.scaling_factor;
         builder.draw(0xFFFFFFFF, &mut pixmap);
     }
     Ok(TextDrawResponse {
