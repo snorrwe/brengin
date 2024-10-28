@@ -1,10 +1,11 @@
 use cecs::prelude::*;
+use rustybuzz::ttf_parser::GlyphId;
 
 use crate::Plugin;
 
 use super::{
     core::{DrawRect, RectRequests},
-    text::OwnedTypeFace,
+    text::{OwnedTypeFace, ShapeCache, ShapeKey},
 };
 
 /// UI context object. Use this to builder your user interface
@@ -19,9 +20,10 @@ pub struct Ui {
     bounds: Aabb,
 
     font: OwnedTypeFace,
+    shape_cache: ShapeCache,
 }
 
-const FONT_SIZE: u32 = 32;
+const FONT_SIZE: u32 = 12;
 const PADDING: u32 = 5;
 
 impl Ui {
@@ -32,6 +34,7 @@ impl Ui {
             id_stack: Default::default(),
             rects: Default::default(),
             bounds: Default::default(),
+            shape_cache: Default::default(),
             font,
         }
     }
@@ -131,6 +134,23 @@ impl Ui {
         })
     }
 
+    pub fn shape_text<'a>(
+        cache: &'a mut ShapeCache,
+        line: String,
+        font: &OwnedTypeFace,
+    ) -> &'a mut rustybuzz::GlyphBuffer {
+        let glyphs = cache
+            .0
+            .entry(ShapeKey { text: line.clone() })
+            .or_insert_with(|| {
+                let mut buffer = rustybuzz::UnicodeBuffer::new();
+                buffer.push_str(&line);
+                rustybuzz::shape(font.face(), &[], buffer)
+            });
+
+        glyphs
+    }
+
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
         let label = label.into();
         let w = label.len() as u32 * FONT_SIZE;
@@ -158,6 +178,18 @@ impl Ui {
 
         // TODO: render the button
         // TODO: width height from label content
+
+        // shape the text
+        {
+            for line in label.split('\n').filter(|l| !l.is_empty()) {
+                let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
+
+                let bounds = super::text::get_bounds(self.font.face(), &glyphs);
+                if let Some(Aabb { x, y, w, h }) = bounds {
+                    self.rect(x, y, w, h, 0x00FF00FF);
+                }
+            }
+        }
 
         // test color
         let color = {
@@ -285,7 +317,7 @@ pub struct UiBuilderPlugin;
 
 impl Plugin for UiBuilderPlugin {
     fn build(self, app: &mut crate::App) {
-        let font = super::text::load_font("/nix/store/a7xny2d815wb4x4rqrq3fl5dhxrqlxrn-X11-fonts/share/X11/fonts/MonaspaceRadon-WideSemiBoldItalic.otf", 0).unwrap();
+        let font = super::text::load_font("/nix/store/a7xny2d815wb4x4rqrq3fl5dhxrqlxrn-X11-fonts/share/X11/fonts/DejaVuSans-Bold.ttf", 0).unwrap();
         app.insert_resource(Ui::new(font));
         app.add_startup_system(setup);
         app.with_stage(crate::Stage::PreUpdate, |s| {
