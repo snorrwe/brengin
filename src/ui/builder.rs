@@ -1,3 +1,5 @@
+use core::panic;
+
 use cecs::prelude::*;
 use rustybuzz::ttf_parser::GlyphId;
 
@@ -196,12 +198,15 @@ impl Ui {
         {
             for line in label.split('\n').filter(|l| !l.is_empty()) {
                 let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
+                let pic = super::text::draw_glyph_buffer(self.font.face(), &glyphs).unwrap();
+                pic.pixmap.save_png("reee.png").unwrap();
+                panic!("{}", label);
 
-                if let Some(UiRect { x, y, w, h }) =
-                    super::text::get_bounds(self.font.face(), &glyphs)
-                {
-                    self.rect(x, y, w, h, 0x00FF00FF);
-                }
+                // if let Some(UiRect { x, y, w, h }) =
+                //     super::text::get_bounds(self.font.face(), &glyphs)
+                // {
+                //     self.rect(x, y, w, h, 0x00FF00FF);
+                // }
             }
         }
 

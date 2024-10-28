@@ -245,6 +245,7 @@ dependencies = [
  "pollster",
  "rustybuzz",
  "smallvec",
+ "tiny-skia",
  "tracing",
  "tracing-subscriber",
  "web-sys",
@@ -2327,6 +2328,7 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "log",
+ "png",
  "tiny-skia-path",
 ]
 
