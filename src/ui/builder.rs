@@ -220,8 +220,6 @@ impl Ui {
             let pic = &e.texture;
             w = w.max(pic.width());
             h += pic.height();
-            pic.pixmap.save_png("reee.png").unwrap();
-            // panic!("{}", label);
         }
         let x = self.bounds.x;
         let y = self.bounds.y;
@@ -322,6 +320,12 @@ fn begin_frame(mut ui: ResMut<Ui>, size: Res<crate::renderer::WindowSize>) {
         w: size.width,
         h: size.height,
     };
+
+    std::fs::create_dir_all("target/out").unwrap();
+    for (k, v) in ui.texture_cache.0.iter() {
+        let pic = &v.texture.pixmap;
+        pic.save_png(format!("target/out/{}.png", k.text)).unwrap();
+    }
 }
 
 fn submit_frame(mut ui: ResMut<Ui>, mut rects: Query<&mut RectRequests>) {
