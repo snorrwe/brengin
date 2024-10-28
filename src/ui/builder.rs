@@ -5,6 +5,7 @@ use crate::Plugin;
 
 use super::{
     core::{DrawRect, RectRequests},
+    rect::UiRect,
     text::{OwnedTypeFace, ShapeCache, ShapeKey},
 };
 
@@ -242,16 +243,6 @@ pub struct Response<T> {
     pub active: bool,
     pub rect: UiRect,
     pub inner: T,
-}
-
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UiRect {
-    /// center x
-    pub x: u32,
-    /// center y
-    pub y: u32,
-    pub w: u32,
-    pub h: u32,
 }
 
 pub struct ButtonResponse {
