@@ -2,10 +2,13 @@ use cecs::prelude::*;
 
 use crate::Plugin;
 
-use super::core::{DrawRect, RectRequests};
+use super::{
+    core::{DrawRect, RectRequests},
+    text::OwnedTypeFace,
+};
 
 /// UI context object. Use this to builder your user interface
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Ui {
     hovered: UiId,
     active: UiId,
@@ -14,12 +17,25 @@ pub struct Ui {
 
     rects: Vec<DrawRect>,
     bounds: Aabb,
+
+    font: OwnedTypeFace,
 }
 
 const FONT_SIZE: u32 = 32;
 const PADDING: u32 = 5;
 
 impl Ui {
+    pub fn new(font: OwnedTypeFace) -> Self {
+        Self {
+            hovered: Default::default(),
+            active: Default::default(),
+            id_stack: Default::default(),
+            rects: Default::default(),
+            bounds: Default::default(),
+            font,
+        }
+    }
+
     #[inline]
     fn set_hovered(&mut self, id: UiId) {
         self.hovered = id;
@@ -269,7 +285,8 @@ pub struct UiBuilderPlugin;
 
 impl Plugin for UiBuilderPlugin {
     fn build(self, app: &mut crate::App) {
-        app.insert_resource(Ui::default());
+        let font = super::text::load_font("/nix/store/a7xny2d815wb4x4rqrq3fl5dhxrqlxrn-X11-fonts/share/X11/fonts/MonaspaceRadon-WideSemiBoldItalic.otf", 0).unwrap();
+        app.insert_resource(Ui::new(font));
         app.add_startup_system(setup);
         app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(begin_frame);

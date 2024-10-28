@@ -8,6 +8,13 @@ pub struct OwnedTypeFace {
     face: rustybuzz::Face<'static>,
 }
 
+impl std::fmt::Debug for OwnedTypeFace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("OwnedTypeFace");
+        d.finish()
+    }
+}
+
 impl OwnedTypeFace {
     pub fn face(&self) -> &rustybuzz::Face<'static> {
         &self.face
