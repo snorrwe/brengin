@@ -215,20 +215,18 @@ impl Ui {
         // shape the text
         let mut w = 0;
         let mut h = 0;
-        {
-            for line in label.split('\n').filter(|l| !l.is_empty()) {
-                let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
-                let pic = Self::draw_text_texture(
-                    &mut self.texture_cache,
-                    line.to_owned(),
-                    &self.font,
-                    glyphs,
-                );
-                w = w.max(pic.width());
-                h += pic.height();
-                pic.pixmap.save_png("reee.png").unwrap();
-                // panic!("{}", label);
-            }
+        for line in label.split('\n').filter(|l| !l.is_empty()) {
+            let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
+            let pic = Self::draw_text_texture(
+                &mut self.texture_cache,
+                line.to_owned(),
+                &self.font,
+                glyphs,
+            );
+            w = w.max(pic.width());
+            h += pic.height();
+            pic.pixmap.save_png("reee.png").unwrap();
+            // panic!("{}", label);
         }
         let x = self.bounds.x;
         let y = self.bounds.y;
