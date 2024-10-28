@@ -17,7 +17,7 @@ pub struct Ui {
     id_stack: Vec<IdType>,
 
     rects: Vec<DrawRect>,
-    bounds: Aabb,
+    bounds: UiRect,
 
     font: OwnedTypeFace,
     shape_cache: ShapeCache,
@@ -197,7 +197,7 @@ impl Ui {
                 let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
 
                 let bounds = super::text::get_bounds(self.font.face(), &glyphs);
-                if let Some(Aabb { x, y, w, h }) = bounds {
+                if let Some(UiRect { x, y, w, h }) = bounds {
                     self.rect(x, y, w, h, 0x00FF00FF);
                 }
             }
@@ -208,7 +208,7 @@ impl Ui {
                 hovered: self.hovered == id,
                 active: self.active == id,
                 inner: (),
-                rect: Aabb { x, y, w, h },
+                rect: UiRect { x, y, w, h },
             },
             pressed,
         }
@@ -240,13 +240,15 @@ impl Default for UiId {
 pub struct Response<T> {
     pub hovered: bool,
     pub active: bool,
-    pub rect: Aabb,
+    pub rect: UiRect,
     pub inner: T,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Aabb {
+pub struct UiRect {
+    /// center x
     pub x: u32,
+    /// center y
     pub y: u32,
     pub w: u32,
     pub h: u32,
@@ -294,7 +296,7 @@ impl<'a> Columns<'a> {
 
 fn begin_frame(mut ui: ResMut<Ui>, size: Res<crate::renderer::WindowSize>) {
     ui.rects.clear();
-    ui.bounds = Aabb {
+    ui.bounds = UiRect {
         x: 0,
         y: 0,
         w: size.width,

@@ -56,7 +56,7 @@ pub fn load_font(path: impl AsRef<Path>, face_index: u32) -> anyhow::Result<Owne
     })
 }
 
-pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> Option<super::builder::Aabb> {
+pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> Option<super::builder::UiRect> {
     let info = glyphs.glyph_infos();
     let pos = glyphs.glyph_positions();
 
@@ -77,7 +77,7 @@ pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> Option<super:
         let extx = maxx / 2;
         let exty = maxx / 2;
 
-        super::builder::Aabb {
+        super::builder::UiRect {
             x: extx as u32,
             y: exty as u32,
             w: maxx as u32,
