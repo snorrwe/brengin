@@ -393,7 +393,6 @@ fn render_system(mut world: WorldAccess) {
                 tracing::trace!("No render pass has been registered");
                 return Ok(());
             };
-            let cameras = cameras.iter();
             let output = state.surface.get_current_texture()?;
             let view = output
                 .texture
@@ -422,7 +421,7 @@ fn render_system(mut world: WorldAccess) {
                     timestamp_writes: None,
                 });
             }
-            for camera_buffer in cameras {
+            for camera_buffer in cameras.iter() {
                 // FIXME: retain the camera bind ground
                 let camera_bind_group =
                     state.device.create_bind_group(&wgpu::BindGroupDescriptor {
