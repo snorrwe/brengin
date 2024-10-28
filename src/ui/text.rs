@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Path, pin::Pin};
+use std::{path::Path, pin::Pin};
 
 use anyhow::Context;
 use rustybuzz::GlyphBuffer;
@@ -10,20 +10,6 @@ pub struct OwnedTypeFace {
     face_index: u32,
     face: rustybuzz::Face<'static>,
 }
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct ShapeKey {
-    pub text: String,
-    pub size: u32,
-    // TODO: include font handle, shaping info etc
-}
-
-// TODO: GC, assets?
-#[derive(Debug, Default)]
-pub struct ShapeCache(pub HashMap<ShapeKey, GlyphBuffer>);
-
-#[derive(Debug, Default)]
-pub struct TextTextureCache(pub HashMap<ShapeKey, TextDrawResponse>);
 
 impl std::fmt::Debug for OwnedTypeFace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

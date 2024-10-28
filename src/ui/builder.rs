@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use cecs::prelude::*;
 
 use crate::Plugin;
@@ -5,8 +7,26 @@ use crate::Plugin;
 use super::{
     core::{DrawRect, RectRequests},
     rect::UiRect,
-    text::{OwnedTypeFace, ShapeCache, ShapeKey, TextDrawResponse, TextTextureCache},
+    text::{OwnedTypeFace, TextDrawResponse},
 };
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct ShapeKey {
+    pub text: String,
+    pub size: u32,
+    // TODO: include font handle, shaping info etc
+}
+
+// TODO: GC, assets?
+#[derive(Debug, Default)]
+pub struct TextTextureCache(pub HashMap<ShapeKey, ShapingResult>);
+
+#[derive(Debug)]
+pub struct ShapingResult {
+    pub unicodebuffer: rustybuzz::UnicodeBuffer,
+    pub glyphs: rustybuzz::GlyphBuffer,
+    pub texture: TextDrawResponse,
+}
 
 /// UI context object. Use this to builder your user interface
 #[derive(Debug)]
@@ -20,7 +40,6 @@ pub struct Ui {
     bounds: UiRect,
 
     font: OwnedTypeFace,
-    shape_cache: ShapeCache,
     texture_cache: TextTextureCache,
 }
 
@@ -35,7 +54,6 @@ impl Ui {
             id_stack: Default::default(),
             rects: Default::default(),
             bounds: Default::default(),
-            shape_cache: Default::default(),
             texture_cache: Default::default(),
             font,
         }
@@ -136,46 +154,29 @@ impl Ui {
         })
     }
 
-    pub fn shape_text<'a>(
-        cache: &'a mut ShapeCache,
-        line: String,
-        font: &OwnedTypeFace,
-    ) -> &'a mut rustybuzz::GlyphBuffer {
-        let glyphs = cache
+    fn shape_and_draw_line(&mut self, line: String, size: u32) -> &mut ShapingResult {
+        self.texture_cache
             .0
             .entry(ShapeKey {
                 text: line.clone(),
-                size: FONT_SIZE,
+                size,
             })
             .or_insert_with(|| {
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
-                rustybuzz::shape(font.face(), &[], buffer)
-            });
+                let glyphs = rustybuzz::shape(self.font.face(), &[], buffer);
 
-        glyphs
-    }
-
-    pub fn draw_text_texture<'a>(
-        cache: &'a mut TextTextureCache,
-        line: String,
-        font: &OwnedTypeFace,
-        glyphs: &rustybuzz::GlyphBuffer,
-    ) -> &'a mut TextDrawResponse {
-        let texture = cache
-            .0
-            .entry(ShapeKey {
-                text: line.clone(),
-                size: FONT_SIZE,
-            })
-            .or_insert_with(|| {
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
                 // TODO: scaling_factor...
-                super::text::draw_glyph_buffer(font.face(), &glyphs, FONT_SIZE).unwrap()
-            });
+                let pic = super::text::draw_glyph_buffer(self.font.face(), &glyphs, size).unwrap();
 
-        texture
+                ShapingResult {
+                    unicodebuffer: buffer,
+                    glyphs,
+                    texture: pic,
+                }
+            })
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
@@ -216,13 +217,8 @@ impl Ui {
         let mut w = 0;
         let mut h = 0;
         for line in label.split('\n').filter(|l| !l.is_empty()) {
-            let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
-            let pic = Self::draw_text_texture(
-                &mut self.texture_cache,
-                line.to_owned(),
-                &self.font,
-                glyphs,
-            );
+            let e = self.shape_and_draw_line(line.to_owned(), FONT_SIZE);
+            let pic = &e.texture;
             w = w.max(pic.width());
             h += pic.height();
             pic.pixmap.save_png("reee.png").unwrap();
