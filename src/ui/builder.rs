@@ -1,7 +1,4 @@
-use core::panic;
-
 use cecs::prelude::*;
-use rustybuzz::ttf_parser::GlyphId;
 
 use crate::Plugin;
 
@@ -146,7 +143,10 @@ impl Ui {
     ) -> &'a mut rustybuzz::GlyphBuffer {
         let glyphs = cache
             .0
-            .entry(ShapeKey { text: line.clone() })
+            .entry(ShapeKey {
+                text: line.clone(),
+                size: FONT_SIZE,
+            })
             .or_insert_with(|| {
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
@@ -164,7 +164,10 @@ impl Ui {
     ) -> &'a mut TextDrawResponse {
         let texture = cache
             .0
-            .entry(ShapeKey { text: line.clone() })
+            .entry(ShapeKey {
+                text: line.clone(),
+                size: FONT_SIZE,
+            })
             .or_insert_with(|| {
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
@@ -177,12 +180,9 @@ impl Ui {
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
         let label = label.into();
-        let w = label.len() as u32 * FONT_SIZE;
-        let h = FONT_SIZE;
         let x = self.bounds.x;
         let y = self.bounds.y;
         let [x, y] = [x + PADDING, y + PADDING];
-        self.bounds.y += h + 2 * PADDING;
 
         let id = self.current_id();
         let mut pressed = false;
@@ -214,11 +214,11 @@ impl Ui {
         // TODO: render the button
         // TODO: width height from label content
 
-        self.rect(x, y, w, h, color);
         const TEXT_PADDING: u32 = 5;
         // shape the text
+        let mut w = 0;
+        let mut h = 0;
         {
-            let mut text_box = UiRect::default();
             for line in label.split('\n').filter(|l| !l.is_empty()) {
                 let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
                 let pic = Self::draw_text_texture(
@@ -227,16 +227,18 @@ impl Ui {
                     &self.font,
                     glyphs,
                 );
+                w = w.max(pic.width());
+                h += pic.height();
                 pic.pixmap.save_png("reee.png").unwrap();
-                panic!("{}", label);
-
-                // if let Some(UiRect { x, y, w, h }) =
-                //     super::text::get_bounds(self.font.face(), &glyphs)
-                // {
-                //     self.rect(x, y, w, h, 0x00FF00FF);
-                // }
+                // panic!("{}", label);
             }
         }
+        self.bounds.y += h + 2 * PADDING + 2 * TEXT_PADDING;
+        // background
+        self.rect(x, y, w + 2 * TEXT_PADDING, h + 2 * TEXT_PADDING, color);
+        // text
+        // TODO: use the textures
+        self.rect(x + TEXT_PADDING, y + TEXT_PADDING, w, h, 0x000F0FFF);
 
         ButtonResponse {
             inner: Response {

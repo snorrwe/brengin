@@ -14,6 +14,7 @@ pub struct OwnedTypeFace {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShapeKey {
     pub text: String,
+    pub size: u32,
     // TODO: include font handle, shaping info etc
 }
 
