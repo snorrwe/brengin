@@ -8,7 +8,7 @@ use crate::Plugin;
 use super::{
     core::{DrawRect, RectRequests},
     rect::UiRect,
-    text::{OwnedTypeFace, ShapeCache, ShapeKey},
+    text::{OwnedTypeFace, ShapeCache, ShapeKey, TextDrawResponse, TextTextureCache},
 };
 
 /// UI context object. Use this to builder your user interface
@@ -24,6 +24,7 @@ pub struct Ui {
 
     font: OwnedTypeFace,
     shape_cache: ShapeCache,
+    texture_cache: TextTextureCache,
 }
 
 const FONT_SIZE: u32 = 12;
@@ -38,6 +39,7 @@ impl Ui {
             rects: Default::default(),
             bounds: Default::default(),
             shape_cache: Default::default(),
+            texture_cache: Default::default(),
             font,
         }
     }
@@ -154,6 +156,24 @@ impl Ui {
         glyphs
     }
 
+    pub fn draw_text_texture<'a>(
+        cache: &'a mut TextTextureCache,
+        line: String,
+        font: &OwnedTypeFace,
+        glyphs: &rustybuzz::GlyphBuffer,
+    ) -> &'a mut TextDrawResponse {
+        let texture = cache
+            .0
+            .entry(ShapeKey { text: line.clone() })
+            .or_insert_with(|| {
+                let mut buffer = rustybuzz::UnicodeBuffer::new();
+                buffer.push_str(&line);
+                super::text::draw_glyph_buffer(font.face(), &glyphs).unwrap()
+            });
+
+        texture
+    }
+
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
         let label = label.into();
         let w = label.len() as u32 * FONT_SIZE;
@@ -198,7 +218,12 @@ impl Ui {
         {
             for line in label.split('\n').filter(|l| !l.is_empty()) {
                 let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
-                let pic = super::text::draw_glyph_buffer(self.font.face(), &glyphs).unwrap();
+                let pic = Self::draw_text_texture(
+                    &mut self.texture_cache,
+                    line.to_owned(),
+                    &self.font,
+                    glyphs,
+                );
                 pic.pixmap.save_png("reee.png").unwrap();
                 panic!("{}", label);
 

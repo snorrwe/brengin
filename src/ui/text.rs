@@ -21,6 +21,9 @@ pub struct ShapeKey {
 #[derive(Debug, Default)]
 pub struct ShapeCache(pub HashMap<ShapeKey, GlyphBuffer>);
 
+#[derive(Debug, Default)]
+pub struct TextTextureCache(pub HashMap<ShapeKey, TextDrawResponse>);
+
 impl std::fmt::Debug for OwnedTypeFace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut d = f.debug_struct("OwnedTypeFace");
@@ -108,6 +111,7 @@ pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBo
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TextDrawResponse {
     pub pixmap: tiny_skia::Pixmap,
     pub xoffset: i32,
