@@ -515,7 +515,9 @@ where
 {
     fn build(self, app: &mut crate::App) {
         app.add_extract_system(extractor_system::<T>);
-        app.render_app_mut().with_stage(crate::Stage::Update, |s| {
+        let render_app = app.render_app_mut();
+        render_app.insert_resource(ExtractionTick(0));
+        render_app.with_stage(crate::Stage::Update, |s| {
             s.add_system(gc_system::<T>);
         });
     }

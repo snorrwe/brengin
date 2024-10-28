@@ -123,17 +123,14 @@ fn extract_render_data(
     render_world: &mut World,
     render_extract: &SystemStage,
 ) {
-    render_world
-        .run_system(
-            |mut cmd: Commands, tick: Option<ResMut<ExtractionTick>>| match tick {
-                Some(mut t) => t.0 += 1,
-                None => cmd.insert_resource(ExtractionTick(0)),
-            },
-        )
-        .unwrap();
     let Some(mut gw) = game_world.try_lock_for(Duration::from_millis(1)) else {
         return;
     };
+    render_world
+        .run_system(|mut tick: ResMut<ExtractionTick>| {
+            tick.0 += 1;
+        })
+        .unwrap();
     render_world.insert_resource(GameWorld {
         world: NonNull::from(&mut *gw),
     });
