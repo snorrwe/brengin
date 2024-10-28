@@ -168,7 +168,6 @@ impl Ui {
 
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
-                // TODO: scaling_factor...
                 let pic = super::text::draw_glyph_buffer(self.font.face(), &glyphs, size).unwrap();
 
                 ShapingResult {
