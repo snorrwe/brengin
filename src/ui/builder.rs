@@ -180,9 +180,6 @@ impl Ui {
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
         let label = label.into();
-        let x = self.bounds.x;
-        let y = self.bounds.y;
-        let [x, y] = [x + PADDING, y + PADDING];
 
         let id = self.current_id();
         let mut pressed = false;
@@ -233,6 +230,9 @@ impl Ui {
                 // panic!("{}", label);
             }
         }
+        let x = self.bounds.x;
+        let y = self.bounds.y;
+        let [x, y] = [x + PADDING, y + PADDING];
         self.bounds.y += h + 2 * PADDING + 2 * TEXT_PADDING;
         // background
         self.rect(x, y, w + 2 * TEXT_PADDING, h + 2 * TEXT_PADDING, color);

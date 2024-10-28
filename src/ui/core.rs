@@ -199,9 +199,10 @@ fn update_instances(
             // flip y
             let y = h - rect.y as f32;
             DrawRectInstance {
-                x: (rect.x as f32 + ww * 0.5) / w,
+                x: (rect.x as f32 + ww) / w,
                 y: (y - hh) / h,
-                w: ww / w,
+                // w: ww / w,
+                w: rect.w as f32 / w,
                 h: rect.h as f32 / h,
                 color: rect.color,
             }
