@@ -168,7 +168,8 @@ impl Ui {
             .or_insert_with(|| {
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
-                super::text::draw_glyph_buffer(font.face(), &glyphs).unwrap()
+                // TODO: scaling_factor...
+                super::text::draw_glyph_buffer(font.face(), &glyphs, FONT_SIZE).unwrap()
             });
 
         texture
@@ -214,8 +215,10 @@ impl Ui {
         // TODO: width height from label content
 
         self.rect(x, y, w, h, color);
+        const TEXT_PADDING: u32 = 5;
         // shape the text
         {
+            let mut text_box = UiRect::default();
             for line in label.split('\n').filter(|l| !l.is_empty()) {
                 let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
                 let pic = Self::draw_text_texture(

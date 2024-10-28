@@ -118,14 +118,27 @@ pub struct TextDrawResponse {
     pub yoffset: i32,
 }
 
+impl TextDrawResponse {
+    pub fn width(&self) -> u32 {
+        self.pixmap.width()
+    }
+
+    pub fn height(&self) -> u32 {
+        self.pixmap.height()
+    }
+}
+
 pub fn draw_glyph_buffer(
     face: &rustybuzz::Face,
     glyphs: &GlyphBuffer,
+    height: u32,
 ) -> anyhow::Result<TextDrawResponse> {
-    let mut builder = TextOutlineBuilder::new();
-    builder.scaling_factor = 1.0 / 10.0;
-
     let bounds = get_bounds(face, glyphs);
+
+    let scaling_factor = height as f32 / bounds.bounds.h as f32;
+
+    let mut builder = TextOutlineBuilder::new();
+    builder.scaling_factor = scaling_factor;
 
     builder.xoffset = bounds.padding_x as f32 * builder.scaling_factor;
     builder.yoffset = bounds.padding_y as f32 * builder.scaling_factor;
