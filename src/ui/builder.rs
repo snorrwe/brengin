@@ -321,6 +321,7 @@ fn begin_frame(mut ui: ResMut<Ui>, size: Res<crate::renderer::WindowSize>) {
         h: size.height,
     };
 
+    // TODO: remove
     std::fs::create_dir_all("target/out").unwrap();
     for (k, v) in ui.texture_cache.0.iter() {
         let pic = &v.texture.pixmap;
