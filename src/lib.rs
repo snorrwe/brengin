@@ -15,6 +15,7 @@ pub use cecs;
 pub use glam;
 pub use image;
 use instant::Instant;
+use tracing::warn;
 use ui::UiPlugin;
 pub use wgpu;
 pub use winit;
@@ -123,7 +124,8 @@ fn extract_render_data(
     render_world: &mut World,
     render_extract: &SystemStage,
 ) {
-    let Some(mut gw) = game_world.try_lock_for(Duration::from_millis(1)) else {
+    let Some(mut gw) = game_world.try_lock_for(Duration::from_millis(6)) else {
+        tracing::debug!("game_world lock failed. rendering the previous frame");
         return;
     };
     render_world
