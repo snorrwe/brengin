@@ -176,21 +176,6 @@ impl Ui {
             self.set_hovered(id);
         }
 
-        // TODO: render the button
-        // TODO: width height from label content
-
-        // shape the text
-        {
-            for line in label.split('\n').filter(|l| !l.is_empty()) {
-                let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
-
-                let bounds = super::text::get_bounds(self.font.face(), &glyphs);
-                if let Some(Aabb { x, y, w, h }) = bounds {
-                    self.rect(x, y, w, h, 0x00FF00FF);
-                }
-            }
-        }
-
         // test color
         let color = {
             let mut hash = 0x81aaaaaau32;
@@ -202,7 +187,21 @@ impl Ui {
             hash
         };
 
+        // TODO: render the button
+        // TODO: width height from label content
+
         self.rect(x, y, w, h, color);
+        // shape the text
+        {
+            for line in label.split('\n').filter(|l| !l.is_empty()) {
+                let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
+
+                let bounds = super::text::get_bounds(self.font.face(), &glyphs);
+                if let Some(Aabb { x, y, w, h }) = bounds {
+                    self.rect(x, y, w, h, 0x00FF00FF);
+                }
+            }
+        }
 
         ButtonResponse {
             inner: Response {
