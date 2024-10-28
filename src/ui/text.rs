@@ -74,8 +74,8 @@ pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> Option<super:
         }
     }
     has.then(|| {
-        let extx = (maxx + 1) / 2;
-        let exty = (maxx + 1) / 2;
+        let extx = maxx / 2;
+        let exty = maxx / 2;
 
         super::builder::Aabb {
             x: extx as u32,
