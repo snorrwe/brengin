@@ -478,9 +478,10 @@ fn extractor_system<T: Extract>(
     game_world
         .world()
         .run_view_system(|q: Query<(EntityId, T::QueryItem), T::Filter>| {
+            let tick: ExtractionTick = *tick;
             for (id, q) in q.iter() {
                 if let Some(out) = <T as Extract>::extract(q) {
-                    cmd.insert_id(id).insert(*tick).insert_bundle(out);
+                    cmd.insert_id(id).insert(tick).insert_bundle(out);
                 }
             }
         });
