@@ -197,8 +197,9 @@ impl Ui {
             for line in label.split('\n').filter(|l| !l.is_empty()) {
                 let glyphs = Self::shape_text(&mut self.shape_cache, line.to_owned(), &self.font);
 
-                let bounds = super::text::get_bounds(self.font.face(), &glyphs);
-                if let Some(UiRect { x, y, w, h }) = bounds {
+                if let Some(UiRect { x, y, w, h }) =
+                    super::text::get_bounds(self.font.face(), &glyphs)
+                {
                     self.rect(x, y, w, h, 0x00FF00FF);
                 }
             }
