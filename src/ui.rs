@@ -2,6 +2,7 @@ use crate::Plugin;
 
 pub mod builder;
 pub mod core;
+pub mod text;
 
 pub struct UiPlugin;
 
