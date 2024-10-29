@@ -1,5 +1,5 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
-use brengin::ui::builder::Ui;
+use brengin::ui::Ui;
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
 use glam::Vec3;
