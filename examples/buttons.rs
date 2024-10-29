@@ -5,7 +5,7 @@ use brengin::{App, DefaultPlugins};
 use glam::Vec3;
 use tracing::info;
 
-fn buttons_ui(mut ctx: ResMut<Ui>) {
+fn buttons_ui(mut ctx: Ui) {
     ctx.grid(4, |mut cols| {
         for col in 0..4 {
             cols.column(col, |ui| {

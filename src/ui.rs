@@ -4,9 +4,9 @@ pub mod core;
 pub mod rect;
 pub mod text;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ptr::NonNull};
 
-use cecs::prelude::*;
+use cecs::{prelude::*, query};
 
 use {
     core::{DrawRect, RectRequests},
@@ -20,7 +20,8 @@ impl Plugin for UiPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(core::UiCorePlugin);
         let font = text::load_font("/nix/store/a7xny2d815wb4x4rqrq3fl5dhxrqlxrn-X11-fonts/share/X11/fonts/DejaVuSans-Bold.ttf", 0).unwrap();
-        app.insert_resource(Ui::new(font));
+        app.insert_resource(UiState::new(font));
+        app.insert_resource(TextTextureCache::default());
         app.add_startup_system(setup);
         app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(begin_frame);
@@ -51,7 +52,7 @@ pub struct ShapingResult {
 
 /// UI context object. Use this to builder your user interface
 #[derive(Debug)]
-pub struct Ui {
+pub struct UiState {
     hovered: UiId,
     active: UiId,
     /// stack of parents in the ui tree
@@ -61,7 +62,6 @@ pub struct Ui {
     bounds: UiRect,
 
     font: OwnedTypeFace,
-    texture_cache: TextTextureCache,
 
     /// layers go from back to front
     layer: u16,
@@ -70,7 +70,7 @@ pub struct Ui {
 const FONT_SIZE: u32 = 12;
 const PADDING: u32 = 5;
 
-impl Ui {
+impl UiState {
     pub fn new(font: OwnedTypeFace) -> Self {
         Self {
             hovered: Default::default(),
@@ -78,26 +78,27 @@ impl Ui {
             id_stack: Default::default(),
             rects: Default::default(),
             bounds: Default::default(),
-            texture_cache: Default::default(),
             layer: 0,
             font,
         }
     }
+}
 
+impl<'a> Ui<'a> {
     #[inline]
     fn set_hovered(&mut self, id: UiId) {
-        self.hovered = id;
+        self.ui.hovered = id;
     }
 
     #[inline]
     fn set_active(&mut self, id: UiId) {
-        self.active = id;
+        self.ui.active = id;
     }
 
     #[inline]
     fn parent(&self) -> IdType {
-        if self.id_stack.len() >= 2 {
-            self.id_stack[self.id_stack.len() - 2]
+        if self.ui.id_stack.len() >= 2 {
+            self.ui.id_stack[self.ui.id_stack.len() - 2]
         } else {
             SENTINEL
         }
@@ -105,8 +106,8 @@ impl Ui {
 
     #[inline]
     fn current_idx(&self) -> IdType {
-        assert!(!self.id_stack.is_empty());
-        unsafe { *self.id_stack.last().unwrap_unchecked() }
+        assert!(!self.ui.id_stack.is_empty());
+        unsafe { *self.ui.id_stack.last().unwrap_unchecked() }
     }
 
     #[inline]
@@ -119,12 +120,12 @@ impl Ui {
 
     #[inline]
     fn is_active(&self, id: UiId) -> bool {
-        self.active == id
+        self.ui.active == id
     }
 
     #[inline]
     fn is_hovered(&self, id: UiId) -> bool {
-        self.hovered == id
+        self.ui.hovered == id
     }
 
     #[inline]
@@ -147,14 +148,17 @@ impl Ui {
 
     #[inline]
     fn set_not_active(&mut self, id: UiId) {
-        if self.active == id {
-            self.active = UiId::SENTINEL;
+        if self.ui.active == id {
+            self.ui.active = UiId::SENTINEL;
         }
     }
 
-    pub fn grid(&mut self, columns: u32, mut contents: impl FnMut(Columns)) {
-        self.id_stack.push(0);
-        let bounds = self.bounds;
+    pub fn grid<'b>(&mut self, columns: u32, mut contents: impl FnMut(Columns) + 'b)
+    where
+        'a: 'b,
+    {
+        self.ui.id_stack.push(0);
+        let bounds = self.ui.bounds;
         let width = bounds.w / columns + 1;
 
         let dims = (0..columns)
@@ -162,15 +166,15 @@ impl Ui {
             .collect();
 
         contents(Columns {
-            ctx: self,
+            ctx: self.into(),
             cols: columns,
             dims,
         });
-        self.id_stack.pop();
+        self.ui.id_stack.pop();
     }
 
     pub fn rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: u32, layer: u16) {
-        self.rects.push(DrawRect {
+        self.ui.rects.push(DrawRect {
             x,
             y,
             w: width,
@@ -190,11 +194,11 @@ impl Ui {
             .or_insert_with(|| {
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
-                let glyphs = rustybuzz::shape(self.font.face(), &[], buffer);
+                let glyphs = rustybuzz::shape(self.ui.font.face(), &[], buffer);
 
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
-                let pic = text::draw_glyph_buffer(self.font.face(), &glyphs, size).unwrap();
+                let pic = text::draw_glyph_buffer(self.ui.font.face(), &glyphs, size).unwrap();
 
                 ShapingResult {
                     unicodebuffer: buffer,
@@ -205,7 +209,7 @@ impl Ui {
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
-        let layer = self.layer;
+        let layer = self.ui.layer;
         let label = label.into();
 
         let id = self.current_id();
@@ -245,10 +249,10 @@ impl Ui {
             w = w.max(pic.width());
             h += pic.height();
         }
-        let x = self.bounds.x;
-        let y = self.bounds.y;
+        let x = self.ui.bounds.x;
+        let y = self.ui.bounds.y;
         let [x, y] = [x + PADDING, y + PADDING];
-        self.bounds.y += h + 2 * PADDING + 2 * TEXT_PADDING;
+        self.ui.bounds.y += h + 2 * PADDING + 2 * TEXT_PADDING;
         // text
         // TODO: use the textures
         self.rect(
@@ -271,8 +275,8 @@ impl Ui {
 
         ButtonResponse {
             inner: Response {
-                hovered: self.hovered == id,
-                active: self.active == id,
+                hovered: self.ui.hovered == id,
+                active: self.ui.active == id,
                 inner: (),
                 rect: UiRect { x, y, w, h },
             },
@@ -322,7 +326,7 @@ impl ButtonResponse {
 }
 
 pub struct Columns<'a> {
-    ctx: &'a mut Ui,
+    ctx: NonNull<Ui<'a>>,
     cols: u32,
     dims: Vec<[u32; 2]>,
 }
@@ -330,18 +334,19 @@ pub struct Columns<'a> {
 impl<'a> Columns<'a> {
     pub fn column(&mut self, i: u32, mut contents: impl FnMut(&mut Ui)) {
         assert!(i < self.cols);
+        let ctx = unsafe { self.ctx.as_mut() };
         let idx = i as usize;
-        let bounds = self.ctx.bounds;
-        self.ctx.bounds.x = self.dims[idx][0];
-        self.ctx.bounds.w = self.dims[idx][1] - self.dims[idx][0];
-        let w = self.ctx.bounds.w;
-        *self.ctx.id_stack.last_mut().unwrap() = i;
-        let layer = self.ctx.layer;
-        self.ctx.layer += 1;
-        contents(self.ctx);
-        let rect = self.ctx.bounds;
-        self.ctx.bounds.y = bounds.y;
-        self.ctx.bounds.h = bounds.h;
+        let bounds = ctx.ui.bounds;
+        ctx.ui.bounds.x = self.dims[idx][0];
+        ctx.ui.bounds.w = self.dims[idx][1] - self.dims[idx][0];
+        let w = ctx.ui.bounds.w;
+        *ctx.ui.id_stack.last_mut().unwrap() = i;
+        let layer = ctx.ui.layer;
+        ctx.ui.layer += 1;
+        contents(ctx);
+        let rect = ctx.ui.bounds;
+        ctx.ui.bounds.y = bounds.y;
+        ctx.ui.bounds.h = bounds.h;
         if rect.w > w && i + 1 < self.cols {
             let diff = rect.w - w;
             for d in &mut self.dims[idx + 1..] {
@@ -349,11 +354,15 @@ impl<'a> Columns<'a> {
                 d[1] += diff;
             }
         }
-        self.ctx.layer = layer;
+        ctx.ui.layer = layer;
     }
 }
 
-fn begin_frame(mut ui: ResMut<Ui>, size: Res<crate::renderer::WindowSize>) {
+fn begin_frame(
+    mut ui: ResMut<UiState>,
+    texture_cache: Res<TextTextureCache>,
+    size: Res<crate::renderer::WindowSize>,
+) {
     ui.rects.clear();
     ui.bounds = UiRect {
         x: 0,
@@ -365,13 +374,13 @@ fn begin_frame(mut ui: ResMut<Ui>, size: Res<crate::renderer::WindowSize>) {
 
     // TODO: remove
     std::fs::create_dir_all("target/out").unwrap();
-    for (k, v) in ui.texture_cache.0.iter() {
+    for (k, v) in texture_cache.0.iter() {
         let pic = &v.texture.pixmap;
         pic.save_png(format!("target/out/{}.png", k.text)).unwrap();
     }
 }
 
-fn submit_frame(mut ui: ResMut<Ui>, mut rects: Query<&mut RectRequests>) {
+fn submit_frame(mut ui: ResMut<UiState>, mut rects: Query<&mut RectRequests>) {
     if let Some(dst) = rects.single_mut() {
         std::mem::swap(&mut ui.rects, &mut dst.0);
     }
@@ -379,4 +388,17 @@ fn submit_frame(mut ui: ResMut<Ui>, mut rects: Query<&mut RectRequests>) {
 
 fn setup(mut cmd: Commands) {
     cmd.spawn().insert(RectRequests::default());
+}
+
+pub struct Ui<'a> {
+    ui: ResMut<'a, UiState>,
+    texture_cache: ResMut<'a, TextTextureCache>,
+}
+
+unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
+    fn new(db: &'a World, _system_idx: usize) -> Self {
+        let ui = ResMut::new(db);
+        let texture_cache = ResMut::new(db);
+        Self { ui, texture_cache }
+    }
 }
