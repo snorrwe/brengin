@@ -339,6 +339,8 @@ impl<'a> Columns<'a> {
         self.ctx.bounds.w = self.dims[idx][1] - self.dims[idx][0];
         let w = self.ctx.bounds.w;
         *self.ctx.id_stack.last_mut().unwrap() = i;
+        let layer = self.ctx.layer;
+        self.ctx.layer += 1;
         contents(self.ctx);
         let rect = self.ctx.bounds;
         self.ctx.bounds.y = bounds.y;
@@ -350,6 +352,7 @@ impl<'a> Columns<'a> {
                 d[1] += diff;
             }
         }
+        self.ctx.layer = layer;
     }
 }
 
