@@ -235,9 +235,6 @@ impl Ui {
             hash
         };
 
-        // TODO: render the button
-        // TODO: width height from label content
-
         const TEXT_PADDING: u32 = 5;
         // shape the text
         let mut w = 0;
