@@ -10,6 +10,7 @@ use tracing::debug;
 use crate::Plugin;
 
 pub type AssetId = u64;
+pub const ASSET_ID_SENTINEL: u64 = AssetId::MAX;
 
 struct RefCount {
     data_references: AtomicUsize,
@@ -23,7 +24,7 @@ pub struct Handle<T> {
 
 impl<T> Default for Handle<T> {
     fn default() -> Self {
-        Self::new(AssetId::MAX)
+        Self::new(ASSET_ID_SENTINEL)
     }
 }
 
