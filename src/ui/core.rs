@@ -82,7 +82,7 @@ impl DrawRectInstance {
 }
 
 struct RectPipeline {
-    render_pipeline: wgpu::RenderPipeline,
+    color_rect_pipeline: wgpu::RenderPipeline,
     ui_rect_layout: wgpu::BindGroupLayout,
 }
 
@@ -92,7 +92,7 @@ impl RectPipeline {
             renderer
                 .device()
                 .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("Ui Rect Uniform Layout"),
+                    label: Some("Ui Color Rect Uniform Layout"),
                     entries: &[wgpu::BindGroupLayoutEntry {
                         binding: 0,
                         visibility: wgpu::ShaderStages::all(),
@@ -108,20 +108,18 @@ impl RectPipeline {
             .device()
             .create_shader_module(include_wgsl!("ui-rect.wgsl"));
 
-        let render_pipeline_layout =
-            renderer
-                .device()
-                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Ui Rect Render Pipeline Layout"),
-                    bind_group_layouts: &[],
-                    push_constant_ranges: &[],
-                });
-        let render_pipeline =
+        let color_rect_pipeline =
             renderer
                 .device()
                 .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("Ui Rect Render Pipeline"),
-                    layout: Some(&render_pipeline_layout),
+                    label: Some("Ui Color Rect Render Pipeline"),
+                    layout: Some(&renderer.device().create_pipeline_layout(
+                        &wgpu::PipelineLayoutDescriptor {
+                            label: Some("Ui Color Rect Render Pipeline Layout"),
+                            bind_group_layouts: &[],
+                            push_constant_ranges: &[],
+                        },
+                    )),
                     vertex: wgpu::VertexState {
                         module: &shader,
                         entry_point: "vs_main",
@@ -165,7 +163,7 @@ impl RectPipeline {
 
         RectPipeline {
             ui_rect_layout,
-            render_pipeline,
+            color_rect_pipeline,
         }
     }
 }
@@ -179,7 +177,9 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
     );
 
     fn render<'r>(input: &'r mut RenderCommandInput<'a>, (rects, pipeline): &'r Self::Parameters) {
-        input.render_pass.set_pipeline(&pipeline.render_pipeline);
+        input
+            .render_pass
+            .set_pipeline(&pipeline.color_rect_pipeline);
         for requests in rects.iter() {
             input
                 .render_pass
