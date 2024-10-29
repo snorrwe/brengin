@@ -5,6 +5,7 @@ struct Vertex {
 struct Instance {
     @location(0) xywh: vec4<f32>,
     @location(1) color: u32,
+    @location(2) layer: f32,
 }
 
 struct VertexOutput {
@@ -61,7 +62,7 @@ fn vs_main(
     // remap to -1..1
     let pos = xywh.xy * 2 - 1;
 
-    out.clip_position = vec4<f32>(pos + vertex, 0.0, 1.0);
+    out.clip_position = vec4<f32>(pos + vertex, instance.layer, 1.0);
     return out;
 }
 

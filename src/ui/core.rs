@@ -1,8 +1,8 @@
 use std::mem::size_of;
 
 use crate::renderer::{
-    ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin,
-    RenderPass,
+    texture, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput,
+    RenderCommandPlugin, RenderPass,
 };
 use crate::wgpu::include_wgsl;
 use cecs::prelude::*;
@@ -39,6 +39,7 @@ pub struct DrawRect {
     pub y: u32,
     pub w: u32,
     pub h: u32,
+    pub layer: u16,
     pub color: u32,
 }
 
@@ -51,6 +52,7 @@ pub struct DrawRectInstance {
     pub w: f32,
     pub h: f32,
     pub color: u32,
+    pub layer: f32,
 }
 
 impl DrawRectInstance {
@@ -68,6 +70,11 @@ impl DrawRectInstance {
                     offset: size_of::<[u32; 4]>() as wgpu::BufferAddress,
                     shader_location: 1,
                     format: wgpu::VertexFormat::Uint32,
+                },
+                wgpu::VertexAttribute {
+                    offset: (size_of::<[u32; 4]>() + size_of::<u32>()) as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32,
                 },
             ],
         }
@@ -140,7 +147,13 @@ impl RectPipeline {
                         unclipped_depth: false,
                         conservative: false,
                     },
-                    depth_stencil: None,
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: texture::Texture::DEPTH_FORMAT,
+                        depth_write_enabled: true,
+                        depth_compare: wgpu::CompareFunction::Less,
+                        stencil: wgpu::StencilState::default(),
+                        bias: wgpu::DepthBiasState::default(),
+                    }),
                     multisample: wgpu::MultisampleState {
                         count: 1,
                         mask: !0,
@@ -198,12 +211,16 @@ fn update_instances(
             let hh = rect.h as f32 * 0.5;
             // flip y
             let y = h - rect.y as f32;
+            // switch order of layers, lower layers are in the front
+            // remap to 0..1
+            let layer = (0xFFFF - rect.layer) as f32 / (0xFFFF as f32);
             DrawRectInstance {
                 x: (rect.x as f32 + ww) / w,
                 y: (y - hh) / h,
                 // w: ww / w,
                 w: rect.w as f32 / w,
                 h: rect.h as f32 / h,
+                layer,
                 color: rect.color,
             }
         }));

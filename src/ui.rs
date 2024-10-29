@@ -62,6 +62,9 @@ pub struct Ui {
 
     font: OwnedTypeFace,
     texture_cache: TextTextureCache,
+
+    /// layers go from back to front
+    layer: u16,
 }
 
 const FONT_SIZE: u32 = 12;
@@ -76,6 +79,7 @@ impl Ui {
             rects: Default::default(),
             bounds: Default::default(),
             texture_cache: Default::default(),
+            layer: 0,
             font,
         }
     }
@@ -165,13 +169,14 @@ impl Ui {
         self.id_stack.pop();
     }
 
-    pub fn rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: u32) {
+    pub fn rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: u32, layer: u16) {
         self.rects.push(DrawRect {
             x,
             y,
             w: width,
             h: height,
             color,
+            layer,
         })
     }
 
@@ -200,6 +205,7 @@ impl Ui {
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
+        let layer = self.layer;
         let label = label.into();
 
         let id = self.current_id();
@@ -246,11 +252,25 @@ impl Ui {
         let y = self.bounds.y;
         let [x, y] = [x + PADDING, y + PADDING];
         self.bounds.y += h + 2 * PADDING + 2 * TEXT_PADDING;
-        // background
-        self.rect(x, y, w + 2 * TEXT_PADDING, h + 2 * TEXT_PADDING, color);
         // text
         // TODO: use the textures
-        self.rect(x + TEXT_PADDING, y + TEXT_PADDING, w, h, 0x000F0FFF);
+        self.rect(
+            x + TEXT_PADDING,
+            y + TEXT_PADDING,
+            w,
+            h,
+            0x000F0FFF,
+            layer + 1,
+        );
+        // background
+        self.rect(
+            x,
+            y,
+            w + 2 * TEXT_PADDING,
+            h + 2 * TEXT_PADDING,
+            color,
+            layer,
+        );
 
         ButtonResponse {
             inner: Response {
@@ -341,6 +361,7 @@ fn begin_frame(mut ui: ResMut<Ui>, size: Res<crate::renderer::WindowSize>) {
         w: size.width,
         h: size.height,
     };
+    ui.layer = 0;
 
     // TODO: remove
     std::fs::create_dir_all("target/out").unwrap();
