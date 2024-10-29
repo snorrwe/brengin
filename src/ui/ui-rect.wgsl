@@ -14,22 +14,6 @@ struct VertexOutput {
     @location(1) color: vec4<f32>,
 }
 
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    return (1.0 - t) * a + t * b;
-}
-
-fn lerp_vec2(a: vec2<f32>, b: vec2<f32>, t: vec2<f32>) -> vec2<f32> {
-    return vec2<f32>(lerp(a.x, b.x, t.x), lerp(a.y, b.y, t.y));
-}
-
-fn inv_lerp(a: f32, b: f32, val: f32) -> f32 {
-    return (val - a) / (b - a);
-}
-
-fn inv_lerp_vec2(a: vec2<f32>, b: vec2<f32>, val: vec2<f32>) -> vec2<f32> {
-    return vec2(inv_lerp(a.x, b.x, val.x), inv_lerp(a.y, b.y, val.y));
-}
-
 @vertex
 fn vs_main(
     model: Vertex,
