@@ -403,4 +403,9 @@ unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
         let texture_cache = ResMut::new(db);
         Self { ui, texture_cache }
     }
+
+    fn resources_mut(set: &mut std::collections::HashSet<std::any::TypeId>) {
+        set.insert(std::any::TypeId::of::<UiState>());
+        set.insert(std::any::TypeId::of::<TextTextureCache>());
+    }
 }
