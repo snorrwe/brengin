@@ -1,4 +1,7 @@
-use crate::Plugin;
+use crate::{
+    assets::{self, AssetsPlugin},
+    Plugin,
+};
 
 pub mod core;
 pub mod rect;
@@ -25,6 +28,7 @@ impl Plugin for UiPlugin {
         app.insert_resource(UiState::new(font));
         app.insert_resource(TextTextureCache::default());
         app.add_startup_system(setup);
+        app.add_plugin(AssetsPlugin::<ShapingResult>::default());
         app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(begin_frame);
         });
@@ -41,9 +45,8 @@ pub struct ShapeKey {
     // TODO: include font handle, shaping info etc
 }
 
-// TODO: GC, assets?
-#[derive(Debug, Default)]
-pub struct TextTextureCache(pub HashMap<ShapeKey, ShapingResult>);
+#[derive(Default)]
+pub struct TextTextureCache(pub HashMap<ShapeKey, assets::Handle<ShapingResult>>);
 
 #[derive(Debug)]
 pub struct ShapingResult {
@@ -187,7 +190,8 @@ impl<'a> Ui<'a> {
     }
 
     fn shape_and_draw_line(&mut self, line: String, size: u32) -> &mut ShapingResult {
-        self.texture_cache
+        let handle = self
+            .texture_cache
             .0
             .entry(ShapeKey {
                 text: line.clone(),
@@ -202,12 +206,16 @@ impl<'a> Ui<'a> {
                 buffer.push_str(&line);
                 let pic = text::draw_glyph_buffer(self.ui.font.face(), &glyphs, size).unwrap();
 
-                ShapingResult {
+                let shaping = ShapingResult {
                     unicodebuffer: buffer,
                     glyphs,
                     texture: pic,
-                }
-            })
+                };
+
+                self.shaping_results.insert(shaping)
+            });
+
+        self.shaping_results.get_mut(handle)
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
@@ -362,7 +370,7 @@ impl<'a> Columns<'a> {
 
 fn begin_frame(
     mut ui: ResMut<UiState>,
-    texture_cache: Res<TextTextureCache>,
+    texture_cache: Res<assets::Assets<ShapingResult>>,
     size: Res<crate::renderer::WindowSize>,
 ) {
     ui.rects.clear();
@@ -376,9 +384,9 @@ fn begin_frame(
 
     // TODO: remove
     std::fs::create_dir_all("target/out").unwrap();
-    for (k, v) in texture_cache.0.iter() {
+    for (k, v) in texture_cache.iter() {
         let pic = &v.texture.pixmap;
-        pic.save_png(format!("target/out/{}.png", k.text)).unwrap();
+        pic.save_png(format!("target/out/{}.png", k)).unwrap();
     }
 }
 
@@ -395,17 +403,24 @@ fn setup(mut cmd: Commands) {
 pub struct Ui<'a> {
     ui: ResMut<'a, UiState>,
     texture_cache: ResMut<'a, TextTextureCache>,
+    shaping_results: ResMut<'a, assets::Assets<ShapingResult>>,
 }
 
 unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
     fn new(db: &'a World, _system_idx: usize) -> Self {
         let ui = ResMut::new(db);
         let texture_cache = ResMut::new(db);
-        Self { ui, texture_cache }
+        let text_assets = ResMut::new(db);
+        Self {
+            ui,
+            texture_cache,
+            shaping_results: text_assets,
+        }
     }
 
     fn resources_mut(set: &mut std::collections::HashSet<std::any::TypeId>) {
         set.insert(std::any::TypeId::of::<UiState>());
         set.insert(std::any::TypeId::of::<TextTextureCache>());
+        set.insert(std::any::TypeId::of::<assets::Assets<ShapingResult>>());
     }
 }
