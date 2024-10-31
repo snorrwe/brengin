@@ -72,6 +72,10 @@ impl GameWorld {
     pub fn world(&self) -> &World {
         unsafe { self.world.as_ref() }
     }
+
+    pub fn world_mut(&mut self) -> &mut World {
+        unsafe { self.world.as_mut() }
+    }
 }
 
 impl Timer {
