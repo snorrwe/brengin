@@ -613,7 +613,7 @@ fn texture_to_bindings(
                 resource: wgpu::BindingResource::Sampler(&texture.sampler),
             },
         ],
-        label: Some("diffuse_bind_group"),
+        label: Some("sprite_texture_bind_group"),
     });
     (texture_bind_group_layout, diffuse_bind_group)
 }
