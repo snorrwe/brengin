@@ -368,11 +368,7 @@ impl<'a> Columns<'a> {
     }
 }
 
-fn begin_frame(
-    mut ui: ResMut<UiState>,
-    texture_cache: Res<assets::Assets<ShapingResult>>,
-    size: Res<crate::renderer::WindowSize>,
-) {
+fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) {
     ui.rects.clear();
     ui.bounds = UiRect {
         x: 0,
@@ -381,13 +377,6 @@ fn begin_frame(
         h: size.height,
     };
     ui.layer = 0;
-
-    // TODO: remove
-    std::fs::create_dir_all("target/out").unwrap();
-    for (k, v) in texture_cache.iter() {
-        let pic = &v.texture.pixmap;
-        pic.save_png(format!("target/out/{}.png", k)).unwrap();
-    }
 }
 
 fn submit_frame(mut ui: ResMut<UiState>, mut rects: Query<&mut RectRequests>) {
