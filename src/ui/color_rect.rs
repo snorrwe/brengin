@@ -322,9 +322,9 @@ fn update_instances(
     }
 }
 
-pub struct UiCorePlugin;
+pub struct UiColorRectPlugin;
 
-impl Plugin for UiCorePlugin {
+impl Plugin for UiColorRectPlugin {
     fn build(self, app: &mut crate::App) {
         app.insert_resource(RectRequests::default());
         app.add_plugin(ExtractionPlugin::<RectRequests>::default());

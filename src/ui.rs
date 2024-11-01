@@ -3,7 +3,7 @@ use crate::{
     Plugin,
 };
 
-pub mod core;
+pub mod color_rect;
 pub mod rect;
 pub mod text;
 
@@ -12,7 +12,7 @@ use std::{collections::HashMap, ptr::NonNull};
 use cecs::{prelude::*, query};
 
 use {
-    core::{DrawRect, RectRequests},
+    color_rect::{DrawRect, RectRequests},
     rect::UiRect,
     text::{OwnedTypeFace, TextDrawResponse},
 };
@@ -21,7 +21,7 @@ pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(self, app: &mut crate::App) {
-        app.add_plugin(core::UiCorePlugin);
+        app.add_plugin(color_rect::UiColorRectPlugin);
         // FIXME: include some default font, or system font?
         // maybe even make it a property of the plugin, so users can set what font is loaded?
         let font = text::load_font("/nix/store/a7xny2d815wb4x4rqrq3fl5dhxrqlxrn-X11-fonts/share/X11/fonts/DejaVuSans-Bold.ttf", 0).unwrap();
