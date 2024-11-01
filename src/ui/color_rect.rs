@@ -1,17 +1,13 @@
-use std::collections::HashMap;
 use std::mem::size_of;
 
-use crate::assets::{AssetId, Assets, WeakHandle};
 use crate::renderer::texture::Texture;
 use crate::renderer::{
     texture, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput,
     RenderCommandPlugin, RenderPass,
 };
 use crate::wgpu::include_wgsl;
-use crate::GameWorld;
 use cecs::prelude::*;
-use tracing::debug;
-use wgpu::util::{DeviceExt as _, RenderEncoder};
+use wgpu::util::DeviceExt as _;
 
 use crate::{renderer::Extract, Plugin};
 
@@ -89,65 +85,11 @@ impl DrawRectInstance {
 struct RectPipeline {
     color_rect_pipeline: wgpu::RenderPipeline,
     ui_rect_layout: wgpu::BindGroupLayout,
-    textures: HashMap<AssetId, UiTextureRenderingData>,
 }
 
 pub struct UiTextureRenderingData {
     pub texture_bind_group: wgpu::BindGroup,
     pub texture: Texture,
-}
-
-#[derive(Default)]
-struct UiTextureReferences(pub HashMap<AssetId, WeakHandle<super::ShapingResult>>);
-
-fn gc_text_textures(
-    mut texturerefs: ResMut<UiTextureReferences>,
-    mut pipeline: ResMut<RectPipeline>,
-) {
-    texturerefs.0.retain(|id, handle| {
-        if handle.upgrade().is_none() {
-            debug!(id, "Collecting expired text texture");
-            pipeline.textures.remove(id);
-            return false;
-        }
-        true
-    });
-}
-
-fn extract_shaping_results(
-    renderer: Res<GraphicsState>,
-    mut pipeline: ResMut<RectPipeline>,
-    mut refs: ResMut<UiTextureReferences>,
-    game_world: Res<GameWorld>,
-) {
-    game_world.world().run_view_system(
-        |cache: Res<super::TextTextureCache>,
-         shaping_results: Res<Assets<super::ShapingResult>>| {
-            for handle in cache.0.values() {
-                let res = shaping_results.get(handle);
-                let id = handle.id();
-                if !refs.0.contains_key(&id) {
-                    let texture = Texture::from_rgba8(
-                        renderer.device(),
-                        renderer.queue(),
-                        res.texture.pixmap.data(),
-                        (res.texture.width(), res.texture.height()),
-                        None,
-                    )
-                    .expect("Failed to create text texture");
-                    let texture_bind_group = texture_to_bindings(renderer.device(), &texture);
-
-                    refs.0.insert(id, handle.downgrade());
-                    let rendering_data = UiTextureRenderingData {
-                        texture_bind_group,
-                        texture,
-                    };
-
-                    pipeline.textures.insert(id, rendering_data);
-                };
-            }
-        },
-    );
 }
 
 impl RectPipeline {
@@ -172,9 +114,6 @@ impl RectPipeline {
             .device()
             .create_shader_module(include_wgsl!("ui-rect.wgsl"));
 
-        let texture_bind_group_layout =
-            texture_bind_group_layout(renderer.device(), "ui-texture-layout");
-
         let color_rect_pipeline =
             renderer
                 .device()
@@ -183,10 +122,7 @@ impl RectPipeline {
                     layout: Some(&renderer.device().create_pipeline_layout(
                         &wgpu::PipelineLayoutDescriptor {
                             label: Some("Ui Color Rect Render Pipeline Layout"),
-                            bind_group_layouts: &[
-                                // TODO:
-                                // &texture_bind_group_layout,
-                            ],
+                            bind_group_layouts: &[],
                             push_constant_ranges: &[],
                         },
                     )),
@@ -234,7 +170,6 @@ impl RectPipeline {
         RectPipeline {
             ui_rect_layout,
             color_rect_pipeline,
-            textures: Default::default(),
         }
     }
 }
@@ -332,61 +267,11 @@ impl Plugin for UiColorRectPlugin {
         app.add_plugin(RenderCommandPlugin::<RectRenderCommand>::new(
             RenderPass::Ui,
         ));
-        app.extact_stage.add_system(extract_shaping_results);
         if let Some(ref mut renderer) = app.render_app {
             renderer.add_startup_system(setup_renderer);
             renderer.with_stage(crate::Stage::Update, |s| {
                 s.add_system(update_instances);
             });
-            renderer.insert_resource(UiTextureReferences::default());
-            renderer.with_stage(crate::Stage::PostUpdate, |s| {
-                s.add_system(gc_text_textures);
-            });
         }
     }
-}
-
-fn texture_to_bindings(device: &wgpu::Device, texture: &texture::Texture) -> wgpu::BindGroup {
-    let texture_bind_group_layout = texture_bind_group_layout(device, "texture_bind_group_layout");
-    let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &texture_bind_group_layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&texture.view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::Sampler(&texture.sampler),
-            },
-        ],
-        label: Some("sprite_texture_bind_group"),
-    });
-    diffuse_bind_group
-}
-
-fn texture_bind_group_layout(device: &wgpu::Device, label: &str) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    multisampled: false,
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                // This should match the filterable field of the
-                // corresponding Texture entry above.
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                count: None,
-            },
-        ],
-        label: Some(label),
-    })
 }
