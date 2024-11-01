@@ -3,18 +3,21 @@ use brengin::ui::Ui;
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
 use glam::Vec3;
-use tracing::info;
 
-fn buttons_ui(mut ctx: Ui) {
-    ctx.grid(4, |mut cols| {
-        for col in 0..4 {
+struct Label(String);
+
+fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
+    ctx.grid(5, |mut cols| {
+        cols.column(0, |ui| {
+            ui.label(label.0.clone());
+        });
+        for col in 1..=4 {
             cols.column(col, |ui| {
                 for row in 0..4 {
                     let fill = row * 2;
-                    let label = format!("{row} {col} Poggies {:0>fill$}", "");
-                    ui.label("some label");
-                    if ui.button(label).pressed {
-                        info!("Poggies {row} {col}")
+                    let l = format!("{row} {col} Poggies {:0>fill$}", "");
+                    if ui.button(&l).pressed {
+                        label.0 = l;
                     }
                 }
             });
@@ -40,6 +43,7 @@ fn setup(mut cmd: Commands) {
 
 async fn game() {
     let mut app = App::default();
+    app.insert_resource(Label(Default::default()));
     app.add_plugin(DefaultPlugins);
     app.add_startup_system(setup);
     app.with_stage(brengin::Stage::Update, |s| {

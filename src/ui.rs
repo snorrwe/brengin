@@ -82,6 +82,8 @@ pub struct UiState {
 
     /// layers go from back to front
     layer: u16,
+
+    bounding_boxes: HashMap<UiId, UiRect>,
 }
 
 #[derive(Debug)]
@@ -104,6 +106,7 @@ impl UiState {
             bounds: Default::default(),
             layer: 0,
             font,
+            bounding_boxes: Default::default(),
         }
     }
 }
@@ -164,14 +167,28 @@ impl<'a> Ui<'a> {
 
     #[inline]
     fn contains_mouse(&self, id: UiId) -> bool {
-        // TODO:
-        false
+        let Some(bbox) = self.ui.bounding_boxes.get(&id) else {
+            return false;
+        };
+
+        let mouse = self.mouse.cursor_position;
+        let dx = mouse.x - bbox.x as f64;
+        let dy = mouse.y - bbox.y as f64;
+
+        dx.abs() <= bbox.w as f64 * 0.5 && dy.abs() <= bbox.h as f64 * 0.5
     }
 
     #[inline]
     fn set_not_active(&mut self, id: UiId) {
         if self.ui.active == id {
             self.ui.active = UiId::SENTINEL;
+        }
+    }
+
+    #[inline]
+    fn set_not_hovered(&mut self, id: UiId) {
+        if self.ui.hovered == id {
+            self.ui.hovered = UiId::SENTINEL;
         }
     }
 
@@ -262,6 +279,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn label(&mut self, label: impl Into<String>) -> Response<()> {
+        self.begin_widget();
         let id = self.current_id();
         let layer = self.ui.layer;
         let label = label.into();
@@ -292,31 +310,51 @@ impl<'a> Ui<'a> {
             text_y += ph;
         }
         self.ui.bounds.y += h + 2 * PADDING;
+        let rect = UiRect { x, y, w, h };
+        self.update_rect(rect);
         Response {
             hovered: self.ui.hovered == id,
             active: self.ui.active == id,
             inner: (),
-            rect: UiRect { x, y, w, h },
+            rect,
         }
     }
 
+    fn update_rect(&mut self, rect: UiRect) {
+        let id = self.current_id();
+        self.ui.bounding_boxes.insert(id, rect);
+    }
+
+    fn begin_widget(&mut self) {
+        *self.ui.id_stack.last_mut().unwrap() += 1;
+    }
+
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
+        self.begin_widget();
         let layer = self.ui.layer;
         let label = label.into();
 
         let id = self.current_id();
         let mut pressed = false;
+        let contains_mouse = self.contains_mouse(id);
+        let mut color = self.theme.secondary_color;
         if self.is_active(id) {
+            color = 0x00FFFFFF;
             if self.mouse_up() {
                 if self.is_hovered(id) {
                     pressed = true;
                 }
                 self.set_not_active(id);
             }
-        } else if self.is_hovered(id) && self.mouse_down() {
-            self.set_active(id);
+        } else if self.is_hovered(id) {
+            color = 0xFF00FFFF;
+            if !contains_mouse {
+                self.set_not_hovered(id);
+            } else if self.mouse_down() {
+                self.set_active(id);
+            }
         }
-        if self.contains_mouse(id) {
+        if contains_mouse {
             self.set_hovered(id);
         }
 
@@ -348,21 +386,18 @@ impl<'a> Ui<'a> {
         }
         self.ui.bounds.y += h + 2 * PADDING + 2 * TEXT_PADDING;
         // background
-        self.color_rect(
-            x,
-            y,
-            w + 2 * TEXT_PADDING,
-            h + 2 * TEXT_PADDING,
-            self.theme.secondary_color,
-            layer,
-        );
+        let w = w + 2 * TEXT_PADDING;
+        let h = h + 2 * TEXT_PADDING;
+        self.color_rect(x, y, w, h, color, layer);
 
+        let rect = UiRect { x, y, w, h };
+        self.update_rect(rect);
         ButtonResponse {
             inner: Response {
                 hovered: self.ui.hovered == id,
                 active: self.ui.active == id,
                 inner: (),
-                rect: UiRect { x, y, w, h },
+                rect,
             },
             pressed,
         }
@@ -427,7 +462,9 @@ impl<'a> Columns<'a> {
         *ctx.ui.id_stack.last_mut().unwrap() = i;
         let layer = ctx.ui.layer;
         ctx.ui.layer += 1;
+        ctx.ui.id_stack.push(0);
         contents(ctx);
+        ctx.ui.id_stack.pop();
         let rect = ctx.ui.bounds;
         ctx.ui.bounds.y = bounds.y;
         ctx.ui.bounds.h = bounds.h;
