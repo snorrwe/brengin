@@ -12,6 +12,7 @@ fn buttons_ui(mut ctx: Ui) {
                 for row in 0..4 {
                     let fill = row * 2;
                     let label = format!("{row} {col} Poggies {:0>fill$}", "");
+                    ui.label("some label");
                     if ui.button(label).pressed {
                         info!("Poggies {row} {col}")
                     }

@@ -264,6 +264,39 @@ impl<'a> Ui<'a> {
         (handle.clone(), shape)
     }
 
+    pub fn label(&mut self, label: impl Into<String>) {
+        let layer = self.ui.layer;
+        let label = label.into();
+
+        const TEXT_PADDING: u32 = 5;
+        // shape the text
+        let mut w = 0;
+        let mut h = 0;
+        let x = self.ui.bounds.x;
+        let y = self.ui.bounds.y;
+        let [x, y] = [x + PADDING, y + PADDING];
+        let mut text_y = y + TEXT_PADDING;
+        for line in label.split('\n').filter(|l| !l.is_empty()) {
+            let (handle, e) = self.shape_and_draw_line(line.to_owned(), FONT_SIZE);
+            let pic = &e.texture;
+            w = w.max(pic.width());
+            h += pic.height();
+            let ph = pic.height();
+
+            self.text_rect(
+                x + TEXT_PADDING,
+                text_y,
+                w,
+                h,
+                self.ui.theme.secondary_color,
+                layer + 1,
+                handle,
+            );
+            text_y += ph;
+        }
+        self.ui.bounds.y += h + 2 * PADDING + 2 * TEXT_PADDING;
+    }
+
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
         let layer = self.ui.layer;
         let label = label.into();
