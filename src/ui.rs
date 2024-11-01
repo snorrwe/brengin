@@ -77,6 +77,14 @@ pub struct UiState {
 
     /// layers go from back to front
     layer: u16,
+
+    theme: Theme,
+}
+
+#[derive(Debug)]
+struct Theme {
+    pub primary_color: u32,
+    pub secondary_color: u32,
 }
 
 const FONT_SIZE: u32 = 12;
@@ -93,6 +101,10 @@ impl UiState {
             bounds: Default::default(),
             layer: 0,
             font,
+            theme: Theme {
+                primary_color: 0xFFFFFFFF,
+                secondary_color: 0x5C5F77FF,
+            },
         }
     }
 }
@@ -272,17 +284,6 @@ impl<'a> Ui<'a> {
             self.set_hovered(id);
         }
 
-        // test color
-        let color = {
-            let mut hash = 0x81aaaaaau32;
-            for byte in label.as_bytes() {
-                hash ^= *byte as u32;
-                hash = hash.wrapping_mul(0x1000193);
-            }
-            hash |= 0xFF;
-            hash
-        };
-
         const TEXT_PADDING: u32 = 5;
         // shape the text
         let mut w = 0;
@@ -297,9 +298,16 @@ impl<'a> Ui<'a> {
             w = w.max(pic.width());
             h += pic.height();
             let ph = pic.height();
-            let color = 0xFFFFFFFF - color | 0xFF;
 
-            self.text_rect(x + TEXT_PADDING, text_y, w, h, color, layer + 1, handle);
+            self.text_rect(
+                x + TEXT_PADDING,
+                text_y,
+                w,
+                h,
+                self.ui.theme.primary_color,
+                layer + 1,
+                handle,
+            );
             text_y += ph;
         }
         self.ui.bounds.y += h + 2 * PADDING + 2 * TEXT_PADDING;
@@ -309,7 +317,7 @@ impl<'a> Ui<'a> {
             y,
             w + 2 * TEXT_PADDING,
             h + 2 * TEXT_PADDING,
-            color,
+            self.ui.theme.secondary_color,
             layer,
         );
 
