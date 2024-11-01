@@ -35,9 +35,14 @@ impl OwnedTypeFace {
 pub fn load_font(path: impl AsRef<Path>, face_index: u32) -> anyhow::Result<OwnedTypeFace> {
     let data = std::fs::read(path.as_ref())
         .with_context(|| format!("Failed to load {:?}", path.as_ref()))?;
-    let data = Pin::new(data.into_boxed_slice());
+    let data = data.into_boxed_slice();
+    parse_font(data, face_index)
+}
+
+pub fn parse_font(data: Box<[u8]>, face_index: u32) -> anyhow::Result<OwnedTypeFace> {
+    let data = Pin::new(data);
     let face = rustybuzz::Face::from_slice(&data[..], face_index)
-        .with_context(|| format!("Failed to parse font {:?}", path.as_ref()))?;
+        .with_context(|| format!("Failed to parse font"))?;
 
     let face: rustybuzz::Face<'static> = unsafe { std::mem::transmute(face) };
 
