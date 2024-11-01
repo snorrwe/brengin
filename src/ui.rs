@@ -1,6 +1,6 @@
 use crate::{
     assets::{self, AssetsPlugin, Handle},
-    Plugin,
+    MouseInputs, Plugin,
 };
 
 pub mod color_rect;
@@ -12,6 +12,7 @@ use std::{collections::HashMap, ptr::NonNull};
 
 use cecs::{prelude::*, query};
 use text_rect::{DrawTextRect, TextRectRequests};
+use winit::event::MouseButton;
 
 use {
     color_rect::{DrawColorRect, RectRequests},
@@ -153,14 +154,12 @@ impl<'a> Ui<'a> {
 
     #[inline]
     fn mouse_up(&self) -> bool {
-        // TODO:
-        false
+        self.mouse.just_released.contains(&MouseButton::Left)
     }
 
     #[inline]
     fn mouse_down(&self) -> bool {
-        // TODO:
-        false
+        self.mouse.pressed.contains(&MouseButton::Left)
     }
 
     #[inline]
@@ -471,6 +470,7 @@ pub struct Ui<'a> {
     texture_cache: ResMut<'a, TextTextureCache>,
     shaping_results: ResMut<'a, assets::Assets<ShapingResult>>,
     theme: ResMut<'a, Theme>,
+    mouse: Res<'a, MouseInputs>,
 }
 
 unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
@@ -479,11 +479,13 @@ unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
         let texture_cache = ResMut::new(db);
         let text_assets = ResMut::new(db);
         let theme = ResMut::new(db);
+        let mouse = Res::new(db);
         Self {
             ui,
             texture_cache,
             shaping_results: text_assets,
             theme,
+            mouse,
         }
     }
 
@@ -491,6 +493,10 @@ unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
         set.insert(std::any::TypeId::of::<UiState>());
         set.insert(std::any::TypeId::of::<TextTextureCache>());
         set.insert(std::any::TypeId::of::<assets::Assets<ShapingResult>>());
-        set.insert(std::any::TypeId::of::<assets::Assets<Theme>>());
+        set.insert(std::any::TypeId::of::<Theme>());
+    }
+
+    fn resources_const(set: &mut std::collections::HashSet<std::any::TypeId>) {
+        set.insert(std::any::TypeId::of::<MouseInputs>());
     }
 }

@@ -341,6 +341,21 @@ impl ApplicationHandler for RunningApp {
                     .next
                     .push(event.clone());
             }
+            WindowEvent::MouseInput { state, button, .. } => {
+                game_world
+                    .lock()
+                    .get_resource_mut::<MouseInputs>()
+                    .unwrap()
+                    .next
+                    .push((button, state));
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                game_world
+                    .lock()
+                    .get_resource_mut::<MouseInputs>()
+                    .unwrap()
+                    .cursor_position = position;
+            }
             WindowEvent::RedrawRequested => {
                 extract_render_data(&game_world, render_world, render_extract);
 
@@ -526,7 +541,6 @@ pub enum Stage {
 
 #[derive(Default)]
 pub struct KeyBoardInputs {
-    pub inputs: Vec<KeyEvent>,
     pub(crate) next: Vec<KeyEvent>,
     pub pressed: HashSet<KeyCode>,
     pub just_released: HashSet<KeyCode>,
@@ -535,11 +549,9 @@ pub struct KeyBoardInputs {
 
 impl KeyBoardInputs {
     pub fn update(&mut self) {
-        std::mem::swap(&mut self.inputs, &mut self.next);
-        self.next.clear();
         self.just_released.clear();
         self.just_pressed.clear();
-        for k in self.inputs.iter() {
+        for k in self.next.iter() {
             match k.state {
                 ElementState::Pressed => {
                     if let PhysicalKey::Code(k) = k.physical_key {
@@ -557,6 +569,38 @@ impl KeyBoardInputs {
                 }
             }
         }
+        self.next.clear();
+    }
+}
+
+#[derive(Default)]
+pub struct MouseInputs {
+    pub(crate) next: Vec<(MouseButton, ElementState)>,
+    pub cursor_position: winit::dpi::PhysicalPosition<f64>,
+    pub pressed: HashSet<MouseButton>,
+    pub just_released: HashSet<MouseButton>,
+    pub just_pressed: HashSet<MouseButton>,
+}
+
+impl MouseInputs {
+    pub fn update(&mut self) {
+        self.just_released.clear();
+        self.just_pressed.clear();
+        for (k, state) in self.next.iter() {
+            match state {
+                ElementState::Pressed => {
+                    if !self.pressed.contains(k) {
+                        self.just_pressed.insert(*k);
+                    }
+                    self.pressed.insert(*k);
+                }
+                ElementState::Released => {
+                    self.pressed.remove(k);
+                    self.just_released.insert(*k);
+                }
+            }
+        }
+        self.next.clear();
     }
 }
 
@@ -564,13 +608,20 @@ fn update_inputs(mut k: ResMut<KeyBoardInputs>) {
     k.update();
 }
 
+fn update_mouse_inputs(mut k: ResMut<MouseInputs>) {
+    k.update();
+}
+
 pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(self, app: &mut App) {
         app.insert_resource(KeyBoardInputs::default());
+        app.insert_resource(MouseInputs::default());
 
         app.with_stage(Stage::PreUpdate, |s| {
-            s.add_system(update_time).add_system(update_inputs);
+            s.add_system(update_time)
+                .add_system(update_inputs)
+                .add_system(update_mouse_inputs);
         });
     }
 }
