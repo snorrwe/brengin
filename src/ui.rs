@@ -34,6 +34,10 @@ impl Plugin for UiPlugin {
         .unwrap();
         app.insert_resource(UiState::new(font));
         app.insert_resource(TextTextureCache::default());
+        app.insert_resource(Theme {
+            primary_color: 0xFFFFFFFF,
+            secondary_color: 0x5C5F77FF,
+        });
         app.add_startup_system(setup);
         app.add_plugin(AssetsPlugin::<ShapingResult>::default());
         app.with_stage(crate::Stage::PreUpdate, |s| {
@@ -77,8 +81,6 @@ pub struct UiState {
 
     /// layers go from back to front
     layer: u16,
-
-    theme: Theme,
 }
 
 #[derive(Debug)]
@@ -101,10 +103,6 @@ impl UiState {
             bounds: Default::default(),
             layer: 0,
             font,
-            theme: Theme {
-                primary_color: 0xFFFFFFFF,
-                secondary_color: 0x5C5F77FF,
-            },
         }
     }
 }
@@ -288,7 +286,7 @@ impl<'a> Ui<'a> {
                 text_y,
                 w,
                 h,
-                self.ui.theme.secondary_color,
+                self.theme.secondary_color,
                 layer + 1,
                 handle,
             );
@@ -337,7 +335,7 @@ impl<'a> Ui<'a> {
                 text_y,
                 w,
                 h,
-                self.ui.theme.primary_color,
+                self.theme.primary_color,
                 layer + 1,
                 handle,
             );
@@ -350,7 +348,7 @@ impl<'a> Ui<'a> {
             y,
             w + 2 * TEXT_PADDING,
             h + 2 * TEXT_PADDING,
-            self.ui.theme.secondary_color,
+            self.theme.secondary_color,
             layer,
         );
 
@@ -473,6 +471,7 @@ pub struct Ui<'a> {
     ui: ResMut<'a, UiState>,
     texture_cache: ResMut<'a, TextTextureCache>,
     shaping_results: ResMut<'a, assets::Assets<ShapingResult>>,
+    theme: ResMut<'a, Theme>,
 }
 
 unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
@@ -480,10 +479,12 @@ unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
         let ui = ResMut::new(db);
         let texture_cache = ResMut::new(db);
         let text_assets = ResMut::new(db);
+        let theme = ResMut::new(db);
         Self {
             ui,
             texture_cache,
             shaping_results: text_assets,
+            theme,
         }
     }
 
@@ -491,5 +492,6 @@ unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
         set.insert(std::any::TypeId::of::<UiState>());
         set.insert(std::any::TypeId::of::<TextTextureCache>());
         set.insert(std::any::TypeId::of::<assets::Assets<ShapingResult>>());
+        set.insert(std::any::TypeId::of::<assets::Assets<Theme>>());
     }
 }
