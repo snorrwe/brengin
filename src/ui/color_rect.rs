@@ -12,7 +12,7 @@ use wgpu::util::DeviceExt as _;
 use crate::{renderer::Extract, Plugin};
 
 #[derive(Default, Clone, Debug)]
-pub struct RectRequests(pub Vec<DrawRect>);
+pub struct RectRequests(pub Vec<DrawColorRect>);
 
 struct RectInstanceBuffer {
     buffer: wgpu::Buffer,
@@ -35,7 +35,7 @@ impl Extract for RectRequests {
 
 /// XY are top-left corner, WH are full-extents
 #[derive(Debug, Default, Clone, Copy)]
-pub struct DrawRect {
+pub struct DrawColorRect {
     pub x: u32,
     pub y: u32,
     pub w: u32,

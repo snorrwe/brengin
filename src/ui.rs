@@ -1,18 +1,20 @@
 use crate::{
-    assets::{self, AssetsPlugin},
+    assets::{self, AssetsPlugin, Handle},
     Plugin,
 };
 
 pub mod color_rect;
 pub mod rect;
 pub mod text;
+pub mod text_rect;
 
 use std::{collections::HashMap, ptr::NonNull};
 
 use cecs::{prelude::*, query};
+use text_rect::{DrawTextRect, TextRectRequests};
 
 use {
-    color_rect::{DrawRect, RectRequests},
+    color_rect::{DrawColorRect, RectRequests},
     rect::UiRect,
     text::{OwnedTypeFace, TextDrawResponse},
 };
@@ -22,6 +24,7 @@ pub struct UiPlugin;
 impl Plugin for UiPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(color_rect::UiColorRectPlugin);
+        app.add_plugin(text_rect::UiTextRectPlugin);
         // FIXME: include some default font, or system font?
         // maybe even make it a property of the plugin, so users can set what font is loaded?
         let font = text::load_font("/nix/store/a7xny2d815wb4x4rqrq3fl5dhxrqlxrn-X11-fonts/share/X11/fonts/DejaVuSans-Bold.ttf", 0).unwrap();
@@ -56,14 +59,14 @@ pub struct ShapingResult {
 }
 
 /// UI context object. Use this to builder your user interface
-#[derive(Debug)]
 pub struct UiState {
     hovered: UiId,
     active: UiId,
     /// stack of parents in the ui tree
     id_stack: Vec<IdType>,
 
-    rects: Vec<DrawRect>,
+    colored_rects: Vec<DrawColorRect>,
+    text_rects: Vec<DrawTextRect>,
     bounds: UiRect,
 
     font: OwnedTypeFace,
@@ -81,7 +84,8 @@ impl UiState {
             hovered: Default::default(),
             active: Default::default(),
             id_stack: Default::default(),
-            rects: Default::default(),
+            colored_rects: Default::default(),
+            text_rects: Default::default(),
             bounds: Default::default(),
             layer: 0,
             font,
@@ -178,8 +182,8 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.pop();
     }
 
-    pub fn rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: u32, layer: u16) {
-        self.ui.rects.push(DrawRect {
+    pub fn color_rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: u32, layer: u16) {
+        self.ui.colored_rects.push(DrawColorRect {
             x,
             y,
             w: width,
@@ -189,7 +193,32 @@ impl<'a> Ui<'a> {
         })
     }
 
-    fn shape_and_draw_line(&mut self, line: String, size: u32) -> &mut ShapingResult {
+    pub fn text_rect(
+        &mut self,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+        color: u32,
+        layer: u16,
+        shaping: Handle<ShapingResult>,
+    ) {
+        self.ui.text_rects.push(DrawTextRect {
+            x,
+            y,
+            w: width,
+            h: height,
+            color,
+            layer,
+            shaping,
+        })
+    }
+
+    fn shape_and_draw_line(
+        &mut self,
+        line: String,
+        size: u32,
+    ) -> (Handle<ShapingResult>, &mut ShapingResult) {
         let handle = self
             .texture_cache
             .0
@@ -215,7 +244,8 @@ impl<'a> Ui<'a> {
                 self.shaping_results.insert(shaping)
             });
 
-        self.shaping_results.get_mut(handle)
+        let shape = self.shaping_results.get_mut(handle);
+        (handle.clone(), shape)
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
@@ -253,28 +283,24 @@ impl<'a> Ui<'a> {
         // shape the text
         let mut w = 0;
         let mut h = 0;
-        for line in label.split('\n').filter(|l| !l.is_empty()) {
-            let e = self.shape_and_draw_line(line.to_owned(), FONT_SIZE);
-            let pic = &e.texture;
-            w = w.max(pic.width());
-            h += pic.height();
-        }
         let x = self.ui.bounds.x;
         let y = self.ui.bounds.y;
         let [x, y] = [x + PADDING, y + PADDING];
+        let mut text_y = y + TEXT_PADDING;
+        for line in label.split('\n').filter(|l| !l.is_empty()) {
+            let (handle, e) = self.shape_and_draw_line(line.to_owned(), FONT_SIZE);
+            let pic = &e.texture;
+            w = w.max(pic.width());
+            h += pic.height();
+            let ph = pic.height();
+            let color = 0xFFFFFFFF - color | 0xFF;
+
+            self.text_rect(x + TEXT_PADDING, text_y, w, h, color, layer + 1, handle);
+            text_y += ph;
+        }
         self.ui.bounds.y += h + 2 * PADDING + 2 * TEXT_PADDING;
-        // text
-        // TODO: use the textures
-        self.rect(
-            x + TEXT_PADDING,
-            y + TEXT_PADDING,
-            w,
-            h,
-            0x000F0FFF,
-            layer + 1,
-        );
         // background
-        self.rect(
+        self.color_rect(
             x,
             y,
             w + 2 * TEXT_PADDING,
@@ -369,7 +395,8 @@ impl<'a> Columns<'a> {
 }
 
 fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) {
-    ui.rects.clear();
+    ui.colored_rects.clear();
+    ui.text_rects.clear();
     ui.bounds = UiRect {
         x: 0,
         y: 0,
@@ -379,14 +406,22 @@ fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) 
     ui.layer = 0;
 }
 
-fn submit_frame(mut ui: ResMut<UiState>, mut rects: Query<&mut RectRequests>) {
+fn submit_frame(
+    mut ui: ResMut<UiState>,
+    mut rects: Query<&mut RectRequests>,
+    mut text_rect: Query<&mut TextRectRequests>,
+) {
     if let Some(dst) = rects.single_mut() {
-        std::mem::swap(&mut ui.rects, &mut dst.0);
+        std::mem::swap(&mut ui.colored_rects, &mut dst.0);
+    }
+    if let Some(dst) = text_rect.single_mut() {
+        std::mem::swap(&mut ui.text_rects, &mut dst.0);
     }
 }
 
 fn setup(mut cmd: Commands) {
     cmd.spawn().insert(RectRequests::default());
+    cmd.spawn().insert(TextRectRequests::default());
 }
 
 pub struct Ui<'a> {
