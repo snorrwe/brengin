@@ -84,7 +84,6 @@ impl DrawRectInstance {
 
 struct RectPipeline {
     color_rect_pipeline: wgpu::RenderPipeline,
-    ui_rect_layout: wgpu::BindGroupLayout,
 }
 
 pub struct UiTextureRenderingData {
@@ -94,22 +93,6 @@ pub struct UiTextureRenderingData {
 
 impl RectPipeline {
     fn new(renderer: &GraphicsState) -> Self {
-        let ui_rect_layout: wgpu::BindGroupLayout =
-            renderer
-                .device()
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("Ui Color Rect Uniform Layout"),
-                    entries: &[wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::all(),
-                        count: None,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                    }],
-                });
         let shader = renderer
             .device()
             .create_shader_module(include_wgsl!("ui-rect.wgsl"));
@@ -168,7 +151,6 @@ impl RectPipeline {
                 });
 
         RectPipeline {
-            ui_rect_layout,
             color_rect_pipeline,
         }
     }

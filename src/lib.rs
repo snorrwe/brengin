@@ -15,7 +15,6 @@ pub use cecs;
 pub use glam;
 pub use image;
 use instant::Instant;
-use tracing::warn;
 use ui::UiPlugin;
 pub use wgpu;
 pub use winit;
