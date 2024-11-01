@@ -261,7 +261,8 @@ impl<'a> Ui<'a> {
         (handle.clone(), shape)
     }
 
-    pub fn label(&mut self, label: impl Into<String>) {
+    pub fn label(&mut self, label: impl Into<String>) -> Response<()> {
+        let id = self.current_id();
         let layer = self.ui.layer;
         let label = label.into();
 
@@ -291,6 +292,12 @@ impl<'a> Ui<'a> {
             text_y += ph;
         }
         self.ui.bounds.y += h + 2 * PADDING;
+        Response {
+            hovered: self.ui.hovered == id,
+            active: self.ui.active == id,
+            inner: (),
+            rect: UiRect { x, y, w, h },
+        }
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
