@@ -175,7 +175,7 @@ impl<'a> Ui<'a> {
         let dx = mouse.x - bbox.x as f64;
         let dy = mouse.y - bbox.y as f64;
 
-        dx.abs() <= bbox.w as f64 * 0.5 && dy.abs() <= bbox.h as f64 * 0.5
+        0.0 <= dx && dx < bbox.w as f64 && 0.0 <= dy && dy < bbox.h as f64
     }
 
     #[inline]
