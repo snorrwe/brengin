@@ -3,19 +3,19 @@ use crate::{
     MouseInputs, Plugin,
 };
 
-pub mod color_rect;
+pub mod color_rect_pipeline;
 pub mod rect;
 pub mod text;
-pub mod text_rect;
+pub mod text_rect_pipeline;
 
 use std::{collections::HashMap, ptr::NonNull};
 
 use cecs::{prelude::*, query};
-use text_rect::{DrawTextRect, TextRectRequests};
+use text_rect_pipeline::{DrawTextRect, TextRectRequests};
 use winit::event::MouseButton;
 
 use {
-    color_rect::{DrawColorRect, RectRequests},
+    color_rect_pipeline::{DrawColorRect, RectRequests},
     rect::UiRect,
     text::{OwnedTypeFace, TextDrawResponse},
 };
@@ -24,8 +24,8 @@ pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(self, app: &mut crate::App) {
-        app.add_plugin(color_rect::UiColorRectPlugin);
-        app.add_plugin(text_rect::UiTextRectPlugin);
+        app.add_plugin(color_rect_pipeline::UiColorRectPlugin);
+        app.add_plugin(text_rect_pipeline::UiTextRectPlugin);
         let font = text::parse_font(
             include_bytes!("./ui/Roboto-Regular.ttf")
                 .to_vec()
