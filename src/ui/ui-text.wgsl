@@ -61,7 +61,7 @@ fn vs_main(
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let alpha = textureSample(texture, texture_sampler, in.uv).a;
     let color = in.color;
-    if alpha < 0.2 {
+    if alpha < 0.001 {
         discard;
     }
     return vec4<f32>(color.xyz, alpha);
