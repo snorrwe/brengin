@@ -10,8 +10,7 @@ struct Instance {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-    @location(1) color: vec4<f32>,
+    @location(0) color: vec4<f32>,
 }
 
 @vertex
@@ -36,10 +35,7 @@ fn vs_main(
         v = 1.0 - v;
     }
 
-    let uv = vec2<f32>(u, v);
-    out.uv = uv;
-
-    var vertex = uv * vec2(2, -2) + vec2(-1, 1);
+    var vertex = vec2<f32>(u, v) * vec2(2, -2) + vec2(-1, 1);
     vertex *= xywh.zw;
 
     // pos is in 0..1
