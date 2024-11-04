@@ -59,10 +59,10 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let alpha = textureSample(texture, texture_sampler, in.uv).a;
     let color = in.color;
+    let alpha = textureSample(texture, texture_sampler, in.uv).a * color.a;
     if alpha < 0.001 {
         discard;
     }
-    return vec4<f32>(color.xyz, alpha);
+    return vec4<f32>(color.rgb * alpha, alpha);
 }
