@@ -192,6 +192,23 @@ impl<'a> Ui<'a> {
         }
     }
 
+    // TODO: alignment or position
+    pub fn panel(&mut self, width: u32, height: u32, mut contents: impl FnMut(&mut Self)) {
+        self.ui.id_stack.push(0);
+        self.ui.bounds = UiRect {
+            x: 0,
+            y: 0,
+            w: width,
+            h: height,
+        };
+        let layer = self.ui.layer;
+        self.ui.layer += 1;
+        self.color_rect(0, 0, width, height, 0x04a5e5ff, self.ui.layer);
+        contents(self);
+        self.ui.layer = layer;
+        self.ui.id_stack.pop();
+    }
+
     pub fn grid<'b>(&mut self, columns: u32, mut contents: impl FnMut(Columns) + 'b)
     where
         'a: 'b,
