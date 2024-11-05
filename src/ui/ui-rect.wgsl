@@ -25,7 +25,7 @@ fn vs_main(
         f32((c >> 24) & 0xFF) / 255.0,
         f32((c >> 16) & 0xFF) / 255.0,
         f32((c >> 8) & 0xFF) / 255.0,
-        f32((c >> 0) & 0xFF) / 255.0,
+        f32(c & 0xFF) / 255.0,
     );
 
     let u = f32(model.vertex_index & 1);
