@@ -443,7 +443,7 @@ impl<'a> Ui<'a> {
                 layer + 2,
                 handle,
             );
-            text_y += ph;
+            text_y += ph + TEXT_PADDING;
         }
         let dy = h + 2 * PADDING + 2 * TEXT_PADDING;
         self.ui.bounds.y += dy;
