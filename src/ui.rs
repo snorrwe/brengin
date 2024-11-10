@@ -438,6 +438,7 @@ impl<'a> Ui<'a> {
             h += line_height;
             let ph = pic.height();
 
+            let mut delta = 0;
             if !active {
                 // add a shadow
                 self.text_rect(
@@ -449,10 +450,14 @@ impl<'a> Ui<'a> {
                     layer + 1,
                     handle.clone(),
                 );
+            } else {
+                // if active, then move the text into the shadow's position
+                // so it appears to have lowered
+                delta = 1
             }
             self.text_rect(
-                x + TEXT_PADDING,
-                text_y,
+                x + TEXT_PADDING + delta,
+                text_y + delta,
                 line_width,
                 line_height,
                 self.theme.primary_color,
