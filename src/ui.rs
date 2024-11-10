@@ -36,8 +36,10 @@ impl Plugin for UiPlugin {
         app.insert_resource(UiState::new(font));
         app.insert_resource(TextTextureCache::default());
         app.insert_resource(Theme {
-            primary_color: 0xFFFFFFFF,
-            secondary_color: 0x5C5F77FF,
+            primary_color: 0xcdd6f4ff,
+            secondary_color: 0x313244ff,
+            button_hovered: 0x45475aff,
+            button_pressed: 0x585b70ff,
         });
         app.add_startup_system(setup);
         app.add_plugin(AssetsPlugin::<ShapingResult>::default());
@@ -90,6 +92,8 @@ pub struct UiState {
 struct Theme {
     pub primary_color: u32,
     pub secondary_color: u32,
+    pub button_hovered: u32,
+    pub button_pressed: u32,
 }
 
 const FONT_SIZE: u32 = 12;
@@ -355,8 +359,9 @@ impl<'a> Ui<'a> {
         let mut pressed = false;
         let contains_mouse = self.contains_mouse(id);
         let mut color = self.theme.secondary_color;
-        if self.is_active(id) {
-            color = 0x00FFFFFF;
+        let active = self.is_active(id);
+        if active {
+            color = self.theme.button_pressed;
             if self.mouse_up() {
                 if self.is_hovered(id) {
                     pressed = true;
@@ -364,7 +369,7 @@ impl<'a> Ui<'a> {
                 self.set_not_active(id);
             }
         } else if self.is_hovered(id) {
-            color = 0xFF00FFFF;
+            color = self.theme.button_hovered;
             if !contains_mouse {
                 self.set_not_hovered(id);
             } else if self.mouse_down() {
@@ -390,13 +395,25 @@ impl<'a> Ui<'a> {
             h += pic.height();
             let ph = pic.height();
 
+            if !active {
+                // add a shadow
+                self.text_rect(
+                    x + TEXT_PADDING + 1,
+                    text_y + 1,
+                    w,
+                    h,
+                    0x000000FF,
+                    layer + 1,
+                    handle.clone(),
+                );
+            }
             self.text_rect(
                 x + TEXT_PADDING,
                 text_y,
                 w,
                 h,
                 self.theme.primary_color,
-                layer + 1,
+                layer + 2,
                 handle,
             );
             text_y += ph;
