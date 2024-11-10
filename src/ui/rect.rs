@@ -36,6 +36,16 @@ impl UiRect {
             h: h as u32,
         }
     }
+
+    #[inline]
+    pub fn y_end(self) -> u32 {
+        self.y + self.h
+    }
+
+    #[inline]
+    pub fn x_end(self) -> u32 {
+        self.x + self.w
+    }
 }
 
 #[cfg(test)]

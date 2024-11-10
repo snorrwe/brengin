@@ -7,21 +7,21 @@ use glam::Vec3;
 struct Label(String);
 
 fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
-    ctx.panel(1000, 200, |ui| {
-        ui.label(label.0.clone());
-        ui.grid(5, |mut cols| {
+    ctx.panel(1000, 300, |ui| {
+        ui.grid(5, |cols| {
             for col in 0..4 {
                 cols.column(col, |ui| {
                     for row in 0..4 {
                         let fill = row * 2;
                         let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
-                        if ui.button(&l).pressed {
+                        if ui.button(&l).pressed() {
                             label.0 = l;
                         }
                     }
                 });
             }
         });
+        ui.label(label.0.clone());
     });
 }
 

@@ -215,7 +215,7 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.pop();
     }
 
-    pub fn grid<'b>(&mut self, columns: u32, mut contents: impl FnMut(Columns) + 'b)
+    pub fn grid<'b>(&mut self, columns: u32, mut contents: impl FnMut(&mut Columns) + 'b)
     where
         'a: 'b,
     {
@@ -227,11 +227,32 @@ impl<'a> Ui<'a> {
             .map(|i| [bounds.x + i * width, bounds.x + (i + 1) * width])
             .collect();
 
-        contents(Columns {
+        let mut cols = Columns {
             ctx: self.into(),
             cols: columns,
             dims,
-        });
+            height: 0,
+        };
+        contents(&mut cols);
+
+        let mut w = bounds.w;
+        for d in cols.dims {
+            w = w.max(d[1] - d[0]);
+        }
+        {
+            let bounds = self.ui.bounds;
+            self.color_rect(bounds.x, bounds.y, bounds.w, bounds.h, 0xFF0000aF, 18);
+        }
+
+        dbg!(bounds, &self.ui.bounds, &cols.height);
+
+        // restore state
+        self.ui.bounds = UiRect {
+            x: bounds.x,
+            y: bounds.y + cols.height,
+            h: bounds.h.saturating_sub(cols.height),
+            w,
+        };
         self.ui.id_stack.pop();
     }
 
@@ -424,7 +445,9 @@ impl<'a> Ui<'a> {
             );
             text_y += ph;
         }
-        self.ui.bounds.y += h + 2 * PADDING + 2 * TEXT_PADDING;
+        let dy = h + 2 * PADDING + 2 * TEXT_PADDING;
+        self.ui.bounds.y += dy;
+        self.ui.bounds.h = self.ui.bounds.h.saturating_sub(dy);
         // background
         let w = w + 2 * TEXT_PADDING;
         let h = h + 2 * TEXT_PADDING;
@@ -433,13 +456,10 @@ impl<'a> Ui<'a> {
         let rect = UiRect { x, y, w, h };
         self.update_rect(rect);
         ButtonResponse {
-            inner: Response {
-                hovered: self.ui.hovered == id,
-                active: self.ui.active == id,
-                inner: (),
-                rect,
-            },
-            pressed,
+            hovered: self.ui.hovered == id,
+            active: self.ui.active == id,
+            inner: ButtonState { pressed },
+            rect,
         }
     }
 }
@@ -473,26 +493,30 @@ pub struct Response<T> {
     pub inner: T,
 }
 
-pub struct ButtonResponse {
-    pub inner: Response<()>,
-    pub pressed: bool,
-}
+pub type ButtonResponse = Response<ButtonState>;
 
 impl ButtonResponse {
     pub fn pressed(&self) -> bool {
-        self.pressed
+        self.inner.pressed
     }
+}
+
+pub struct ButtonState {
+    pub pressed: bool,
 }
 
 pub struct Columns<'a> {
     ctx: NonNull<Ui<'a>>,
     cols: u32,
+    /// [x start, x end][cols]
     dims: Vec<[u32; 2]>,
+    height: u32,
 }
 
 impl<'a> Columns<'a> {
     pub fn column(&mut self, i: u32, mut contents: impl FnMut(&mut Ui)) {
         assert!(i < self.cols);
+        // setup
         let ctx = unsafe { self.ctx.as_mut() };
         let idx = i as usize;
         let bounds = ctx.ui.bounds;
@@ -503,9 +527,13 @@ impl<'a> Columns<'a> {
         let layer = ctx.ui.layer;
         ctx.ui.layer += 1;
         ctx.ui.id_stack.push(0);
+
         contents(ctx);
+
+        // restore state
         ctx.ui.id_stack.pop();
         let rect = ctx.ui.bounds;
+        self.height = self.height.max(ctx.ui.bounds.h);
         ctx.ui.bounds.y = bounds.y;
         ctx.ui.bounds.h = bounds.h;
         if rect.w > w && i + 1 < self.cols {
