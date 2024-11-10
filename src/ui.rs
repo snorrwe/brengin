@@ -88,6 +88,8 @@ pub struct UiState {
     layer: u16,
 
     bounding_boxes: HashMap<UiId, UiRect>,
+
+    rect_history: Vec<UiRect>,
 }
 
 #[derive(Debug)]
@@ -113,6 +115,7 @@ impl UiState {
             layer: 0,
             font,
             bounding_boxes: Default::default(),
+            rect_history: Default::default(),
         }
     }
 }
@@ -220,6 +223,7 @@ impl<'a> Ui<'a> {
         'a: 'b,
     {
         self.ui.id_stack.push(0);
+        let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
         let width = bounds.w / columns + 1;
 
@@ -239,24 +243,30 @@ impl<'a> Ui<'a> {
         for d in cols.dims {
             w = w.max(d[1] - d[0]);
         }
-        {
-            let bounds = self.ui.bounds;
-            self.color_rect(bounds.x, bounds.y, bounds.w, bounds.h, 0xFF0000aF, 18);
-        }
 
-        dbg!(bounds, &self.ui.bounds, &cols.height);
+        let h = self.ui.rect_history[history_start..]
+            .iter()
+            .map(|r| r.y_end() - bounds.y)
+            .max()
+            .unwrap_or(0);
 
         // restore state
         self.ui.bounds = UiRect {
             x: bounds.x,
-            y: bounds.y + cols.height,
-            h: bounds.h.saturating_sub(cols.height),
+            y: bounds.y + h,
+            h: bounds.h.saturating_sub(h),
             w,
         };
         self.ui.id_stack.pop();
     }
 
     pub fn color_rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: u32, layer: u16) {
+        self.ui.rect_history.push(UiRect {
+            x,
+            y,
+            w: width,
+            h: height,
+        });
         self.ui.colored_rects.push(DrawColorRect {
             x,
             y,
@@ -277,6 +287,12 @@ impl<'a> Ui<'a> {
         layer: u16,
         shaping: Handle<ShapingResult>,
     ) {
+        self.ui.rect_history.push(UiRect {
+            x,
+            y,
+            w: width,
+            h: height,
+        });
         self.ui.text_rects.push(DrawTextRect {
             x,
             y,
@@ -533,7 +549,9 @@ impl<'a> Columns<'a> {
         // restore state
         ctx.ui.id_stack.pop();
         let rect = ctx.ui.bounds;
-        self.height = self.height.max(ctx.ui.bounds.h);
+        self.height = self
+            .height
+            .max(ctx.ui.bounds.y_end().saturating_sub(bounds.y));
         ctx.ui.bounds.y = bounds.y;
         ctx.ui.bounds.h = bounds.h;
         if rect.w > w && i + 1 < self.cols {
@@ -548,6 +566,7 @@ impl<'a> Columns<'a> {
 }
 
 fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) {
+    ui.rect_history.clear();
     ui.colored_rects.clear();
     ui.text_rects.clear();
     ui.bounds = UiRect {
