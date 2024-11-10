@@ -235,7 +235,6 @@ impl<'a> Ui<'a> {
             ctx: self.into(),
             cols: columns,
             dims,
-            height: 0,
         };
         contents(&mut cols);
 
@@ -531,7 +530,6 @@ pub struct Columns<'a> {
     cols: u32,
     /// [x start, x end][cols]
     dims: Vec<[u32; 2]>,
-    height: u32,
 }
 
 impl<'a> Columns<'a> {
@@ -554,9 +552,6 @@ impl<'a> Columns<'a> {
         // restore state
         ctx.ui.id_stack.pop();
         let rect = ctx.ui.bounds;
-        self.height = self
-            .height
-            .max(ctx.ui.bounds.y_end().saturating_sub(bounds.y));
         ctx.ui.bounds.y = bounds.y;
         ctx.ui.bounds.h = bounds.h;
         if rect.w > w && i + 1 < self.cols {
