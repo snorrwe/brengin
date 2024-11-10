@@ -35,12 +35,14 @@ impl Plugin for UiPlugin {
         .unwrap();
         app.insert_resource(UiState::new(font));
         app.insert_resource(TextTextureCache::default());
-        app.insert_resource(Theme {
-            primary_color: 0xcdd6f4ff,
-            secondary_color: 0x313244ff,
-            button_hovered: 0x45475aff,
-            button_pressed: 0x585b70ff,
-        });
+        if app.get_resource::<Theme>().is_none() {
+            app.insert_resource(Theme {
+                primary_color: 0xcdd6f4ff,
+                secondary_color: 0x313244ff,
+                button_hovered: 0x45475aff,
+                button_pressed: 0x585b70ff,
+            });
+        }
         app.add_startup_system(setup);
         app.add_plugin(AssetsPlugin::<ShapingResult>::default());
         app.with_stage(crate::Stage::PreUpdate, |s| {
