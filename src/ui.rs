@@ -393,8 +393,10 @@ impl<'a> Ui<'a> {
         for line in label.split('\n').filter(|l| !l.is_empty()) {
             let (handle, e) = self.shape_and_draw_line(line.to_owned(), FONT_SIZE);
             let pic = &e.texture;
-            w = w.max(pic.width());
-            h += pic.height();
+            let line_width = pic.width();
+            let line_height = pic.height();
+            w = w.max(line_width);
+            h += line_height;
             let ph = pic.height();
 
             if !active {
@@ -402,8 +404,8 @@ impl<'a> Ui<'a> {
                 self.text_rect(
                     x + TEXT_PADDING + 1,
                     text_y + 1,
-                    w,
-                    h,
+                    line_width,
+                    line_height,
                     0x000000FF,
                     layer + 1,
                     handle.clone(),
@@ -412,8 +414,8 @@ impl<'a> Ui<'a> {
             self.text_rect(
                 x + TEXT_PADDING,
                 text_y,
-                w,
-                h,
+                line_width,
+                line_height,
                 self.theme.primary_color,
                 layer + 2,
                 handle,
