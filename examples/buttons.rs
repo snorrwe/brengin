@@ -23,7 +23,7 @@ fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
         });
         ui.grid(3, |cols| {
             cols.column(1, |ui| {
-                ui.label(label.0.clone());
+                ui.label(format!("Selected:\n{}", label.0));
             });
         });
     });
