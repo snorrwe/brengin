@@ -1,5 +1,5 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
-use brengin::ui::{Ui, UiCoordinate};
+use brengin::ui::{HorizontalAlignment, Ui, UiCoordinate, VerticalAlignment};
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
 use glam::Vec3;
@@ -7,32 +7,40 @@ use glam::Vec3;
 struct Label(String);
 
 fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
-    ctx.panel(UiCoordinate::Percent(100), 300.into(), |ui| {
-        ui.grid(5, |cols| {
-            for col in 0..4 {
-                cols.column(col, |ui| {
-                    for row in 0..4 {
-                        ui.horizontal(|ui| {
-                            ui.label("Click this one pls");
-                            let fill = row * 2;
-                            let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
-                            if ui.button(&l).pressed() {
-                                label.0 = l;
-                            }
-                        });
-                    }
-                });
-            }
-        });
-        ui.grid(3, |cols| {
-            cols.column(1, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("Selected: ");
-                    ui.label(&label.0);
+    ctx.panel(
+        brengin::ui::PanelDescriptor {
+            width: UiCoordinate::Absolute(1000),
+            height: 300.into(),
+            horizonal: HorizontalAlignment::Right,
+            vertical: VerticalAlignment::Bottom,
+        },
+        |ui| {
+            ui.grid(5, |cols| {
+                for col in 0..4 {
+                    cols.column(col, |ui| {
+                        for row in 0..4 {
+                            ui.horizontal(|ui| {
+                                ui.label("Click this one pls");
+                                let fill = row * 2;
+                                let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
+                                if ui.button(&l).pressed() {
+                                    label.0 = l;
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            ui.grid(3, |cols| {
+                cols.column(1, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Selected: ");
+                        ui.label(&label.0);
+                    });
                 });
             });
-        });
-    });
+        },
+    );
 }
 
 fn setup(mut cmd: Commands) {

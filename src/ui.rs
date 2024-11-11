@@ -152,6 +152,12 @@ pub enum UiCoordinate {
     Percent(u8),
 }
 
+impl Default for UiCoordinate {
+    fn default() -> Self {
+        Self::Absolute(0)
+    }
+}
+
 impl From<u32> for UiCoordinate {
     fn from(value: u32) -> Self {
         Self::Absolute(value)
@@ -169,6 +175,28 @@ impl UiCoordinate {
             }
         }
     }
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+pub struct PanelDescriptor {
+    pub width: UiCoordinate,
+    pub height: UiCoordinate,
+    pub horizonal: HorizontalAlignment,
+    pub vertical: VerticalAlignment,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub enum HorizontalAlignment {
+    #[default]
+    Left,
+    Right,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub enum VerticalAlignment {
+    #[default]
+    Top,
+    Bottom,
 }
 
 impl<'a> Ui<'a> {
@@ -261,29 +289,42 @@ impl<'a> Ui<'a> {
         }
     }
 
-    // TODO: alignment or position
-    pub fn panel(
-        &mut self,
-        width: UiCoordinate,
-        height: UiCoordinate,
-        mut contents: impl FnMut(&mut Self),
-    ) {
-        let width = width.as_abolute(self.ui.bounds.w);
-        let height = height.as_abolute(self.ui.bounds.h);
+    pub fn panel(&mut self, desc: PanelDescriptor, mut contents: impl FnMut(&mut Self)) {
+        let width = desc.width.as_abolute(self.ui.bounds.w);
+        let height = desc.height.as_abolute(self.ui.bounds.h);
         self.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[width, height]));
-        self.ui.bounds = UiRect {
+
+        let old_bounds = self.ui.bounds;
+        let mut bounds = UiRect {
             x: 0,
             y: 0,
             w: width,
             h: height,
         };
+
+        match desc.horizonal {
+            HorizontalAlignment::Left => {}
+            HorizontalAlignment::Right => {
+                bounds.x = old_bounds.w.saturating_sub(width + 1);
+            }
+        }
+        match desc.vertical {
+            VerticalAlignment::Top => {}
+            VerticalAlignment::Bottom => {
+                bounds.y = old_bounds.h.saturating_sub(height + 1);
+            }
+        }
+        self.ui.bounds = bounds;
+
         let layer = self.ui.layer;
         self.ui.layer += 1;
-        self.color_rect(0, 0, width, height, 0x04a5e5ff, self.ui.layer);
+        self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
         self.ui.id_stack.push(0);
         contents(self);
         self.ui.layer = layer;
         self.ui.id_stack.pop();
+        self.ui.bounds = old_bounds;
+        self.submit_rect(Default::default(), bounds);
     }
 
     pub fn horizontal(&mut self, mut contents: impl FnMut(&mut Self)) {
