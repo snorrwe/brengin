@@ -1,5 +1,5 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
-use brengin::ui::Ui;
+use brengin::ui::{Ui, UiCoordinate};
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
 use glam::Vec3;
@@ -7,7 +7,7 @@ use glam::Vec3;
 struct Label(String);
 
 fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
-    ctx.panel(1500, 300, |ui| {
+    ctx.panel(UiCoordinate::Percent(100), 300.into(), |ui| {
         ui.grid(5, |cols| {
             for col in 0..4 {
                 cols.column(col, |ui| {

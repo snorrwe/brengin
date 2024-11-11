@@ -146,6 +146,31 @@ enum LayoutDirection {
     LeftRight,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UiCoordinate {
+    Absolute(u32),
+    Percent(u8),
+}
+
+impl From<u32> for UiCoordinate {
+    fn from(value: u32) -> Self {
+        Self::Absolute(value)
+    }
+}
+
+impl UiCoordinate {
+    pub fn as_abolute(self, max: u32) -> u32 {
+        match self {
+            UiCoordinate::Absolute(x) => x,
+            UiCoordinate::Percent(p) => {
+                let p = p as f64 / 100.0;
+                let x = max as f64 * p;
+                x as u32
+            }
+        }
+    }
+}
+
 impl<'a> Ui<'a> {
     #[inline]
     fn set_hovered(&mut self, id: UiId) {
@@ -237,7 +262,14 @@ impl<'a> Ui<'a> {
     }
 
     // TODO: alignment or position
-    pub fn panel(&mut self, width: u32, height: u32, mut contents: impl FnMut(&mut Self)) {
+    pub fn panel(
+        &mut self,
+        width: UiCoordinate,
+        height: UiCoordinate,
+        mut contents: impl FnMut(&mut Self),
+    ) {
+        let width = width.as_abolute(self.ui.bounds.w);
+        let height = height.as_abolute(self.ui.bounds.h);
         self.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[width, height]));
         self.ui.bounds = UiRect {
             x: 0,
