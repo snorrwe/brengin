@@ -264,18 +264,8 @@ impl<'a> Ui<'a> {
         contents(self);
         self.ui.id_stack.pop();
         self.ui.layout_dir = layout;
-        if self.ui.rect_history.len() <= history_start {
-            // no rects have been submitted
-            return;
-        }
-
-        let mut rect = self.ui.rect_history[history_start];
-        self.ui.rect_history[history_start + 1..]
-            .iter()
-            .for_each(|r| rect = rect.grow_over(*r));
-
         self.ui.bounds = bounds;
-        self.submit_rect(self.current_id(), rect);
+        self.submit_rect_group(history_start);
     }
 
     pub fn vertical(&mut self, mut contents: impl FnMut(&mut Self)) {
@@ -288,7 +278,11 @@ impl<'a> Ui<'a> {
         contents(self);
         self.ui.id_stack.pop();
         self.ui.layout_dir = layout;
+        self.ui.bounds = bounds;
+        self.submit_rect_group(history_start);
+    }
 
+    fn submit_rect_group(&mut self, history_start: usize) {
         if self.ui.rect_history.len() <= history_start {
             // no rects have been submitted
             return;
@@ -298,7 +292,6 @@ impl<'a> Ui<'a> {
         self.ui.rect_history[history_start + 1..]
             .iter()
             .for_each(|r| rect = rect.grow_over(*r));
-        self.ui.bounds = bounds;
         self.submit_rect(self.current_id(), rect);
     }
 
@@ -327,21 +320,9 @@ impl<'a> Ui<'a> {
         for d in cols.dims {
             w = w.max(d[1] - d[0]);
         }
-
-        let h = self.ui.rect_history[history_start..]
-            .iter()
-            .map(|r| r.y_end() - bounds.y)
-            .max()
-            .unwrap_or(0);
-
-        // restore state
-        self.ui.bounds = UiRect {
-            x: bounds.x,
-            y: bounds.y + h,
-            h: bounds.h.saturating_sub(h),
-            w,
-        };
         self.ui.id_stack.pop();
+        self.ui.bounds = bounds;
+        self.submit_rect_group(history_start);
     }
 
     pub fn color_rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: u32, layer: u16) {
