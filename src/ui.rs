@@ -36,15 +36,7 @@ impl Plugin for UiPlugin {
         app.insert_resource(UiState::new(font));
         app.insert_resource(TextTextureCache::default());
         if app.get_resource::<Theme>().is_none() {
-            app.insert_resource(Theme {
-                primary_color: 0xcdd6f4ff,
-                secondary_color: 0x313244ff,
-                button_hovered: 0x45475aff,
-                button_pressed: 0x585b70ff,
-                text_padding: 5,
-                font_size: 12,
-                padding: 5,
-            });
+            app.insert_resource(Theme::default());
         }
         app.add_startup_system(setup);
         app.add_plugin(AssetsPlugin::<ShapingResult>::default());
@@ -122,6 +114,20 @@ pub struct Theme {
     pub text_padding: u32,
     pub font_size: u32,
     pub padding: u32,
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Theme {
+            primary_color: 0xcdd6f4ff,
+            secondary_color: 0x313244ff,
+            button_hovered: 0x45475aff,
+            button_pressed: 0x585b70ff,
+            text_padding: 5,
+            font_size: 12,
+            padding: 5,
+        }
+    }
 }
 
 impl UiState {
