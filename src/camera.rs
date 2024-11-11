@@ -22,6 +22,20 @@ pub struct PerspectiveCamera {
     pub zfar: f32,
 }
 
+impl Default for PerspectiveCamera {
+    fn default() -> Self {
+        PerspectiveCamera {
+            eye: Vec3::new(0.0, 0.0, 100.0),
+            target: Vec3::ZERO,
+            up: Vec3::Y,
+            aspect: 16.0 / 9.0,
+            fovy: std::f32::consts::TAU / 6.0,
+            znear: 5.0,
+            zfar: 5000.0,
+        }
+    }
+}
+
 /// Cameras marked with this component are automatically updated to fit their window
 /// Camera entities do not have this component by default
 pub struct WindowCamera;
