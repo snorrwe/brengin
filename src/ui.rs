@@ -41,6 +41,9 @@ impl Plugin for UiPlugin {
                 secondary_color: 0x313244ff,
                 button_hovered: 0x45475aff,
                 button_pressed: 0x585b70ff,
+                text_padding: 5,
+                font_size: 12,
+                padding: 5,
             });
         }
         app.add_startup_system(setup);
@@ -116,10 +119,10 @@ struct Theme {
     pub secondary_color: u32,
     pub button_hovered: u32,
     pub button_pressed: u32,
+    pub text_padding: u32,
+    pub font_size: u32,
+    pub padding: u32,
 }
-
-const FONT_SIZE: u32 = 12;
-const PADDING: u32 = 5;
 
 impl UiState {
     pub fn new(font: OwnedTypeFace) -> Self {
@@ -494,10 +497,11 @@ impl<'a> Ui<'a> {
         let mut h = 0;
         let x = self.ui.bounds.x;
         let y = self.ui.bounds.y;
-        let [x, y] = [x + PADDING, y + PADDING];
+        let padding = self.theme.padding;
+        let [x, y] = [x + padding, y + padding];
         let mut text_y = y;
         for line in label.split('\n').filter(|l| !l.is_empty()) {
-            let (handle, e) = self.shape_and_draw_line(line.to_owned(), FONT_SIZE);
+            let (handle, e) = self.shape_and_draw_line(line.to_owned(), self.theme.font_size);
             let pic = &e.texture;
             let line_width = pic.width();
             let line_height = pic.height();
@@ -528,14 +532,15 @@ impl<'a> Ui<'a> {
 
     /// When a widget has been completed, submit it's bounding rectangle
     fn submit_rect(&mut self, id: UiId, rect: UiRect) {
+        let padding = self.theme.padding;
         match self.ui.layout_dir {
             LayoutDirection::TopDown => {
-                let dy = rect.h + 2 * PADDING;
+                let dy = rect.h + 2 * padding;
                 self.ui.bounds.y += dy;
                 self.ui.bounds.h = self.ui.bounds.h.saturating_sub(dy);
             }
             LayoutDirection::LeftRight => {
-                let dx = rect.w + 2 * PADDING;
+                let dx = rect.w + 2 * padding;
                 self.ui.bounds.x += dx;
                 self.ui.bounds.w = self.ui.bounds.w.saturating_sub(dx);
             }
@@ -577,16 +582,17 @@ impl<'a> Ui<'a> {
             self.set_hovered(id);
         }
 
-        const TEXT_PADDING: u32 = 5;
         // shape the text
         let mut w = 0;
         let mut h = 0;
         let x = self.ui.bounds.x;
         let y = self.ui.bounds.y;
-        let [x, y] = [x + PADDING, y + PADDING];
-        let mut text_y = y + TEXT_PADDING;
+        let padding = self.theme.padding;
+        let [x, y] = [x + padding, y + padding];
+        let text_padding = self.theme.text_padding;
+        let mut text_y = y + text_padding;
         for line in label.split('\n').filter(|l| !l.is_empty()) {
-            let (handle, e) = self.shape_and_draw_line(line.to_owned(), FONT_SIZE);
+            let (handle, e) = self.shape_and_draw_line(line.to_owned(), self.theme.font_size);
             let pic = &e.texture;
             let line_width = pic.width();
             let line_height = pic.height();
@@ -598,7 +604,7 @@ impl<'a> Ui<'a> {
             if !active {
                 // add a shadow
                 self.text_rect(
-                    x + TEXT_PADDING + 1,
+                    x + text_padding + 1,
                     text_y + 1,
                     line_width,
                     line_height,
@@ -612,7 +618,7 @@ impl<'a> Ui<'a> {
                 delta = 1
             }
             self.text_rect(
-                x + TEXT_PADDING + delta,
+                x + text_padding + delta,
                 text_y + delta,
                 line_width,
                 line_height,
@@ -620,11 +626,11 @@ impl<'a> Ui<'a> {
                 layer + 2,
                 handle,
             );
-            text_y += ph + TEXT_PADDING;
+            text_y += ph + text_padding;
         }
         // background
-        let w = w + 2 * TEXT_PADDING;
-        let h = h + 2 * TEXT_PADDING;
+        let w = w + 2 * text_padding;
+        let h = h + 2 * text_padding;
         self.color_rect(x, y, w, h, color, layer);
 
         let rect = UiRect { x, y, w, h };
