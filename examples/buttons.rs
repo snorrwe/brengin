@@ -9,7 +9,7 @@ struct Label(String);
 fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoordinate::Absolute(1000),
+            width: UiCoordinate::Percent(100),
             height: 300.into(),
             horizonal: HorizontalAlignment::Right,
             vertical: VerticalAlignment::Bottom,
@@ -31,13 +31,20 @@ fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
                     });
                 }
             });
-            ui.grid(3, |cols| {
-                cols.column(1, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Selected: ");
-                        ui.label(&label.0);
-                    });
-                });
+        },
+    );
+    ctx.panel(
+        brengin::ui::PanelDescriptor {
+            width: UiCoordinate::Percent(50),
+            height: 200.into(),
+            horizonal: HorizontalAlignment::Center,
+            vertical: VerticalAlignment::Center,
+        },
+        |ui| {
+            ui.label("My panel is centered!!");
+            ui.horizontal(|ui| {
+                ui.label("Selected: ");
+                ui.label(&label.0);
             });
         },
     );

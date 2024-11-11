@@ -189,6 +189,7 @@ pub struct PanelDescriptor {
 pub enum HorizontalAlignment {
     #[default]
     Left,
+    Center,
     Right,
 }
 
@@ -196,6 +197,7 @@ pub enum HorizontalAlignment {
 pub enum VerticalAlignment {
     #[default]
     Top,
+    Center,
     Bottom,
 }
 
@@ -307,11 +309,17 @@ impl<'a> Ui<'a> {
             HorizontalAlignment::Right => {
                 bounds.x = old_bounds.w.saturating_sub(width + 1);
             }
+            HorizontalAlignment::Center => {
+                bounds.x = (old_bounds.w / 2).saturating_sub(width / 2);
+            }
         }
         match desc.vertical {
             VerticalAlignment::Top => {}
             VerticalAlignment::Bottom => {
                 bounds.y = old_bounds.h.saturating_sub(height + 1);
+            }
+            VerticalAlignment::Center => {
+                bounds.y = (old_bounds.h / 2).saturating_sub(height / 2);
             }
         }
         self.ui.bounds = bounds;
@@ -324,7 +332,6 @@ impl<'a> Ui<'a> {
         self.ui.layer = layer;
         self.ui.id_stack.pop();
         self.ui.bounds = old_bounds;
-        self.submit_rect(Default::default(), bounds);
     }
 
     pub fn horizontal(&mut self, mut contents: impl FnMut(&mut Self)) {
