@@ -54,6 +54,19 @@ impl Plugin for UiPlugin {
     }
 }
 
+fn fnv_1a(value: &[u8]) -> u32 {
+    let mut hash: u32 = 0x811c9dc5;
+    for byte in value {
+        hash ^= *byte as u32;
+        hash = hash.wrapping_mul(0x1000193);
+    }
+    hash
+}
+
+fn fnv_1a_u32(value: u32) -> u32 {
+    fnv_1a(bytemuck::cast_slice(&[value]))
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShapeKey {
     pub text: String,
@@ -76,7 +89,7 @@ pub struct UiState {
     hovered: UiId,
     active: UiId,
     /// stack of parents in the ui tree
-    id_stack: Vec<IdType>,
+    id_stack: Vec<IdxType>,
 
     colored_rects: Vec<DrawColorRect>,
     text_rects: Vec<DrawTextRect>,
@@ -90,6 +103,9 @@ pub struct UiState {
     bounding_boxes: HashMap<UiId, UiRect>,
 
     rect_history: Vec<UiRect>,
+
+    /// hash of the current tree root
+    root_hash: u32,
 }
 
 #[derive(Debug)]
@@ -116,6 +132,7 @@ impl UiState {
             font,
             bounding_boxes: Default::default(),
             rect_history: Default::default(),
+            root_hash: 0,
         }
     }
 }
@@ -132,7 +149,7 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
-    fn parent(&self) -> IdType {
+    fn parent(&self) -> IdxType {
         if self.ui.id_stack.len() >= 2 {
             self.ui.id_stack[self.ui.id_stack.len() - 2]
         } else {
@@ -141,16 +158,25 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
-    fn current_idx(&self) -> IdType {
+    fn current_idx(&self) -> IdxType {
         assert!(!self.ui.id_stack.is_empty());
         unsafe { *self.ui.id_stack.last().unwrap_unchecked() }
     }
 
     #[inline]
     fn current_id(&self) -> UiId {
+        let index = self.current_idx();
+        let hash = {
+            let mut hash = fnv_1a_u32(self.ui.root_hash);
+            for i in self.ui.id_stack.iter() {
+                hash = fnv_1a(bytemuck::cast_slice(&[hash, *i]));
+            }
+            hash
+        };
         UiId {
             parent: self.parent(),
-            index: self.current_idx(),
+            index,
+            uid: hash,
         }
     }
 
@@ -203,7 +229,7 @@ impl<'a> Ui<'a> {
 
     // TODO: alignment or position
     pub fn panel(&mut self, width: u32, height: u32, mut contents: impl FnMut(&mut Self)) {
-        self.ui.id_stack.push(0);
+        self.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[width, height]));
         self.ui.bounds = UiRect {
             x: 0,
             y: 0,
@@ -213,6 +239,7 @@ impl<'a> Ui<'a> {
         let layer = self.ui.layer;
         self.ui.layer += 1;
         self.color_rect(0, 0, width, height, 0x04a5e5ff, self.ui.layer);
+        self.ui.id_stack.push(0);
         contents(self);
         self.ui.layer = layer;
         self.ui.id_stack.pop();
@@ -222,6 +249,7 @@ impl<'a> Ui<'a> {
     where
         'a: 'b,
     {
+        self.begin_widget();
         self.ui.id_stack.push(0);
         let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
@@ -484,19 +512,21 @@ impl<'a> Ui<'a> {
     }
 }
 
-type IdType = u32;
-const SENTINEL: IdType = !0;
+type IdxType = u32;
+const SENTINEL: IdxType = !0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UiId {
-    parent: IdType,
-    index: IdType,
+    parent: IdxType,
+    index: IdxType,
+    uid: IdxType,
 }
 
 impl UiId {
     pub const SENTINEL: UiId = Self {
         parent: SENTINEL,
         index: SENTINEL,
+        uid: SENTINEL,
     };
 }
 
@@ -566,6 +596,7 @@ impl<'a> Columns<'a> {
 }
 
 fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) {
+    ui.root_hash = 0;
     ui.rect_history.clear();
     ui.colored_rects.clear();
     ui.text_rects.clear();
