@@ -7,16 +7,19 @@ use glam::Vec3;
 struct Label(String);
 
 fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
-    ctx.panel(1000, 300, |ui| {
+    ctx.panel(1500, 300, |ui| {
         ui.grid(5, |cols| {
             for col in 0..4 {
                 cols.column(col, |ui| {
                     for row in 0..4 {
-                        let fill = row * 2;
-                        let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
-                        if ui.button(&l).pressed() {
-                            label.0 = l;
-                        }
+                        ui.horizontal(|ui| {
+                            ui.label("Click this one pls");
+                            let fill = row * 2;
+                            let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
+                            if ui.button(&l).pressed() {
+                                label.0 = l;
+                            }
+                        });
                     }
                 });
             }
@@ -24,10 +27,7 @@ fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
         ui.grid(3, |cols| {
             cols.column(1, |ui| {
                 ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.label("Selected: ");
-                        ui.label("Reeeeeeeeeeee");
-                    });
+                    ui.label("Selected: ");
                     ui.label(&label.0);
                 });
             });
