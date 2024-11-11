@@ -400,7 +400,7 @@ impl<'a> Ui<'a> {
         }
         self.ui.bounds.y += h + 2 * PADDING;
         let rect = UiRect { x, y, w, h };
-        self.update_rect(rect);
+        self.update_rect(id, rect);
         Response {
             hovered: self.ui.hovered == id,
             active: self.ui.active == id,
@@ -409,8 +409,7 @@ impl<'a> Ui<'a> {
         }
     }
 
-    fn update_rect(&mut self, rect: UiRect) {
-        let id = self.current_id();
+    fn update_rect(&mut self, id: UiId, rect: UiRect) {
         self.ui.bounding_boxes.insert(id, rect);
     }
 
@@ -502,7 +501,7 @@ impl<'a> Ui<'a> {
         self.color_rect(x, y, w, h, color, layer);
 
         let rect = UiRect { x, y, w, h };
-        self.update_rect(rect);
+        self.update_rect(id, rect);
         ButtonResponse {
             hovered: self.ui.hovered == id,
             active: self.ui.active == id,
