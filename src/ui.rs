@@ -398,7 +398,6 @@ impl<'a> Ui<'a> {
             );
             text_y += ph;
         }
-        self.ui.bounds.y += h + 2 * PADDING;
         let rect = UiRect { x, y, w, h };
         self.update_rect(id, rect);
         Response {
@@ -410,6 +409,9 @@ impl<'a> Ui<'a> {
     }
 
     fn update_rect(&mut self, id: UiId, rect: UiRect) {
+        let dy = rect.h + 2 * PADDING;
+        self.ui.bounds.y += dy;
+        self.ui.bounds.h = self.ui.bounds.h.saturating_sub(dy);
         self.ui.bounding_boxes.insert(id, rect);
     }
 
@@ -492,9 +494,6 @@ impl<'a> Ui<'a> {
             );
             text_y += ph + TEXT_PADDING;
         }
-        let dy = h + 2 * PADDING + 2 * TEXT_PADDING;
-        self.ui.bounds.y += dy;
-        self.ui.bounds.h = self.ui.bounds.h.saturating_sub(dy);
         // background
         let w = w + 2 * TEXT_PADDING;
         let h = h + 2 * TEXT_PADDING;
