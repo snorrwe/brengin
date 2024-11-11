@@ -399,7 +399,7 @@ impl<'a> Ui<'a> {
             text_y += ph;
         }
         let rect = UiRect { x, y, w, h };
-        self.update_rect(id, rect);
+        self.submit_rect(id, rect);
         Response {
             hovered: self.ui.hovered == id,
             active: self.ui.active == id,
@@ -408,7 +408,8 @@ impl<'a> Ui<'a> {
         }
     }
 
-    fn update_rect(&mut self, id: UiId, rect: UiRect) {
+    /// When a widget has been completed, submit it's bounding rectangle
+    fn submit_rect(&mut self, id: UiId, rect: UiRect) {
         let dy = rect.h + 2 * PADDING;
         self.ui.bounds.y += dy;
         self.ui.bounds.h = self.ui.bounds.h.saturating_sub(dy);
@@ -500,7 +501,7 @@ impl<'a> Ui<'a> {
         self.color_rect(x, y, w, h, color, layer);
 
         let rect = UiRect { x, y, w, h };
-        self.update_rect(id, rect);
+        self.submit_rect(id, rect);
         ButtonResponse {
             hovered: self.ui.hovered == id,
             active: self.ui.active == id,
