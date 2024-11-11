@@ -23,7 +23,13 @@ fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
         });
         ui.grid(3, |cols| {
             cols.column(1, |ui| {
-                ui.label(format!("Selected:\n{}", label.0));
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label("Selected: ");
+                        ui.label("Reeeeeeeeeeee");
+                    });
+                    ui.label(&label.0);
+                });
             });
         });
     });

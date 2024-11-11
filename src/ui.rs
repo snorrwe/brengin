@@ -106,6 +106,8 @@ pub struct UiState {
 
     /// hash of the current tree root
     root_hash: u32,
+
+    layout_dir: LayoutDirection,
 }
 
 #[derive(Debug)]
@@ -133,8 +135,15 @@ impl UiState {
             bounding_boxes: Default::default(),
             rect_history: Default::default(),
             root_hash: 0,
+            layout_dir: LayoutDirection::TopDown,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LayoutDirection {
+    TopDown,
+    LeftRight,
 }
 
 impl<'a> Ui<'a> {
@@ -243,6 +252,54 @@ impl<'a> Ui<'a> {
         contents(self);
         self.ui.layer = layer;
         self.ui.id_stack.pop();
+    }
+
+    pub fn horizontal(&mut self, mut contents: impl FnMut(&mut Self)) {
+        self.begin_widget();
+        let layout = self.ui.layout_dir;
+        let history_start = self.ui.rect_history.len();
+        let bounds = self.ui.bounds;
+        self.ui.layout_dir = LayoutDirection::LeftRight;
+        self.ui.id_stack.push(0);
+        contents(self);
+        self.ui.id_stack.pop();
+        self.ui.layout_dir = layout;
+        if self.ui.rect_history.len() <= history_start {
+            // no rects have been submitted
+            return;
+        }
+
+        let mut rect = self.ui.rect_history[history_start];
+        self.ui.rect_history[history_start + 1..]
+            .iter()
+            .for_each(|r| rect = rect.grow_over(*r));
+
+        self.ui.bounds = bounds;
+        self.submit_rect(self.current_id(), rect);
+    }
+
+    pub fn vertical(&mut self, mut contents: impl FnMut(&mut Self)) {
+        self.begin_widget();
+        let layout = self.ui.layout_dir;
+        let history_start = self.ui.rect_history.len();
+        let bounds = self.ui.bounds;
+        self.ui.layout_dir = LayoutDirection::TopDown;
+        self.ui.id_stack.push(0);
+        contents(self);
+        self.ui.id_stack.pop();
+        self.ui.layout_dir = layout;
+
+        if self.ui.rect_history.len() <= history_start {
+            // no rects have been submitted
+            return;
+        }
+
+        let mut rect = self.ui.rect_history[history_start];
+        self.ui.rect_history[history_start + 1..]
+            .iter()
+            .for_each(|r| rect = rect.grow_over(*r));
+        self.ui.bounds = bounds;
+        self.submit_rect(self.current_id(), rect);
     }
 
     pub fn grid<'b>(&mut self, columns: u32, mut contents: impl FnMut(&mut Columns) + 'b)
@@ -410,9 +467,18 @@ impl<'a> Ui<'a> {
 
     /// When a widget has been completed, submit it's bounding rectangle
     fn submit_rect(&mut self, id: UiId, rect: UiRect) {
-        let dy = rect.h + 2 * PADDING;
-        self.ui.bounds.y += dy;
-        self.ui.bounds.h = self.ui.bounds.h.saturating_sub(dy);
+        match self.ui.layout_dir {
+            LayoutDirection::TopDown => {
+                let dy = rect.h + 2 * PADDING;
+                self.ui.bounds.y += dy;
+                self.ui.bounds.h = self.ui.bounds.h.saturating_sub(dy);
+            }
+            LayoutDirection::LeftRight => {
+                let dx = rect.w + 2 * PADDING;
+                self.ui.bounds.x += dx;
+                self.ui.bounds.w = self.ui.bounds.w.saturating_sub(dx);
+            }
+        }
         self.ui.bounding_boxes.insert(id, rect);
     }
 
@@ -595,6 +661,7 @@ impl<'a> Columns<'a> {
 }
 
 fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) {
+    ui.layout_dir = LayoutDirection::TopDown;
     ui.root_hash = 0;
     ui.rect_history.clear();
     ui.colored_rects.clear();
