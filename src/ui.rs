@@ -113,8 +113,8 @@ pub struct UiState {
     layout_dir: LayoutDirection,
 }
 
-#[derive(Debug)]
-struct Theme {
+#[derive(Debug, Clone)]
+pub struct Theme {
     pub primary_color: u32,
     pub secondary_color: u32,
     pub button_hovered: u32,
@@ -486,6 +486,14 @@ impl<'a> Ui<'a> {
         (handle.clone(), shape)
     }
 
+    pub fn with_theme(&mut self, theme: Theme, mut contents: impl FnMut(&mut Self)) {
+        let t = std::mem::replace(&mut *self.theme, theme);
+
+        contents(self);
+
+        *self.theme = t;
+    }
+
     pub fn label(&mut self, label: impl Into<String>) -> Response<()> {
         self.begin_widget();
         let id = self.current_id();
@@ -641,6 +649,14 @@ impl<'a> Ui<'a> {
             inner: ButtonState { pressed },
             rect,
         }
+    }
+
+    pub fn theme(&self) -> &Theme {
+        &self.theme
+    }
+
+    pub fn theme_mut(&mut self) -> &mut ResMut<'a, Theme> {
+        &mut self.theme
     }
 }
 

@@ -41,7 +41,15 @@ fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
             vertical: VerticalAlignment::Center,
         },
         |ui| {
-            ui.label("My panel is centered!!");
+            ui.with_theme(
+                brengin::ui::Theme {
+                    font_size: 24,
+                    ..ui.theme().clone()
+                },
+                |ui| {
+                    ui.label("My panel is centered!!");
+                },
+            );
             ui.horizontal(|ui| {
                 ui.label("Selected: ");
                 ui.label(&label.0);
