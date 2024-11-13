@@ -18,14 +18,11 @@ fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
                 for col in 0..4 {
                     cols.column(col, |ui| {
                         for row in 0..4 {
-                            ui.horizontal(|ui| {
-                                ui.label("Click this one pls");
-                                let fill = row * 2;
-                                let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
-                                if ui.button(&l).pressed() {
-                                    label.0 = l;
-                                }
-                            });
+                            let fill = row * 2;
+                            let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
+                            if ui.button(&l).pressed() {
+                                label.0 = l;
+                            }
                         }
                     });
                 }
