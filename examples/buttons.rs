@@ -14,7 +14,7 @@ fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
             vertical: VerticalAlignment::Bottom,
         },
         |ui| {
-            ui.grid(5, |cols| {
+            ui.grid(4, |cols| {
                 for col in 0..4 {
                     cols.column(col, |ui| {
                         for row in 0..4 {
