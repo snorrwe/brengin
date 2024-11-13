@@ -2,7 +2,6 @@ use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
 use brengin::ui::{HorizontalAlignment, Ui, UiCoordinate, VerticalAlignment};
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
-use glam::Vec3;
 
 struct Label(String);
 
