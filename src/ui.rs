@@ -544,7 +544,7 @@ impl<'a> Ui<'a> {
         }
     }
 
-    /// When a widget has been completed, submit it's bounding rectangle
+    /// When a widget has been completed, submit its bounding rectangle
     fn submit_rect(&mut self, id: UiId, rect: UiRect) {
         let padding = self.theme.padding;
         match self.ui.layout_dir {
