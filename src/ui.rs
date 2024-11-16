@@ -826,9 +826,9 @@ fn submit_text_rects(
         (text_rects.chunk_by_mut(|a, b| a.scissor == b.scissor)).zip(text_rect_q.iter_mut())
     {
         buffers_reused += 1;
+        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
         rects.0.clear();
         rects.0.extend(g.iter_mut().map(|x| std::mem::take(x)));
-        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
     }
     for (_, _, id) in text_rect_q.iter().skip(buffers_reused) {
         cmd.delete(id);
@@ -838,8 +838,8 @@ fn submit_text_rects(
         .skip(buffers_reused)
     {
         cmd.spawn().insert_bundle((
-            TextRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
             UiScissor(ui.scissors[g[0].scissor as usize]),
+            TextRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
         ));
     }
 }

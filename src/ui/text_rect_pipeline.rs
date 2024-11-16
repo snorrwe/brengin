@@ -294,6 +294,8 @@ fn update_instances(
         }
     }
 
+    // FIXME: retain buffers or do a smarter gc
+    pipeline.instances.clear();
     for ((id, scissor), cpu) in instances.iter() {
         let rendering_data = pipeline.instances.entry(*scissor).or_default();
 
