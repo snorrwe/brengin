@@ -139,6 +139,18 @@ fn extract_render_data(
     render_world.insert_resource(GameWorld {
         world: NonNull::from(&mut *gw),
     });
+    render_world
+        .run_system(
+            |world: Res<GameWorld>, mut cmd: Commands, q: Query<EntityId>| {
+                // clear invalid ids
+                for id in q.iter() {
+                    if !world.world().is_id_valid(id) {
+                        cmd.delete(id);
+                    }
+                }
+            },
+        )
+        .unwrap();
     render_world.run_stage(render_extract.clone()).unwrap();
     render_world.remove_resource::<GameWorld>();
 }
