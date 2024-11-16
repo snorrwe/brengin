@@ -794,9 +794,7 @@ fn submit_frame_color_rects(
     mut color_rect_q: Query<(&mut RectRequests, &mut UiScissor, EntityId)>,
 ) {
     let mut color_rects = std::mem::take(&mut ui.color_rects);
-    let mut text_rects = std::mem::take(&mut ui.text_rects);
     color_rects.sort_unstable_by_key(|r| r.scissor);
-    text_rects.sort_unstable_by_key(|r| r.scissor);
 
     let mut color_chunks = color_rects.chunk_by(|a, b| a.scissor == b.scissor);
     let mut qiter = color_rect_q.iter_mut();
