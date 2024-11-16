@@ -1,6 +1,5 @@
 use std::mem::size_of;
 
-use crate::renderer::texture::Texture;
 use crate::renderer::{
     texture, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput,
     RenderCommandPlugin, RenderPass,
@@ -84,11 +83,6 @@ impl DrawRectInstance {
 
 struct RectPipeline {
     color_rect_pipeline: wgpu::RenderPipeline,
-}
-
-pub struct UiTextureRenderingData {
-    pub texture_bind_group: wgpu::BindGroup,
-    pub texture: Texture,
 }
 
 impl RectPipeline {
