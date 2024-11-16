@@ -89,6 +89,7 @@ pub struct UiState {
     color_rects: Vec<DrawColorRect>,
     text_rects: Vec<DrawTextRect>,
     scissors: Vec<UiRect>,
+    scissor_idx: u32,
     bounds: UiRect,
 
     font: OwnedTypeFace,
@@ -140,6 +141,7 @@ impl UiState {
             color_rects: Default::default(),
             text_rects: Default::default(),
             scissors: Default::default(),
+            scissor_idx: 0,
             bounds: Default::default(),
             layer: 0,
             font,
@@ -334,6 +336,8 @@ impl<'a> Ui<'a> {
             }
         }
         self.ui.bounds = bounds;
+        let scissor = self.ui.scissor_idx;
+        self.ui.scissor_idx = self.ui.scissors.len() as u32;
         self.ui.scissors.push(bounds);
 
         let layer = self.ui.layer;
@@ -344,6 +348,7 @@ impl<'a> Ui<'a> {
         self.ui.layer = layer;
         self.ui.id_stack.pop();
         self.ui.bounds = old_bounds;
+        self.ui.scissor_idx = scissor;
     }
 
     pub fn horizontal(&mut self, mut contents: impl FnMut(&mut Self)) {
@@ -426,7 +431,7 @@ impl<'a> Ui<'a> {
             h: height,
         });
         assert!(!self.ui.scissors.is_empty());
-        let scissor = self.ui.scissors.len() as u32 - 1;
+        let scissor = self.ui.scissor_idx;
         self.ui.color_rects.push(DrawColorRect {
             x,
             y,
@@ -455,7 +460,7 @@ impl<'a> Ui<'a> {
             h: height,
         });
         assert!(!self.ui.scissors.is_empty());
-        let scissor = self.ui.scissors.len() as u32 - 1;
+        let scissor = self.ui.scissor_idx;
         self.ui.text_rects.push(DrawTextRect {
             x,
             y,
@@ -764,7 +769,6 @@ fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) 
     ui.rect_history.clear();
     ui.color_rects.clear();
     ui.text_rects.clear();
-    ui.scissors.clear();
     ui.bounds = UiRect {
         x: 0,
         y: 0,
@@ -772,7 +776,9 @@ fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) 
         h: size.height as i32,
     };
     let b = ui.bounds;
+    ui.scissors.clear();
     ui.scissors.push(b);
+    ui.scissor_idx = 0;
     ui.layer = 0;
 }
 
