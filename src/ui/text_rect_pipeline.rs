@@ -14,22 +14,22 @@ use tracing::debug;
 
 use crate::{renderer::Extract, Plugin};
 
-use super::ShapingResult;
+use super::{ShapingResult, UiScissor};
 
 #[derive(Default, Clone)]
 pub struct TextRectRequests(pub Vec<DrawTextRect>);
 
 impl Extract for TextRectRequests {
-    type QueryItem = &'static Self;
+    type QueryItem = (&'static Self, &'static UiScissor);
 
     type Filter = ();
 
-    type Out = (Self,);
+    type Out = (Self, UiScissor);
 
     fn extract<'a>(
-        it: <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
+        (it, sc): <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
     ) -> Option<Self::Out> {
-        Some((it.clone(),))
+        Some((it.clone(), *sc))
     }
 }
 

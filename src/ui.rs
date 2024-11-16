@@ -1,6 +1,5 @@
 use crate::{
     assets::{self, AssetsPlugin, Handle},
-    renderer::{Extract, ExtractionPlugin},
     MouseInputs, Plugin,
 };
 
@@ -34,19 +33,17 @@ impl Plugin for UiPlugin {
             0,
         )
         .unwrap();
-        app.add_plugin(ExtractionPlugin::<UiScissors>::default());
         app.insert_resource(UiState::new(font));
         app.insert_resource(TextTextureCache::default());
         if app.get_resource::<Theme>().is_none() {
             app.insert_resource(Theme::default());
         }
-        app.add_startup_system(setup);
         app.add_plugin(AssetsPlugin::<ShapingResult>::default());
         app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(begin_frame);
         });
         app.with_stage(crate::Stage::PostUpdate, |s| {
-            s.add_system(submit_frame).add_system(submit_scissors);
+            s.add_system(submit_frame);
         });
     }
 }
@@ -760,7 +757,16 @@ impl<'a> Columns<'a> {
     }
 }
 
-fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) {
+fn begin_frame(
+    mut ui: ResMut<UiState>,
+    size: Res<crate::renderer::WindowSize>,
+    rects: Query<EntityId, Or<With<RectRequests>, With<TextRectRequests>>>,
+    mut cmd: Commands,
+) {
+    for id in rects.iter() {
+        cmd.delete(id);
+    }
+
     ui.layout_dir = LayoutDirection::TopDown;
     ui.root_hash = 0;
     ui.rect_history.clear();
@@ -778,22 +784,28 @@ fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) 
     ui.layer = 0;
 }
 
-fn submit_frame(
-    mut ui: ResMut<UiState>,
-    mut rects: Query<&mut RectRequests>,
-    mut text_rect: Query<&mut TextRectRequests>,
-) {
-    if let Some(dst) = rects.single_mut() {
-        std::mem::swap(&mut ui.colored_rects, &mut dst.0);
-    }
-    if let Some(dst) = text_rect.single_mut() {
-        std::mem::swap(&mut ui.text_rects, &mut dst.0);
-    }
-}
+fn submit_frame(mut ui: ResMut<UiState>, mut cmd: Commands) {
+    // TODO:
+    // preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
+    // GC if too many
+    // most frames should have the same items
+    let mut colored_rects = std::mem::take(&mut ui.colored_rects);
+    let mut text_rects = std::mem::take(&mut ui.text_rects);
+    colored_rects.sort_unstable_by_key(|r| r.scissor);
+    text_rects.sort_unstable_by_key(|r| r.scissor);
 
-fn setup(mut cmd: Commands) {
-    cmd.spawn().insert(RectRequests::default());
-    cmd.spawn().insert(TextRectRequests::default());
+    for g in colored_rects.chunk_by(|a, b| a.scissor == b.scissor) {
+        cmd.spawn().insert_bundle((
+            RectRequests(g.iter().copied().collect()),
+            UiScissor(ui.scissors[g[0].scissor as usize]),
+        ));
+    }
+    for g in text_rects.chunk_by_mut(|a, b| a.scissor == b.scissor) {
+        cmd.spawn().insert_bundle((
+            TextRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
+            UiScissor(ui.scissors[g[0].scissor as usize]),
+        ));
+    }
 }
 
 pub struct Ui<'a> {
@@ -832,28 +844,5 @@ unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
     }
 }
 
-fn submit_scissors(mut cmd: Commands, mut q: Query<&mut UiScissors>, mut ui: ResMut<UiState>) {
-    match q.single_mut() {
-        Some(r) => {
-            std::mem::swap(&mut r.0, &mut ui.scissors);
-        }
-        None => {
-            cmd.spawn()
-                .insert(UiScissors(std::mem::take(&mut ui.scissors)));
-        }
-    }
-}
-
-#[derive(Default, Clone, Debug)]
-pub struct UiScissors(pub Vec<UiRect>);
-impl Extract for UiScissors {
-    type QueryItem = &'static Self;
-
-    type Filter = ();
-
-    type Out = (Self,);
-
-    fn extract(it: <Self::QueryItem as query::QueryFragment>::Item<'_>) -> Option<Self::Out> {
-        Some((it.clone(),))
-    }
-}
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct UiScissor(pub UiRect);

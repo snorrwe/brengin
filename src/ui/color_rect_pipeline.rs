@@ -10,6 +10,8 @@ use wgpu::util::DeviceExt as _;
 
 use crate::{renderer::Extract, Plugin};
 
+use super::UiScissor;
+
 #[derive(Default, Clone, Debug)]
 pub struct RectRequests(pub Vec<DrawColorRect>);
 
@@ -19,16 +21,16 @@ struct RectInstanceBuffer {
 }
 
 impl Extract for RectRequests {
-    type QueryItem = &'static Self;
+    type QueryItem = (&'static Self, &'static UiScissor);
 
     type Filter = ();
 
-    type Out = (Self,);
+    type Out = (Self, UiScissor);
 
     fn extract<'a>(
-        it: <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
+        (it, sc): <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
     ) -> Option<Self::Out> {
-        Some((it.clone(),))
+        Some((it.clone(), *sc))
     }
 }
 
