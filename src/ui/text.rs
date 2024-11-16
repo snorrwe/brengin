@@ -93,10 +93,10 @@ pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBo
 
     GlyphBufferBounds {
         bounds: UiRect {
-            x: extx as u32,
-            y: exty as u32,
-            w: maxx as u32,
-            h: maxy as u32,
+            x: extx,
+            y: exty,
+            w: maxx,
+            h: maxy,
         },
         padding_x,
         padding_y,
@@ -136,8 +136,8 @@ pub fn draw_glyph_buffer(
     builder.yoffset = bounds.padding_y as f32 * builder.scaling_factor;
 
     let mut pixmap = tiny_skia::Pixmap::new(
-        ((bounds.bounds.w + bounds.padding_x) as f32 * builder.scaling_factor) as u32,
-        ((bounds.bounds.h + bounds.padding_y) as f32 * builder.scaling_factor) as u32,
+        ((bounds.bounds.w + bounds.padding_x as i32) as f32 * builder.scaling_factor) as u32,
+        ((bounds.bounds.h + bounds.padding_y as i32) as f32 * builder.scaling_factor) as u32,
     )
     .context("Failed to create pixmap")?;
 

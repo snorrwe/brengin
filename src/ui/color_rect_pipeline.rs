@@ -37,10 +37,10 @@ impl Extract for RectRequests {
 /// XY are top-left corner, WH are full-extents
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DrawColorRect {
-    pub x: u32,
-    pub y: u32,
-    pub w: u32,
-    pub h: u32,
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
     pub layer: u16,
     pub color: u32,
     pub scissor: u32,
@@ -166,9 +166,12 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
             .render_pass
             .set_pipeline(&pipeline.color_rect_pipeline);
         for (requests, scissor) in rects.iter() {
-            input
-                .render_pass
-                .set_scissor_rect(scissor.0.x, scissor.0.y, scissor.0.w, scissor.0.h);
+            input.render_pass.set_scissor_rect(
+                scissor.0.x.max(0) as u32,
+                scissor.0.y.max(0) as u32,
+                scissor.0.w as u32,
+                scissor.0.h as u32,
+            );
             input
                 .render_pass
                 .set_vertex_buffer(0, requests.buffer.slice(..));

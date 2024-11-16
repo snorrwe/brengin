@@ -159,8 +159,8 @@ enum LayoutDirection {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiCoordinate {
-    Absolute(u32),
-    Percent(u8),
+    Absolute(i32),
+    Percent(i8),
 }
 
 impl Default for UiCoordinate {
@@ -169,20 +169,20 @@ impl Default for UiCoordinate {
     }
 }
 
-impl From<u32> for UiCoordinate {
-    fn from(value: u32) -> Self {
+impl From<i32> for UiCoordinate {
+    fn from(value: i32) -> Self {
         Self::Absolute(value)
     }
 }
 
 impl UiCoordinate {
-    pub fn as_abolute(self, max: u32) -> u32 {
+    pub fn as_abolute(self, max: i32) -> i32 {
         match self {
             UiCoordinate::Absolute(x) => x,
             UiCoordinate::Percent(p) => {
                 let p = p as f64 / 100.0;
                 let x = max as f64 * p;
-                x as u32
+                x as i32
             }
         }
     }
@@ -318,19 +318,19 @@ impl<'a> Ui<'a> {
         match desc.horizonal {
             HorizontalAlignment::Left => {}
             HorizontalAlignment::Right => {
-                bounds.x = old_bounds.w.saturating_sub(width + 1);
+                bounds.x = old_bounds.w.saturating_sub(width + 1) as i32;
             }
             HorizontalAlignment::Center => {
-                bounds.x = (old_bounds.w / 2).saturating_sub(width / 2);
+                bounds.x = (old_bounds.w / 2).saturating_sub(width / 2) as i32;
             }
         }
         match desc.vertical {
             VerticalAlignment::Top => {}
             VerticalAlignment::Bottom => {
-                bounds.y = old_bounds.h.saturating_sub(height + 1);
+                bounds.y = old_bounds.h.saturating_sub(height + 1) as i32;
             }
             VerticalAlignment::Center => {
-                bounds.y = (old_bounds.h / 2).saturating_sub(height / 2);
+                bounds.y = (old_bounds.h / 2).saturating_sub(height / 2) as i32;
             }
         }
         self.ui.bounds = bounds;
@@ -393,11 +393,12 @@ impl<'a> Ui<'a> {
     {
         self.begin_widget();
         self.ui.id_stack.push(0);
+        let cols = columns as i32;
         let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
-        let width = bounds.w / columns + 1;
+        let width = (bounds.w / cols + 1) as i32;
 
-        let dims = (0..columns)
+        let dims = (0..cols as i32)
             .map(|i| [bounds.x + i * width, bounds.x + (i + 1) * width])
             .collect();
 
@@ -408,7 +409,7 @@ impl<'a> Ui<'a> {
         };
         contents(&mut cols);
 
-        let mut w = bounds.w;
+        let mut w = bounds.w as i32;
         for d in cols.dims {
             w = w.max(d[1] - d[0]);
         }
@@ -417,7 +418,7 @@ impl<'a> Ui<'a> {
         self.submit_rect_group(history_start);
     }
 
-    pub fn color_rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: u32, layer: u16) {
+    pub fn color_rect(&mut self, x: i32, y: i32, width: i32, height: i32, color: u32, layer: u16) {
         self.ui.rect_history.push(UiRect {
             x,
             y,
@@ -439,10 +440,10 @@ impl<'a> Ui<'a> {
 
     pub fn text_rect(
         &mut self,
-        x: u32,
-        y: u32,
-        width: u32,
-        height: u32,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
         color: u32,
         layer: u16,
         shaping: Handle<ShapingResult>,
@@ -520,17 +521,17 @@ impl<'a> Ui<'a> {
         let mut h = 0;
         let x = self.ui.bounds.x;
         let y = self.ui.bounds.y;
-        let padding = self.theme.padding;
+        let padding = self.theme.padding as i32;
         let [x, y] = [x + padding, y + padding];
         let mut text_y = y;
         for line in label.split('\n').filter(|l| !l.is_empty()) {
             let (handle, e) = self.shape_and_draw_line(line.to_owned(), self.theme.font_size);
             let pic = &e.texture;
-            let line_width = pic.width();
-            let line_height = pic.height();
+            let line_width = pic.width() as i32;
+            let line_height = pic.height() as i32;
             w = w.max(line_width);
             h += line_height;
-            let ph = pic.height();
+            let ph = pic.height() as i32;
 
             self.text_rect(
                 x,
@@ -555,16 +556,16 @@ impl<'a> Ui<'a> {
 
     /// When a widget has been completed, submit its bounding rectangle
     fn submit_rect(&mut self, id: UiId, rect: UiRect) {
-        let padding = self.theme.padding;
+        let padding = self.theme.padding as i32;
         match self.ui.layout_dir {
             LayoutDirection::TopDown => {
                 let dy = rect.h + 2 * padding;
-                self.ui.bounds.y += dy;
+                self.ui.bounds.y += dy as i32;
                 self.ui.bounds.h = self.ui.bounds.h.saturating_sub(dy);
             }
             LayoutDirection::LeftRight => {
                 let dx = rect.w + 2 * padding;
-                self.ui.bounds.x += dx;
+                self.ui.bounds.x += dx as i32;
                 self.ui.bounds.w = self.ui.bounds.w.saturating_sub(dx);
             }
         }
@@ -608,20 +609,19 @@ impl<'a> Ui<'a> {
         // shape the text
         let mut w = 0;
         let mut h = 0;
-        let x = self.ui.bounds.x;
-        let y = self.ui.bounds.y;
-        let padding = self.theme.padding;
+        let x = self.ui.bounds.x as i32;
+        let y = self.ui.bounds.y as i32;
+        let padding = self.theme.padding as i32;
         let [x, y] = [x + padding, y + padding];
-        let text_padding = self.theme.text_padding;
+        let text_padding = self.theme.text_padding as i32;
         let mut text_y = y + text_padding;
         for line in label.split('\n').filter(|l| !l.is_empty()) {
             let (handle, e) = self.shape_and_draw_line(line.to_owned(), self.theme.font_size);
             let pic = &e.texture;
-            let line_width = pic.width();
-            let line_height = pic.height();
+            let line_width = pic.width() as i32;
+            let line_height = pic.height() as i32;
             w = w.max(line_width);
             h += line_height;
-            let ph = pic.height();
 
             let mut delta = 0;
             if !active {
@@ -649,7 +649,7 @@ impl<'a> Ui<'a> {
                 layer + 2,
                 handle,
             );
-            text_y += ph + text_padding;
+            text_y += line_height + text_padding;
         }
         // background
         let w = w + 2 * text_padding;
@@ -722,7 +722,7 @@ pub struct Columns<'a> {
     ctx: NonNull<Ui<'a>>,
     cols: u32,
     /// [x start, x end][cols]
-    dims: Vec<[u32; 2]>,
+    dims: Vec<[i32; 2]>,
 }
 
 impl<'a> Columns<'a> {
@@ -768,8 +768,8 @@ fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) 
     ui.bounds = UiRect {
         x: 0,
         y: 0,
-        w: size.width,
-        h: size.height,
+        w: size.width as i32,
+        h: size.height as i32,
     };
     let b = ui.bounds;
     ui.scissors.push(b);

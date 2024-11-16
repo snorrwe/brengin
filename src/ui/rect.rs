@@ -1,11 +1,11 @@
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UiRect {
     /// center x
-    pub x: u32,
+    pub x: i32,
     /// center y
-    pub y: u32,
-    pub w: u32,
-    pub h: u32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
 }
 
 impl UiRect {
@@ -30,21 +30,21 @@ impl UiRect {
         let halfh = h * 0.5;
 
         UiRect {
-            x: (minx + halfw) as u32,
-            y: (miny + halfh) as u32,
-            w: w as u32,
-            h: h as u32,
+            x: (minx + halfw) as i32,
+            y: (miny + halfh) as i32,
+            w: w as i32,
+            h: h as i32,
         }
     }
 
     #[inline]
-    pub fn y_end(self) -> u32 {
-        self.y + self.h
+    pub fn y_end(self) -> i32 {
+        self.y + self.h as i32
     }
 
     #[inline]
-    pub fn x_end(self) -> u32 {
-        self.x + self.w
+    pub fn x_end(self) -> i32 {
+        self.x + self.w as i32
     }
 }
 

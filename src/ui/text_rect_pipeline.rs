@@ -36,10 +36,10 @@ impl Extract for TextRectRequests {
 /// XY are top-left corner, WH are full-extents
 #[derive(Default, Clone)]
 pub struct DrawTextRect {
-    pub x: u32,
-    pub y: u32,
-    pub w: u32,
-    pub h: u32,
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
     pub layer: u16,
     pub color: u32,
     pub shaping: Handle<ShapingResult>,
@@ -236,9 +236,14 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
             .set_pipeline(&pipeline.color_rect_pipeline);
 
         for (scissor, requests) in pipeline.instances.iter() {
-            input
-                .render_pass
-                .set_scissor_rect(scissor.0.x, scissor.0.y, scissor.0.w, scissor.0.h);
+            // TODO:
+            // should only use the overlapping area, instead of clamping the pos to 0
+            input.render_pass.set_scissor_rect(
+                scissor.0.x.max(0) as u32,
+                scissor.0.y.max(0) as u32,
+                scissor.0.w as u32,
+                scissor.0.h as u32,
+            );
             for requests in requests.iter() {
                 let Some(texture) = pipeline.textures.get(&requests.id) else {
                     continue;
