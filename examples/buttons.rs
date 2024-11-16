@@ -48,7 +48,13 @@ fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
             );
             ui.horizontal(|ui| {
                 ui.label("Selected: ");
-                ui.label(&label.0);
+                ui.vertical(|ui| {
+                    ui.label("This right here");
+                    ui.label("|");
+                    ui.label("|");
+                    ui.label("v");
+                    ui.label(&label.0);
+                });
             });
         },
     );
