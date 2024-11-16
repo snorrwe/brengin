@@ -426,6 +426,8 @@ impl<'a> Ui<'a> {
             w: width,
             h: height,
         });
+        assert!(!self.ui.scissors.is_empty());
+        let scissor = self.ui.scissors.len() as u32 - 1;
         self.ui.colored_rects.push(DrawColorRect {
             x,
             y,
@@ -433,6 +435,7 @@ impl<'a> Ui<'a> {
             h: height,
             color,
             layer,
+            scissor,
         })
     }
 
@@ -452,6 +455,8 @@ impl<'a> Ui<'a> {
             w: width,
             h: height,
         });
+        assert!(!self.ui.scissors.is_empty());
+        let scissor = self.ui.scissors.len() as u32 - 1;
         self.ui.text_rects.push(DrawTextRect {
             x,
             y,
@@ -460,6 +465,7 @@ impl<'a> Ui<'a> {
             color,
             layer,
             shaping,
+            scissor,
         })
     }
 

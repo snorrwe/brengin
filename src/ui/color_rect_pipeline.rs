@@ -41,6 +41,7 @@ pub struct DrawColorRect {
     pub h: u32,
     pub layer: u16,
     pub color: u32,
+    pub scissor: u32,
 }
 
 /// XY is the center, WH are half-extents

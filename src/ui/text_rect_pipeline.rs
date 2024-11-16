@@ -43,6 +43,7 @@ pub struct DrawTextRect {
     pub layer: u16,
     pub color: u32,
     pub shaping: Handle<ShapingResult>,
+    pub scissor: u32,
 }
 
 /// XY is the center, WH are half-extents
