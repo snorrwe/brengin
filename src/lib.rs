@@ -459,6 +459,7 @@ impl App {
         self
     }
 
+    /// extraction systems run on the RenderWorld with readonly access to the GameWorld
     pub fn add_extract_system<P>(
         &mut self,
         sys: impl cecs::systems::IntoSystem<'static, P, ()>,
