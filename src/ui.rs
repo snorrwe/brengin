@@ -43,7 +43,8 @@ impl Plugin for UiPlugin {
             s.add_system(begin_frame);
         });
         app.with_stage(crate::Stage::PostUpdate, |s| {
-            s.add_system(submit_frame);
+            s.add_system(submit_frame_color_rects)
+                .add_system(submit_text_rects);
         });
     }
 }
@@ -85,7 +86,7 @@ pub struct UiState {
     /// stack of parents in the ui tree
     id_stack: Vec<IdxType>,
 
-    colored_rects: Vec<DrawColorRect>,
+    color_rects: Vec<DrawColorRect>,
     text_rects: Vec<DrawTextRect>,
     scissors: Vec<UiRect>,
     bounds: UiRect,
@@ -136,7 +137,7 @@ impl UiState {
             hovered: Default::default(),
             active: Default::default(),
             id_stack: Default::default(),
-            colored_rects: Default::default(),
+            color_rects: Default::default(),
             text_rects: Default::default(),
             scissors: Default::default(),
             bounds: Default::default(),
@@ -425,7 +426,7 @@ impl<'a> Ui<'a> {
         });
         assert!(!self.ui.scissors.is_empty());
         let scissor = self.ui.scissors.len() as u32 - 1;
-        self.ui.colored_rects.push(DrawColorRect {
+        self.ui.color_rects.push(DrawColorRect {
             x,
             y,
             w: width,
@@ -770,7 +771,7 @@ fn begin_frame(
     ui.layout_dir = LayoutDirection::TopDown;
     ui.root_hash = 0;
     ui.rect_history.clear();
-    ui.colored_rects.clear();
+    ui.color_rects.clear();
     ui.text_rects.clear();
     ui.scissors.clear();
     ui.bounds = UiRect {
@@ -784,23 +785,59 @@ fn begin_frame(
     ui.layer = 0;
 }
 
-fn submit_frame(mut ui: ResMut<UiState>, mut cmd: Commands) {
-    // TODO:
-    // preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
-    // GC if too many
-    // most frames should have the same items
-    let mut colored_rects = std::mem::take(&mut ui.colored_rects);
+// preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
+// GC if too many
+// most frames should have the same items
+fn submit_frame_color_rects(
+    mut ui: ResMut<UiState>,
+    mut cmd: Commands,
+    mut color_rect_q: Query<(&mut RectRequests, &mut UiScissor, EntityId)>,
+) {
+    let mut color_rects = std::mem::take(&mut ui.color_rects);
     let mut text_rects = std::mem::take(&mut ui.text_rects);
-    colored_rects.sort_unstable_by_key(|r| r.scissor);
+    color_rects.sort_unstable_by_key(|r| r.scissor);
     text_rects.sort_unstable_by_key(|r| r.scissor);
 
-    for g in colored_rects.chunk_by(|a, b| a.scissor == b.scissor) {
+    let mut color_chunks = color_rects.chunk_by(|a, b| a.scissor == b.scissor);
+    let mut qiter = color_rect_q.iter_mut();
+    for (g, (rects, sc, _id)) in (&mut color_chunks).zip(&mut qiter) {
+        rects.0.clear();
+        rects.0.extend_from_slice(g);
+        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
+    }
+    for (_, _, id) in qiter {
+        cmd.delete(id);
+    }
+    for g in color_chunks {
         cmd.spawn().insert_bundle((
             RectRequests(g.iter().copied().collect()),
             UiScissor(ui.scissors[g[0].scissor as usize]),
         ));
     }
-    for g in text_rects.chunk_by_mut(|a, b| a.scissor == b.scissor) {
+}
+
+// preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
+// GC if too many
+// most frames should have the same items
+fn submit_text_rects(
+    mut ui: ResMut<UiState>,
+    mut cmd: Commands,
+    mut text_rect_q: Query<(&mut TextRectRequests, &mut UiScissor, EntityId)>,
+) {
+    let mut text_rects = std::mem::take(&mut ui.text_rects);
+    text_rects.sort_unstable_by_key(|r| r.scissor);
+
+    let mut text_chunks = text_rects.chunk_by_mut(|a, b| a.scissor == b.scissor);
+    let mut qiter = text_rect_q.iter_mut();
+    for (g, (rects, sc, _id)) in (&mut text_chunks).zip(&mut qiter) {
+        rects.0.clear();
+        rects.0.extend(g.iter_mut().map(|x| std::mem::take(x)));
+        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
+    }
+    for (_, _, id) in qiter {
+        cmd.delete(id);
+    }
+    for g in text_chunks {
         cmd.spawn().insert_bundle((
             TextRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
             UiScissor(ui.scissors[g[0].scissor as usize]),
