@@ -157,7 +157,7 @@ struct RectRenderCommand;
 
 impl<'a> RenderCommand<'a> for RectRenderCommand {
     type Parameters = (
-        Query<'a, &'static RectInstanceBuffer>,
+        Query<'a, (&'static RectInstanceBuffer, &'static UiScissor)>,
         Res<'a, RectPipeline>,
     );
 
@@ -165,7 +165,10 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
         input
             .render_pass
             .set_pipeline(&pipeline.color_rect_pipeline);
-        for requests in rects.iter() {
+        for (requests, scissor) in rects.iter() {
+            input
+                .render_pass
+                .set_scissor_rect(scissor.0.x, scissor.0.y, scissor.0.w, scissor.0.h);
             input
                 .render_pass
                 .set_vertex_buffer(0, requests.buffer.slice(..));
