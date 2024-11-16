@@ -758,16 +758,7 @@ impl<'a> Columns<'a> {
     }
 }
 
-fn begin_frame(
-    mut ui: ResMut<UiState>,
-    size: Res<crate::renderer::WindowSize>,
-    rects: Query<EntityId, Or<With<RectRequests>, With<TextRectRequests>>>,
-    mut cmd: Commands,
-) {
-    for id in rects.iter() {
-        cmd.delete(id);
-    }
-
+fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) {
     ui.layout_dir = LayoutDirection::TopDown;
     ui.root_hash = 0;
     ui.rect_history.clear();
