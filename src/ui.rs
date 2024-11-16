@@ -1,5 +1,6 @@
 use crate::{
     assets::{self, AssetsPlugin, Handle},
+    renderer::{Extract, ExtractionPlugin},
     MouseInputs, Plugin,
 };
 
@@ -33,6 +34,7 @@ impl Plugin for UiPlugin {
             0,
         )
         .unwrap();
+        app.add_plugin(ExtractionPlugin::<UiScissors>::default());
         app.insert_resource(UiState::new(font));
         app.insert_resource(TextTextureCache::default());
         if app.get_resource::<Theme>().is_none() {
@@ -44,7 +46,7 @@ impl Plugin for UiPlugin {
             s.add_system(begin_frame);
         });
         app.with_stage(crate::Stage::PostUpdate, |s| {
-            s.add_system(submit_frame);
+            s.add_system(submit_frame).add_system(submit_scissors);
         });
     }
 }
@@ -88,6 +90,7 @@ pub struct UiState {
 
     colored_rects: Vec<DrawColorRect>,
     text_rects: Vec<DrawTextRect>,
+    scissors: Vec<UiRect>,
     bounds: UiRect,
 
     font: OwnedTypeFace,
@@ -138,6 +141,7 @@ impl UiState {
             id_stack: Default::default(),
             colored_rects: Default::default(),
             text_rects: Default::default(),
+            scissors: Default::default(),
             bounds: Default::default(),
             layer: 0,
             font,
@@ -332,6 +336,7 @@ impl<'a> Ui<'a> {
             }
         }
         self.ui.bounds = bounds;
+        self.ui.scissors.push(bounds);
 
         let layer = self.ui.layer;
         self.ui.layer += 1;
@@ -755,12 +760,15 @@ fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) 
     ui.rect_history.clear();
     ui.colored_rects.clear();
     ui.text_rects.clear();
+    ui.scissors.clear();
     ui.bounds = UiRect {
         x: 0,
         y: 0,
         w: size.width,
         h: size.height,
     };
+    let b = ui.bounds;
+    ui.scissors.push(b);
     ui.layer = 0;
 }
 
@@ -815,5 +823,31 @@ unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
 
     fn resources_const(set: &mut std::collections::HashSet<std::any::TypeId>) {
         set.insert(std::any::TypeId::of::<MouseInputs>());
+    }
+}
+
+fn submit_scissors(mut cmd: Commands, mut q: Query<&mut UiScissors>, mut ui: ResMut<UiState>) {
+    match q.single_mut() {
+        Some(r) => {
+            std::mem::swap(&mut r.0, &mut ui.scissors);
+        }
+        None => {
+            cmd.spawn()
+                .insert(UiScissors(std::mem::take(&mut ui.scissors)));
+        }
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct UiScissors(pub Vec<UiRect>);
+impl Extract for UiScissors {
+    type QueryItem = &'static Self;
+
+    type Filter = ();
+
+    type Out = (Self,);
+
+    fn extract(it: <Self::QueryItem as query::QueryFragment>::Item<'_>) -> Option<Self::Out> {
+        Some((it.clone(),))
     }
 }
