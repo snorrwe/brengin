@@ -796,17 +796,22 @@ fn submit_frame_color_rects(
     let mut color_rects = std::mem::take(&mut ui.color_rects);
     color_rects.sort_unstable_by_key(|r| r.scissor);
 
-    let mut color_chunks = color_rects.chunk_by(|a, b| a.scissor == b.scissor);
-    let mut qiter = color_rect_q.iter_mut();
-    for (g, (rects, sc, _id)) in (&mut color_chunks).zip(&mut qiter) {
+    let mut buffers_reused = 0;
+    for (g, (rects, sc, _id)) in
+        (color_rects.chunk_by(|a, b| a.scissor == b.scissor)).zip(color_rect_q.iter_mut())
+    {
+        buffers_reused += 1;
         rects.0.clear();
         rects.0.extend_from_slice(g);
         *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
     }
-    for (_, _, id) in qiter {
+    for (_, _, id) in color_rect_q.iter().skip(buffers_reused) {
         cmd.delete(id);
     }
-    for g in color_chunks {
+    for g in color_rects
+        .chunk_by(|a, b| a.scissor == b.scissor)
+        .skip(buffers_reused)
+    {
         cmd.spawn().insert_bundle((
             RectRequests(g.iter().copied().collect()),
             UiScissor(ui.scissors[g[0].scissor as usize]),
@@ -825,17 +830,22 @@ fn submit_text_rects(
     let mut text_rects = std::mem::take(&mut ui.text_rects);
     text_rects.sort_unstable_by_key(|r| r.scissor);
 
-    let mut text_chunks = text_rects.chunk_by_mut(|a, b| a.scissor == b.scissor);
-    let mut qiter = text_rect_q.iter_mut();
-    for (g, (rects, sc, _id)) in (&mut text_chunks).zip(&mut qiter) {
+    let mut buffers_reused = 0;
+    for (g, (rects, sc, _id)) in
+        (text_rects.chunk_by_mut(|a, b| a.scissor == b.scissor)).zip(text_rect_q.iter_mut())
+    {
+        buffers_reused += 1;
         rects.0.clear();
         rects.0.extend(g.iter_mut().map(|x| std::mem::take(x)));
         *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
     }
-    for (_, _, id) in qiter {
+    for (_, _, id) in text_rect_q.iter().skip(buffers_reused) {
         cmd.delete(id);
     }
-    for g in text_chunks {
+    for g in text_rects
+        .chunk_by_mut(|a, b| a.scissor == b.scissor)
+        .skip(buffers_reused)
+    {
         cmd.spawn().insert_bundle((
             TextRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
             UiScissor(ui.scissors[g[0].scissor as usize]),

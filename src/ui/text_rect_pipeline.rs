@@ -87,11 +87,16 @@ impl DrawRectInstance {
 struct TextPipeline {
     color_rect_pipeline: wgpu::RenderPipeline,
     textures: HashMap<AssetId, UiTextureRenderingData>,
+    instances: HashMap<UiScissor, Vec<UiTextureRenderingInstances>>,
+}
+
+pub struct UiTextureRenderingInstances {
+    pub id: AssetId,
+    pub count: usize,
+    pub instance_gpu: wgpu::Buffer,
 }
 
 pub struct UiTextureRenderingData {
-    pub count: usize,
-    pub instance_gpu: wgpu::Buffer,
     pub texture_bind_group: wgpu::BindGroup,
     pub texture: Texture,
 }
@@ -140,13 +145,6 @@ fn extract_shaping_results(
 
                 refs.0.insert(id, handle.downgrade());
                 let rendering_data = UiTextureRenderingData {
-                    count: 0,
-                    instance_gpu: renderer.device().create_buffer(&wgpu::BufferDescriptor {
-                        label: Some("Text Instance Buffer"),
-                        mapped_at_creation: false,
-                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                        size: 0,
-                    }),
                     texture_bind_group,
                     texture,
                 };
@@ -222,6 +220,7 @@ impl TextPipeline {
         TextPipeline {
             color_rect_pipeline,
             textures: Default::default(),
+            instances: Default::default(),
         }
     }
 }
@@ -236,14 +235,22 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
             .render_pass
             .set_pipeline(&pipeline.color_rect_pipeline);
 
-        for requests in pipeline.textures.values() {
+        for (scissor, requests) in pipeline.instances.iter() {
             input
                 .render_pass
-                .set_vertex_buffer(0, requests.instance_gpu.slice(..));
-            input
-                .render_pass
-                .set_bind_group(0, &requests.texture_bind_group, &[]);
-            input.render_pass.draw(0..6, 0..requests.count as u32);
+                .set_scissor_rect(scissor.0.x, scissor.0.y, scissor.0.w, scissor.0.h);
+            for requests in requests.iter() {
+                let Some(texture) = pipeline.textures.get(&requests.id) else {
+                    continue;
+                };
+                input
+                    .render_pass
+                    .set_vertex_buffer(0, requests.instance_gpu.slice(..));
+                input
+                    .render_pass
+                    .set_bind_group(0, &texture.texture_bind_group, &[]);
+                input.render_pass.draw(0..6, 0..requests.count as u32);
+            }
         }
     }
 }
@@ -254,15 +261,15 @@ fn setup_renderer(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
 }
 
 fn update_instances(
-    q: Query<&TextRectRequests>,
+    q: Query<(&TextRectRequests, &UiScissor)>,
     renderer: Res<GraphicsState>,
     mut pipeline: ResMut<TextPipeline>,
 ) {
     // TODO: retain buffer
     let w = renderer.size().width as f32;
     let h = renderer.size().height as f32;
-    let mut instances = HashMap::<AssetId, Vec<DrawRectInstance>>::default();
-    for rects in q.iter() {
+    let mut instances = HashMap::<(AssetId, UiScissor), Vec<DrawRectInstance>>::default();
+    for (rects, scissor) in q.iter() {
         for rect in rects.0.iter() {
             let ww = rect.w as f32 * 0.5;
             let hh = rect.h as f32 * 0.5;
@@ -281,15 +288,31 @@ fn update_instances(
                 color: rect.color,
             };
             instances
-                .entry(rect.shaping.id())
+                .entry((rect.shaping.id(), *scissor))
                 .or_default()
                 .push(instance);
         }
     }
 
-    for (id, cpu) in instances.iter() {
-        let Some(rendering_data) = pipeline.textures.get_mut(id) else {
-            continue;
+    for ((id, scissor), cpu) in instances.iter() {
+        let rendering_data = pipeline.instances.entry(*scissor).or_default();
+
+        let rendering_data = match rendering_data.iter_mut().find(|r| &r.id == id) {
+            Some(x) => x,
+            None => {
+                let r = UiTextureRenderingInstances {
+                    id: *id,
+                    count: 0,
+                    instance_gpu: renderer.device().create_buffer(&wgpu::BufferDescriptor {
+                        label: Some(&format!("Text Instance Buffer - {:?} {}", scissor, id)),
+                        mapped_at_creation: false,
+                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                        size: 0,
+                    }),
+                };
+                rendering_data.push(r);
+                rendering_data.last_mut().unwrap()
+            }
         };
 
         let instance_data_bytes = bytemuck::cast_slice::<_, u8>(&cpu);
@@ -298,7 +321,7 @@ fn update_instances(
             // resize the buffer
             rendering_data.instance_gpu =
                 renderer.device().create_buffer(&wgpu::BufferDescriptor {
-                    label: Some(&format!("UI Text Instance Buffer - {}", id)),
+                    label: Some(&format!("UI Text Instance Buffer - {:?} {}", scissor, id)),
                     size: size * 2,
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
