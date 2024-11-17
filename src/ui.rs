@@ -304,53 +304,6 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub fn panel(&mut self, desc: PanelDescriptor, mut contents: impl FnMut(&mut Self)) {
-        let width = desc.width.as_abolute(self.ui.bounds.w);
-        let height = desc.height.as_abolute(self.ui.bounds.h);
-        self.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[width, height]));
-
-        let old_bounds = self.ui.bounds;
-        let mut bounds = UiRect {
-            x: 0,
-            y: 0,
-            w: width,
-            h: height,
-        };
-
-        match desc.horizonal {
-            HorizontalAlignment::Left => {}
-            HorizontalAlignment::Right => {
-                bounds.x = old_bounds.w.saturating_sub(width + 1) as i32;
-            }
-            HorizontalAlignment::Center => {
-                bounds.x = (old_bounds.w / 2).saturating_sub(width / 2) as i32;
-            }
-        }
-        match desc.vertical {
-            VerticalAlignment::Top => {}
-            VerticalAlignment::Bottom => {
-                bounds.y = old_bounds.h.saturating_sub(height + 1) as i32;
-            }
-            VerticalAlignment::Center => {
-                bounds.y = (old_bounds.h / 2).saturating_sub(height / 2) as i32;
-            }
-        }
-        self.ui.bounds = bounds;
-        let scissor = self.ui.scissor_idx;
-        self.ui.scissor_idx = self.ui.scissors.len() as u32;
-        self.ui.scissors.push(bounds);
-
-        let layer = self.ui.layer;
-        self.ui.layer += 1;
-        self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
-        self.ui.id_stack.push(0);
-        contents(self);
-        self.ui.layer = layer;
-        self.ui.id_stack.pop();
-        self.ui.bounds = old_bounds;
-        self.ui.scissor_idx = scissor;
-    }
-
     pub fn horizontal(&mut self, mut contents: impl FnMut(&mut Self)) {
         self.begin_widget();
         let layout = self.ui.layout_dir;
@@ -858,20 +811,87 @@ pub struct Ui<'a> {
     mouse: Res<'a, MouseInputs>,
 }
 
-unsafe impl<'a> query::WorldQuery<'a> for Ui<'a> {
+/// Root of the UI used to instantiate UI containers
+pub struct UiRoot<'a>(Ui<'a>);
+
+impl<'a> UiRoot<'a> {
+    pub fn panel(&mut self, desc: PanelDescriptor, mut contents: impl FnMut(&mut Ui)) {
+        let width = desc.width.as_abolute(self.0.ui.bounds.w);
+        let height = desc.height.as_abolute(self.0.ui.bounds.h);
+        self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[width, height]));
+
+        let old_bounds = self.0.ui.bounds;
+        let mut bounds = UiRect {
+            x: 0,
+            y: 0,
+            w: width,
+            h: height,
+        };
+
+        match desc.horizonal {
+            HorizontalAlignment::Left => {}
+            HorizontalAlignment::Right => {
+                bounds.x = old_bounds.w.saturating_sub(width + 1) as i32;
+            }
+            HorizontalAlignment::Center => {
+                bounds.x = (old_bounds.w / 2).saturating_sub(width / 2) as i32;
+            }
+        }
+        match desc.vertical {
+            VerticalAlignment::Top => {}
+            VerticalAlignment::Bottom => {
+                bounds.y = old_bounds.h.saturating_sub(height + 1) as i32;
+            }
+            VerticalAlignment::Center => {
+                bounds.y = (old_bounds.h / 2).saturating_sub(height / 2) as i32;
+            }
+        }
+        self.0.ui.bounds = bounds;
+        let scissor = self.0.ui.scissor_idx;
+        self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
+        self.0.ui.scissors.push(bounds);
+
+        let layer = self.0.ui.layer;
+        self.0.ui.layer += 1;
+        self.0.color_rect(
+            bounds.x,
+            bounds.y,
+            width,
+            height,
+            0x04a5e5ff,
+            self.0.ui.layer,
+        );
+        self.0.ui.id_stack.push(0);
+        contents(&mut self.0);
+        self.0.ui.layer = layer;
+        self.0.ui.id_stack.pop();
+        self.0.ui.bounds = old_bounds;
+        self.0.ui.scissor_idx = scissor;
+    }
+
+    pub fn theme(&self) -> &Theme {
+        &self.0.theme
+    }
+
+    pub fn theme_mut(&mut self) -> &mut ResMut<'a, Theme> {
+        &mut self.0.theme
+    }
+}
+
+unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
     fn new(db: &'a World, _system_idx: usize) -> Self {
         let ui = ResMut::new(db);
         let texture_cache = ResMut::new(db);
         let text_assets = ResMut::new(db);
         let theme = ResMut::new(db);
         let mouse = Res::new(db);
-        Self {
+        Self(Ui {
             ui,
             texture_cache,
             shaping_results: text_assets,
             theme,
             mouse,
-        }
+        })
     }
 
     fn resources_mut(set: &mut std::collections::HashSet<std::any::TypeId>) {

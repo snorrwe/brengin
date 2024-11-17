@@ -1,11 +1,11 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
-use brengin::ui::{HorizontalAlignment, Ui, UiCoordinate, VerticalAlignment};
+use brengin::ui::{HorizontalAlignment, UiCoordinate, UiRoot, VerticalAlignment};
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
 
 struct Label(String);
 
-fn buttons_ui(mut ctx: Ui, mut label: ResMut<Label>) {
+fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>) {
     ctx.panel(
         brengin::ui::PanelDescriptor {
             width: UiCoordinate::Percent(100),
