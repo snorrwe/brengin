@@ -122,7 +122,7 @@ impl Default for Theme {
     fn default() -> Self {
         Theme {
             primary_color: 0xcdd6f4ff,
-            secondary_color: 0x313244ff,
+            secondary_color: 0x212224ff,
             button_hovered: 0x45475aff,
             button_pressed: 0x585b70ff,
             text_padding: 5,
