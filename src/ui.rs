@@ -8,7 +8,7 @@ pub mod rect;
 pub mod text;
 pub mod text_rect_pipeline;
 
-use std::{collections::HashMap, ptr::NonNull};
+use std::{any::TypeId, collections::HashMap, ptr::NonNull};
 
 use cecs::{prelude::*, query};
 use text_rect_pipeline::{DrawTextRect, TextRectRequests};
@@ -35,6 +35,7 @@ impl Plugin for UiPlugin {
         .unwrap();
         app.insert_resource(UiState::new(font));
         app.insert_resource(TextTextureCache::default());
+        app.insert_resource(UiMemory::default());
         if app.get_resource::<Theme>().is_none() {
             app.insert_resource(Theme::default());
         }
@@ -631,6 +632,46 @@ impl<'a> Ui<'a> {
     pub fn theme_mut(&mut self) -> &mut ResMut<'a, Theme> {
         &mut self.theme
     }
+
+    pub fn get_memory_or_default<T: Default + 'static>(&mut self) -> &mut T {
+        let key = self.memory_key::<T>();
+        let res = self
+            .memory
+            .0
+            .entry(key)
+            .or_insert_with(|| ErasedMemoryEntry::new(T::default()));
+        unsafe { res.as_inner_mut() }
+    }
+
+    pub fn get_memory<T: 'static>(&self) -> Option<&T> {
+        let key = self.memory_key::<T>();
+        self.memory.0.get(&key).map(|res| unsafe { res.as_inner() })
+    }
+
+    pub fn get_memory_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        let key = self.memory_key::<T>();
+        self.memory
+            .0
+            .get_mut(&key)
+            .map(|res| unsafe { res.as_inner_mut() })
+    }
+
+    pub fn insert_memory<T: 'static>(&mut self, item: T) {
+        let key = self.memory_key::<T>();
+        self.memory.0.insert(key, ErasedMemoryEntry::new(item));
+    }
+
+    pub fn remove_memory<T: 'static>(&mut self) -> Option<Box<T>> {
+        let key = self.memory_key::<T>();
+        self.memory
+            .0
+            .remove(&key)
+            .map(|res| unsafe { res.into_inner() })
+    }
+
+    fn memory_key<T: 'static>(&self) -> (UiId, TypeId) {
+        (self.current_id(), TypeId::of::<T>())
+    }
 }
 
 type IdxType = u32;
@@ -809,6 +850,7 @@ pub struct Ui<'a> {
     shaping_results: ResMut<'a, assets::Assets<ShapingResult>>,
     theme: ResMut<'a, Theme>,
     mouse: Res<'a, MouseInputs>,
+    memory: ResMut<'a, UiMemory>,
 }
 
 /// Root of the UI used to instantiate UI containers
@@ -884,6 +926,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         let texture_cache = ResMut::new(db);
         let text_assets = ResMut::new(db);
         let theme = ResMut::new(db);
+        let memory = ResMut::new(db);
         let mouse = Res::new(db);
         Self(Ui {
             ui,
@@ -891,6 +934,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
             shaping_results: text_assets,
             theme,
             mouse,
+            memory,
         })
     }
 
@@ -899,6 +943,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         set.insert(std::any::TypeId::of::<TextTextureCache>());
         set.insert(std::any::TypeId::of::<assets::Assets<ShapingResult>>());
         set.insert(std::any::TypeId::of::<Theme>());
+        set.insert(std::any::TypeId::of::<UiMemory>());
     }
 
     fn resources_const(set: &mut std::collections::HashSet<std::any::TypeId>) {
@@ -908,3 +953,54 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
 
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct UiScissor(pub UiRect);
+
+// TODO: gc?
+#[derive(Default)]
+struct UiMemory(pub HashMap<(UiId, TypeId), ErasedMemoryEntry>);
+
+unsafe impl Send for UiMemory {}
+unsafe impl Sync for UiMemory {}
+
+pub struct ErasedMemoryEntry {
+    inner: *mut u8,
+    finalize: fn(&mut ErasedMemoryEntry),
+}
+
+impl Drop for ErasedMemoryEntry {
+    fn drop(&mut self) {
+        (self.finalize)(self);
+    }
+}
+
+impl ErasedMemoryEntry {
+    pub fn new<T>(value: T) -> Self {
+        let inner = Box::leak(Box::new(value));
+        Self {
+            inner: (inner as *mut T).cast(),
+            finalize: |resource| unsafe {
+                if !resource.inner.is_null() {
+                    let _inner: Box<T> = Box::from_raw(resource.inner.cast::<T>());
+                    resource.inner = std::ptr::null_mut();
+                }
+            },
+        }
+    }
+
+    /// # SAFETY
+    /// Must be called with the same type as `new`
+    pub unsafe fn as_inner<T>(&self) -> &T {
+        &*self.inner.cast()
+    }
+
+    /// # SAFETY
+    /// Must be called with the same type as `new`
+    pub unsafe fn as_inner_mut<T>(&mut self) -> &mut T {
+        &mut *self.inner.cast()
+    }
+
+    pub unsafe fn into_inner<T>(mut self) -> Box<T> {
+        let inner = self.inner;
+        self.inner = std::ptr::null_mut();
+        Box::from_raw(inner.cast())
+    }
+}
