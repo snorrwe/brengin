@@ -75,7 +75,6 @@ pub struct TextTextureCache(pub HashMap<ShapeKey, assets::Handle<ShapingResult>>
 
 #[derive(Debug)]
 pub struct ShapingResult {
-    pub unicodebuffer: rustybuzz::UnicodeBuffer,
     pub glyphs: rustybuzz::GlyphBuffer,
     pub texture: TextDrawResponse,
 }
@@ -443,13 +442,9 @@ impl<'a> Ui<'a> {
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
                 let glyphs = rustybuzz::shape(self.ui.font.face(), &[], buffer);
-
-                let mut buffer = rustybuzz::UnicodeBuffer::new();
-                buffer.push_str(&line);
                 let pic = text::draw_glyph_buffer(self.ui.font.face(), &glyphs, size).unwrap();
 
                 let shaping = ShapingResult {
-                    unicodebuffer: buffer,
                     glyphs,
                     texture: pic,
                 };
