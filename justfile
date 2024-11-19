@@ -6,7 +6,7 @@ sprites flags="": (_example "sprites" flags)
 
 mandelbrot flags="": (_example "mandelbrot" flags)
 
-buttons flags="": (_example "buttons" flags)
+ui flags="": (_example "ui" flags)
 
 update:
     # update the index
