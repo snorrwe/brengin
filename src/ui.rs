@@ -367,10 +367,6 @@ impl<'a> Ui<'a> {
         };
         contents(&mut cols);
 
-        let mut w = bounds.w as i32;
-        for d in cols.dims {
-            w = w.max(d[1] - d[0]);
-        }
         self.ui.id_stack.pop();
         self.ui.bounds = bounds;
         self.submit_rect_group(history_start);
@@ -672,6 +668,42 @@ impl<'a> Ui<'a> {
         let layer = std::mem::replace(&mut self.ui.layer, layer);
         contents(self);
         self.ui.layer = layer;
+    }
+
+    pub fn scroll_vertical(
+        &mut self,
+        height: Option<UiCoordinate>,
+        mut contents: impl FnMut(&mut Self),
+    ) {
+        let height = height.unwrap_or(UiCoordinate::Percent(100));
+        let width = self.ui.bounds.w;
+        let height = height.as_abolute(self.ui.bounds.h);
+
+        let old_bounds = self.ui.bounds;
+        let bounds = UiRect {
+            x: 0,
+            y: 0,
+            w: width,
+            h: height,
+        };
+
+        self.ui.bounds = bounds;
+        let scissor = self.ui.scissor_idx;
+        self.ui.scissor_idx = self.ui.scissors.len() as u32;
+        self.ui.scissors.push(bounds);
+
+        let layer = self.ui.layer;
+        self.ui.layer += 1;
+        self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
+        self.ui.id_stack.push(0);
+        // TODO:
+        // - offset
+        // - disable widgets outside bounds
+        contents(self);
+        self.ui.layer = layer;
+        self.ui.id_stack.pop();
+        self.ui.bounds = old_bounds;
+        self.ui.scissor_idx = scissor;
     }
 }
 
