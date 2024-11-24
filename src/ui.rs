@@ -111,11 +111,14 @@ pub struct UiState {
 pub struct Theme {
     pub primary_color: u32,
     pub secondary_color: u32,
+    // color
     pub button_hovered: u32,
+    // color
     pub button_pressed: u32,
-    pub text_padding: u32,
-    pub font_size: u32,
-    pub padding: u32,
+    pub text_padding: u16,
+    pub font_size: u16,
+    pub padding: u16,
+    pub scroll_bar_size: u16,
 }
 
 impl Default for Theme {
@@ -128,6 +131,7 @@ impl Default for Theme {
             text_padding: 5,
             font_size: 12,
             padding: 5,
+            scroll_bar_size: 15,
         }
     }
 }
@@ -479,7 +483,8 @@ impl<'a> Ui<'a> {
         let [x, y] = [x + padding, y + padding];
         let mut text_y = y;
         for line in label.split('\n').filter(|l| !l.is_empty()) {
-            let (handle, e) = self.shape_and_draw_line(line.to_owned(), self.theme.font_size);
+            let (handle, e) =
+                self.shape_and_draw_line(line.to_owned(), self.theme.font_size as u32);
             let pic = &e.texture;
             let line_width = pic.width() as i32;
             let line_height = pic.height() as i32;
@@ -570,7 +575,8 @@ impl<'a> Ui<'a> {
         let text_padding = self.theme.text_padding as i32;
         let mut text_y = y + text_padding;
         for line in label.split('\n').filter(|l| !l.is_empty()) {
-            let (handle, e) = self.shape_and_draw_line(line.to_owned(), self.theme.font_size);
+            let (handle, e) =
+                self.shape_and_draw_line(line.to_owned(), self.theme.font_size as u32);
             let pic = &e.texture;
             let line_width = pic.width() as i32;
             let line_height = pic.height() as i32;
@@ -724,6 +730,7 @@ impl<'a> Ui<'a> {
         };
         let mut bounds = scissor_bounds;
         bounds.y += offset as i32;
+        bounds.w = bounds.w.saturating_sub(self.theme.scroll_bar_size as i32);
 
         self.ui.bounds = bounds;
         let scissor_idx = self.ui.scissor_idx;
@@ -746,6 +753,28 @@ impl<'a> Ui<'a> {
         let state = self.get_memory_or_default::<ScrollState>();
 
         state.max_height = if min_y <= max_y { max_y - min_y } else { 0 };
+        let t = state.t;
+
+        // scroll bar
+        self.color_rect(
+            scissor_bounds
+                .x_end()
+                .saturating_sub(self.theme.scroll_bar_size as i32),
+            scissor_bounds.y,
+            self.theme.scroll_bar_size as i32,
+            scissor_bounds.h,
+            0xFF0000FF,
+            layer + 2,
+        );
+        let s = self.theme.scroll_bar_size as i32;
+        self.color_rect(
+            scissor_bounds.x_end().saturating_sub(s),
+            scissor_bounds.y - ((scissor_bounds.h.saturating_sub(s)) as f32 * t) as i32,
+            s,
+            s,
+            0xFF0AA0FF,
+            layer + 3,
+        );
 
         self.submit_rect(id, scissor_bounds);
         self.ui.layer = layer;
