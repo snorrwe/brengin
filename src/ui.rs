@@ -686,10 +686,33 @@ impl<'a> Ui<'a> {
         let height = height.unwrap_or(UiCoordinate::Percent(100));
         let width = self.ui.bounds.w;
         let height = height.as_abolute(self.ui.bounds.h);
+        let mut state = *self.get_memory_or_default::<ScrollState>();
 
-        let state = self.get_memory_or_default::<ScrollState>();
+        let line_height = self.theme.font_size + self.theme.text_padding;
 
+        if self.contains_mouse(id) {
+            let mut dt = 0.0;
+            for ds in self.mouse.scroll.iter() {
+                match ds {
+                    winit::event::MouseScrollDelta::LineDelta(_, dy) => {
+                        dt += *dy / line_height as f32;
+                    }
+                    winit::event::MouseScrollDelta::PixelDelta(physical_position) => {
+                        dt += physical_position.y as f32;
+                    }
+                }
+            }
+            if dt != 0.0 {
+                state.t += dt;
+                // TODO: animation at edge?
+                // TODO: the min needs work, doesn't work as intended
+                state.t = state
+                    .t
+                    .clamp(-1.0 + 1.0 / (line_height as f32), 0.0);
+            }
+        }
         let offset = state.t * state.max_height as f32;
+        self.insert_memory(state);
 
         let old_bounds = self.ui.bounds;
         let scissor_bounds = UiRect {

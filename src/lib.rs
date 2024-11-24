@@ -361,6 +361,14 @@ impl ApplicationHandler for RunningApp {
                     .next
                     .push((button, state));
             }
+            WindowEvent::MouseWheel { delta, .. } => {
+                game_world
+                    .lock()
+                    .get_resource_mut::<MouseInputs>()
+                    .unwrap()
+                    .next_scroll
+                    .push(delta);
+            }
             WindowEvent::CursorMoved { position, .. } => {
                 game_world
                     .lock()
@@ -589,6 +597,8 @@ impl KeyBoardInputs {
 #[derive(Default)]
 pub struct MouseInputs {
     pub(crate) next: Vec<(MouseButton, ElementState)>,
+    pub(crate) next_scroll: Vec<winit::event::MouseScrollDelta>,
+    pub scroll: Vec<winit::event::MouseScrollDelta>,
     pub cursor_position: winit::dpi::PhysicalPosition<f64>,
     pub pressed: HashSet<MouseButton>,
     pub just_released: HashSet<MouseButton>,
@@ -599,6 +609,8 @@ impl MouseInputs {
     pub fn update(&mut self) {
         self.just_released.clear();
         self.just_pressed.clear();
+        self.scroll.clear();
+        std::mem::swap(&mut self.scroll, &mut self.next_scroll);
         for (k, state) in self.next.iter() {
             match state {
                 ElementState::Pressed => {
