@@ -46,6 +46,13 @@ impl UiRect {
     pub fn x_end(self) -> i32 {
         self.x + self.w as i32
     }
+
+    pub fn contains_point(&self, x: i32, y: i32) -> bool {
+        let dx = x as i64 - self.x as i64;
+        let dy = y as i64 - self.y as i64;
+
+        0 <= dx && dx < self.w as i64 && 0 <= dy && dy < self.h as i64
+    }
 }
 
 #[cfg(test)]

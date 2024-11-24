@@ -14,18 +14,20 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>) {
             vertical: VerticalAlignment::Bottom,
         },
         |ui| {
-            ui.grid(4, |cols| {
-                for col in 0..4 {
-                    cols.column(col, |ui| {
-                        for row in 0..4 {
-                            let fill = row * 2;
-                            let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
-                            if ui.button(&l).pressed() {
-                                label.0 = l;
+            ui.scroll_vertical(None, |ui| {
+                ui.grid(4, |cols| {
+                    for col in 0..4 {
+                        cols.column(col, |ui| {
+                            for row in 0..10 {
+                                let fill = row * 2;
+                                let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
+                                if ui.button(&l).pressed() {
+                                    label.0 = l;
+                                }
                             }
-                        }
-                    });
-                }
+                        });
+                    }
+                });
             });
         },
     );

@@ -279,15 +279,18 @@ impl<'a> Ui<'a> {
 
     #[inline]
     fn contains_mouse(&self, id: UiId) -> bool {
+        let mouse = self.mouse.cursor_position;
+
+        if let Some(scissor) = self.ui.scissors.get(self.ui.scissor_idx as usize) {
+            if !scissor.contains_point(mouse.x as i32, mouse.y as i32) {
+                return false;
+            }
+        }
+
         let Some(bbox) = self.ui.bounding_boxes.get(&id) else {
             return false;
         };
-
-        let mouse = self.mouse.cursor_position;
-        let dx = mouse.x - bbox.x as f64;
-        let dy = mouse.y - bbox.y as f64;
-
-        0.0 <= dx && dx < bbox.w as f64 && 0.0 <= dy && dy < bbox.h as f64
+        bbox.contains_point(mouse.x as i32, mouse.y as i32)
     }
 
     #[inline]
@@ -706,9 +709,7 @@ impl<'a> Ui<'a> {
                 state.t += dt;
                 // TODO: animation at edge?
                 // TODO: the min needs work, doesn't work as intended
-                state.t = state
-                    .t
-                    .clamp(-1.0 + 1.0 / (line_height as f32), 0.0);
+                state.t = state.t.clamp(-1.0 + 1.0 / (line_height as f32), 0.0);
             }
         }
         let offset = state.t * state.max_height as f32;
@@ -733,8 +734,6 @@ impl<'a> Ui<'a> {
         self.ui.layer += 1;
         self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
         self.ui.id_stack.push(0);
-        // TODO:
-        // - disable widgets outside bounds / disable their bounding boxes
         contents(self);
         self.ui.id_stack.pop();
         let mut max_y = std::i32::MIN;
