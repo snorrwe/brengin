@@ -332,6 +332,7 @@ impl<'a> Ui<'a> {
         self.submit_rect_group(history_start);
     }
 
+    /// submit a new rect that contains all rects submitted beginning at history_start index
     fn submit_rect_group(&mut self, history_start: usize) {
         if self.ui.rect_history.len() <= history_start {
             // no rects have been submitted
@@ -698,7 +699,7 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.push(0);
         // TODO:
         // - offset
-        // - disable widgets outside bounds
+        // - disable widgets outside bounds / disable their bounding boxes
         contents(self);
         self.ui.layer = layer;
         self.ui.id_stack.pop();
