@@ -626,12 +626,16 @@ impl<'a> Ui<'a> {
     }
 
     pub fn get_memory_or_default<T: Default + 'static>(&mut self) -> &mut T {
+        self.get_memory_or_insert(Default::default)
+    }
+
+    pub fn get_memory_or_insert<T: 'static>(&mut self, f: impl FnOnce() -> T) -> &mut T {
         let key = self.memory_key::<T>();
         let res = self
             .memory
             .0
             .entry(key)
-            .or_insert_with(|| ErasedMemoryEntry::new(T::default()));
+            .or_insert_with(|| ErasedMemoryEntry::new(f()));
         unsafe { res.as_inner_mut() }
     }
 
@@ -676,35 +680,55 @@ impl<'a> Ui<'a> {
         height: Option<UiCoordinate>,
         mut contents: impl FnMut(&mut Self),
     ) {
+        self.begin_widget();
+        let id = self.current_id();
+        let history_start = self.ui.rect_history.len();
         let height = height.unwrap_or(UiCoordinate::Percent(100));
         let width = self.ui.bounds.w;
         let height = height.as_abolute(self.ui.bounds.h);
 
+        let state = self.get_memory_or_default::<ScrollState>();
+
+        let offset = state.t * state.max_height as f32;
+
         let old_bounds = self.ui.bounds;
-        let bounds = UiRect {
-            x: 0,
-            y: 0,
+        let scissor_bounds = UiRect {
+            x: old_bounds.x,
+            y: old_bounds.y,
             w: width,
             h: height,
         };
+        let mut bounds = scissor_bounds;
+        bounds.y += offset as i32;
 
         self.ui.bounds = bounds;
-        let scissor = self.ui.scissor_idx;
+        let scissor_idx = self.ui.scissor_idx;
         self.ui.scissor_idx = self.ui.scissors.len() as u32;
-        self.ui.scissors.push(bounds);
+        self.ui.scissors.push(scissor_bounds);
 
         let layer = self.ui.layer;
         self.ui.layer += 1;
         self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
         self.ui.id_stack.push(0);
         // TODO:
-        // - offset
         // - disable widgets outside bounds / disable their bounding boxes
         contents(self);
-        self.ui.layer = layer;
         self.ui.id_stack.pop();
+        let mut max_y = std::i32::MIN;
+        let mut min_y = 0;
+        for r in &self.ui.rect_history[history_start..] {
+            min_y = min_y.min(r.y);
+            max_y = max_y.max(r.y_end());
+        }
+
+        let state = self.get_memory_or_default::<ScrollState>();
+
+        state.max_height = if min_y <= max_y { max_y - min_y } else { 0 };
+
+        self.submit_rect(id, scissor_bounds);
+        self.ui.layer = layer;
         self.ui.bounds = old_bounds;
-        self.ui.scissor_idx = scissor;
+        self.ui.scissor_idx = scissor_idx;
     }
 }
 
@@ -1037,4 +1061,10 @@ impl ErasedMemoryEntry {
         self.inner = std::ptr::null_mut();
         Box::from_raw(inner.cast())
     }
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+struct ScrollState {
+    pub t: f32,
+    pub max_height: i32,
 }
