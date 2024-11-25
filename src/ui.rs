@@ -742,6 +742,7 @@ impl<'a> Ui<'a> {
         self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
         self.ui.id_stack.push(0);
         contents(self);
+        let last_id = *self.ui.id_stack.last().unwrap();
         self.ui.id_stack.pop();
         let mut max_y = std::i32::MIN;
         let mut min_y = 0;
@@ -766,14 +767,26 @@ impl<'a> Ui<'a> {
             0xFF0000FF,
             layer + 2,
         );
-        self.color_rect(
-            scissor_bounds.x_end().saturating_sub(s),
-            scissor_bounds.y - (scissor_bounds.h as f32 * t) as i32,
-            s,
-            s,
-            0xFF0AA0FF,
-            layer + 3,
-        );
+        {
+            self.ui.id_stack.push(last_id);
+            self.begin_widget();
+            let control_box = UiRect {
+                x: scissor_bounds.x_end().saturating_sub(s),
+                y: scissor_bounds.y - (scissor_bounds.h as f32 * t) as i32,
+                w: s,
+                h: s,
+            };
+            self.color_rect(
+                control_box.x,
+                control_box.y,
+                control_box.w,
+                control_box.h,
+                0xFF0AA0FF,
+                layer + 3,
+            );
+            self.submit_rect(id, control_box);
+            self.ui.id_stack.pop();
+        }
 
         self.submit_rect(id, scissor_bounds);
         self.ui.layer = layer;
