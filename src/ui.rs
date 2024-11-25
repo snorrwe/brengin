@@ -756,21 +756,19 @@ impl<'a> Ui<'a> {
         // t <= 0
         let t = state.t;
 
+        let s = self.theme.scroll_bar_size as i32;
         // scroll bar
         self.color_rect(
-            scissor_bounds
-                .x_end()
-                .saturating_sub(self.theme.scroll_bar_size as i32),
+            scissor_bounds.x_end().saturating_sub(s),
             scissor_bounds.y,
-            self.theme.scroll_bar_size as i32,
+            s,
             scissor_bounds.h,
             0xFF0000FF,
             layer + 2,
         );
-        let s = self.theme.scroll_bar_size as i32;
         self.color_rect(
             scissor_bounds.x_end().saturating_sub(s),
-            scissor_bounds.y - ((scissor_bounds.h.saturating_sub(s)) as f32 * t) as i32,
+            scissor_bounds.y - (scissor_bounds.h as f32 * t) as i32,
             s,
             s,
             0xFF0AA0FF,
