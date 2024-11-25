@@ -691,7 +691,6 @@ impl<'a> Ui<'a> {
     ) {
         self.begin_widget();
         let id = self.current_id();
-        let history_start = self.ui.rect_history.len();
         let height = height.unwrap_or(UiCoordinate::Percent(100));
         let width = self.ui.bounds.w;
         let height = height.as_abolute(self.ui.bounds.h);
@@ -741,6 +740,7 @@ impl<'a> Ui<'a> {
         self.ui.layer += 1;
         self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
         self.ui.id_stack.push(0);
+        let history_start = self.ui.rect_history.len();
         contents(self);
         let last_id = *self.ui.id_stack.last().unwrap();
         self.ui.id_stack.pop();
