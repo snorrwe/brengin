@@ -753,6 +753,7 @@ impl<'a> Ui<'a> {
         let state = self.get_memory_or_default::<ScrollState>();
 
         state.max_height = if min_y <= max_y { max_y - min_y } else { 0 };
+        // t <= 0
         let t = state.t;
 
         // scroll bar
