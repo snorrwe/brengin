@@ -770,6 +770,7 @@ impl<'a> Ui<'a> {
         {
             self.ui.id_stack.push(last_id);
             self.begin_widget();
+            let id = self.current_id();
             let control_box = UiRect {
                 x: scissor_bounds.x_end().saturating_sub(s),
                 y: scissor_bounds.y - (scissor_bounds.h as f32 * t) as i32,
