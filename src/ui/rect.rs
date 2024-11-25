@@ -39,12 +39,12 @@ impl UiRect {
 
     #[inline]
     pub fn y_end(self) -> i32 {
-        self.y + self.h as i32
+        self.y + self.h
     }
 
     #[inline]
     pub fn x_end(self) -> i32 {
-        self.x + self.w as i32
+        self.x + self.w
     }
 
     pub fn contains_point(&self, x: i32, y: i32) -> bool {

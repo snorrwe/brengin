@@ -717,7 +717,7 @@ impl<'a> Ui<'a> {
                 state.t = state.t.clamp(-1.0 + 1.0 / (line_height as f32), 0.0);
             }
         }
-        let offset = state.t * state.max_height as f32;
+        let offset = state.t * state.content_height as f32;
         self.insert_memory(state);
 
         let old_bounds = self.ui.bounds;
@@ -753,7 +753,10 @@ impl<'a> Ui<'a> {
 
         let state = self.get_memory_or_default::<ScrollState>();
 
-        state.max_height = if min_y <= max_y { max_y - min_y } else { 0 };
+        let content_height = if min_y <= max_y { max_y - min_y } else { 0 };
+        if state.content_height.abs_diff(content_height) > 5 {
+            state.content_height = content_height;
+        }
         // t <= 0
         let t = state.t;
 
@@ -1130,5 +1133,5 @@ impl ErasedMemoryEntry {
 #[derive(Default, Debug, Clone, Copy)]
 struct ScrollState {
     pub t: f32,
-    pub max_height: i32,
+    pub content_height: i32,
 }
