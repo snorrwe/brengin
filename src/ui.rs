@@ -745,7 +745,7 @@ impl<'a> Ui<'a> {
         let last_id = *self.ui.id_stack.last().unwrap();
         self.ui.id_stack.pop();
         let mut max_y = std::i32::MIN;
-        let mut min_y = 0;
+        let mut min_y = std::i32::MAX;
         for r in &self.ui.rect_history[history_start..] {
             min_y = min_y.min(r.y);
             max_y = max_y.max(r.y_end());
