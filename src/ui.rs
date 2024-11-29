@@ -1165,6 +1165,7 @@ impl ErasedMemoryEntry {
 
 #[derive(Default, Debug, Clone, Copy)]
 struct ScrollState {
+    /// goes from -1 to 0
     pub t: f32,
     pub content_height: i32,
 }
