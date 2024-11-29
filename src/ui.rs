@@ -678,12 +678,6 @@ impl<'a> Ui<'a> {
         (self.current_id(), TypeId::of::<T>())
     }
 
-    pub fn with_layer(&mut self, layer: u16, mut contents: impl FnMut(&mut Self)) {
-        let layer = std::mem::replace(&mut self.ui.layer, layer);
-        contents(self);
-        self.ui.layer = layer;
-    }
-
     fn vertical_scroll_pip(
         &mut self,
         last_id: u32,
