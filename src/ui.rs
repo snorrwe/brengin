@@ -689,7 +689,7 @@ impl<'a> Ui<'a> {
         last_id: u32,
         scissor_bounds: &UiRect,
         t: f32,
-        s: i32,
+        scroll_bar_width: i32,
         layer: u16,
     ) {
         let mut parent_state = *self.get_memory_or_default::<ScrollState>();
@@ -704,7 +704,8 @@ impl<'a> Ui<'a> {
                 self.set_not_active(id);
             } else {
                 let coord = self.mouse.cursor_position.y as i32;
-                let coord = coord.clamp(scissor_bounds.y, scissor_bounds.y_end() - s);
+                let coord =
+                    coord.clamp(scissor_bounds.y, scissor_bounds.y_end() - scroll_bar_width);
                 y = coord as i32;
                 parent_state.t = -(y - scissor_bounds.y) as f32 / scissor_bounds.h as f32;
             }
@@ -719,10 +720,10 @@ impl<'a> Ui<'a> {
             self.set_hovered(id);
         }
         let control_box = UiRect {
-            x: scissor_bounds.x_end().saturating_sub(s),
+            x: scissor_bounds.x_end().saturating_sub(scroll_bar_width),
             y,
-            w: s,
-            h: s,
+            w: scroll_bar_width,
+            h: scroll_bar_width,
         };
         self.color_rect(
             control_box.x,
