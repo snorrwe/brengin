@@ -682,11 +682,11 @@ impl<'a> Ui<'a> {
         &mut self,
         last_id: u32,
         scissor_bounds: &UiRect,
-        t: f32,
         scroll_bar_width: i32,
         layer: u16,
     ) {
         let mut parent_state = *self.get_memory_or_default::<ScrollState>();
+        let t = parent_state.t;
         self.ui.id_stack.push(last_id);
         self.begin_widget();
         let id = self.current_id();
@@ -805,8 +805,6 @@ impl<'a> Ui<'a> {
         if state.content_height.abs_diff(content_height) > 5 {
             state.content_height = content_height;
         }
-        // t <= 0
-        let t = state.t;
 
         let s = self.theme.scroll_bar_size as i32;
         // scroll bar
@@ -819,7 +817,7 @@ impl<'a> Ui<'a> {
             layer + 2,
         );
         self.submit_rect(id, scissor_bounds);
-        self.vertical_scroll_pip(last_id, &scissor_bounds, t, s, layer);
+        self.vertical_scroll_pip(last_id, &scissor_bounds, s, layer);
 
         self.ui.layer = layer;
         self.ui.bounds = old_bounds;
