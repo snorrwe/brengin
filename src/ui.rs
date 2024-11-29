@@ -318,7 +318,9 @@ impl<'a> Ui<'a> {
         let bounds = self.ui.bounds;
         self.ui.layout_dir = LayoutDirection::LeftRight;
         self.ui.id_stack.push(0);
+        ///////////////////////
         contents(self);
+        ///////////////////////
         self.ui.id_stack.pop();
         self.ui.layout_dir = layout;
         self.ui.bounds = bounds;
@@ -332,7 +334,9 @@ impl<'a> Ui<'a> {
         let bounds = self.ui.bounds;
         self.ui.layout_dir = LayoutDirection::TopDown;
         self.ui.id_stack.push(0);
+        ///////////////////////
         contents(self);
+        ///////////////////////
         self.ui.id_stack.pop();
         self.ui.layout_dir = layout;
         self.ui.bounds = bounds;
@@ -373,7 +377,9 @@ impl<'a> Ui<'a> {
             cols: columns,
             dims,
         };
+        ///////////////////////
         contents(&mut cols);
+        ///////////////////////
 
         self.ui.id_stack.pop();
         self.ui.bounds = bounds;
@@ -463,7 +469,9 @@ impl<'a> Ui<'a> {
     pub fn with_theme(&mut self, theme: Theme, mut contents: impl FnMut(&mut Self)) {
         let t = std::mem::replace(&mut *self.theme, theme);
 
+        ///////////////////////
         contents(self);
+        ///////////////////////
 
         *self.theme = t;
     }
@@ -789,7 +797,9 @@ impl<'a> Ui<'a> {
         self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
         self.ui.id_stack.push(0);
         let history_start = self.ui.rect_history.len();
+        ///////////////////////
         contents(self);
+        ///////////////////////
         let last_id = *self.ui.id_stack.last().unwrap();
         self.ui.id_stack.pop();
         let mut max_y = std::i32::MIN;
@@ -890,7 +900,9 @@ impl<'a> Columns<'a> {
         ctx.ui.layer += 1;
         ctx.ui.id_stack.push(0);
 
+        ///////////////////////
         contents(ctx);
+        ///////////////////////
 
         // restore state
         ctx.ui.id_stack.pop();
@@ -1055,7 +1067,9 @@ impl<'a> UiRoot<'a> {
             self.0.ui.layer,
         );
         self.0.ui.id_stack.push(0);
+        ///////////////////////
         contents(&mut self.0);
+        ///////////////////////
         self.0.ui.layer = layer;
         self.0.ui.id_stack.pop();
         self.0.ui.bounds = old_bounds;
