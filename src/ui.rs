@@ -823,9 +823,9 @@ impl<'a> Ui<'a> {
             0xFF0000FF,
             layer + 2,
         );
+        self.submit_rect(id, scissor_bounds);
         self.vertical_scroll_pip(last_id, &scissor_bounds, t, s, layer);
 
-        self.submit_rect(id, scissor_bounds);
         self.ui.layer = layer;
         self.ui.bounds = old_bounds;
         self.ui.scissor_idx = scissor_idx;
