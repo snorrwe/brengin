@@ -771,12 +771,35 @@ impl<'a> Ui<'a> {
             layer + 2,
         );
         {
+            let mut parent_state = *self.get_memory_or_default::<ScrollState>();
             self.ui.id_stack.push(last_id);
             self.begin_widget();
             let id = self.current_id();
+            let active = self.is_active(id);
+            let contains_mouse = self.contains_mouse(id);
+            let mut y = scissor_bounds.y - (scissor_bounds.h as f32 * t) as i32;
+            if active {
+                if self.mouse_up() {
+                    self.set_not_active(id);
+                } else {
+                    let coord = self.mouse.cursor_position.y as i32;
+                    let coord = coord.clamp(scissor_bounds.y, scissor_bounds.y_end() - s);
+                    y = coord as i32;
+                    parent_state.t = -(y - scissor_bounds.y) as f32 / scissor_bounds.h as f32;
+                }
+            } else if self.is_hovered(id) {
+                if !contains_mouse {
+                    self.set_not_hovered(id);
+                } else if self.mouse_down() {
+                    self.set_active(id);
+                }
+            }
+            if contains_mouse {
+                self.set_hovered(id);
+            }
             let control_box = UiRect {
                 x: scissor_bounds.x_end().saturating_sub(s),
-                y: scissor_bounds.y - (scissor_bounds.h as f32 * t) as i32,
+                y,
                 w: s,
                 h: s,
             };
@@ -790,6 +813,7 @@ impl<'a> Ui<'a> {
             );
             self.submit_rect(id, control_box);
             self.ui.id_stack.pop();
+            self.insert_memory(parent_state);
         }
 
         self.submit_rect(id, scissor_bounds);
