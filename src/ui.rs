@@ -688,14 +688,14 @@ impl<'a> Ui<'a> {
 
     fn vertical_scroll_bar(
         &mut self,
-        last_id: u32,
         scissor_bounds: &UiRect,
         scroll_bar_width: i32,
         layer: u16,
+        parent_state: &mut ScrollState,
     ) {
-        self.ui.id_stack.push(last_id);
         self.begin_widget();
-        let id = self.current_id();
+
+        // bar
         let bounds = UiRect {
             x: scissor_bounds.x_end().saturating_sub(scroll_bar_width),
             y: scissor_bounds.y,
@@ -703,21 +703,11 @@ impl<'a> Ui<'a> {
             h: scissor_bounds.h,
         };
         self.color_rect(bounds.x, bounds.y, bounds.w, bounds.h, 0xFF0000FF, layer);
-        self.submit_rect(id, bounds);
-        self.ui.id_stack.pop();
-    }
+        let id = self.current_id();
+        self.ui.bounding_boxes.insert(id, bounds);
 
-    fn vertical_scroll_pip(
-        &mut self,
-        last_id: u32,
-        scissor_bounds: &UiRect,
-        scroll_bar_width: i32,
-        layer: u16,
-    ) {
-        let mut parent_state = *self.get_memory_or_default::<ScrollState>();
+        // pip
         let t = parent_state.t;
-        self.ui.id_stack.push(last_id);
-        self.begin_widget();
         let id = self.current_id();
         let active = self.is_active(id);
         let contains_mouse = self.contains_mouse(id);
@@ -754,11 +744,9 @@ impl<'a> Ui<'a> {
             control_box.w,
             control_box.h,
             0xFF0AA0FF,
-            layer,
+            layer + 1,
         );
-        self.submit_rect(id, control_box);
-        self.ui.id_stack.pop();
-        self.insert_memory(parent_state);
+        self.ui.bounding_boxes.insert(id, control_box);
     }
 
     pub fn scroll_vertical(
@@ -821,8 +809,7 @@ impl<'a> Ui<'a> {
         ///////////////////////
         contents(self);
         ///////////////////////
-        let last_id = *self.ui.id_stack.last().unwrap();
-        self.ui.id_stack.pop();
+        let last_id = self.ui.id_stack.pop().unwrap();
         let mut max_y = std::i32::MIN;
         let mut min_y = std::i32::MAX;
         for r in &self.ui.rect_history[history_start..] {
@@ -836,10 +823,13 @@ impl<'a> Ui<'a> {
         if state.content_height.abs_diff(content_height) > 5 {
             state.content_height = content_height;
         }
+        let mut state = *state;
 
         let scroll_bar_width = self.theme.scroll_bar_size as i32;
-        self.vertical_scroll_bar(last_id, &scissor_bounds, scroll_bar_width, layer + 2);
-        self.vertical_scroll_pip(last_id, &scissor_bounds, scroll_bar_width, layer + 3);
+        self.ui.id_stack.push(last_id);
+        self.vertical_scroll_bar(&scissor_bounds, scroll_bar_width, layer + 2, &mut state);
+        self.ui.id_stack.pop();
+        self.insert_memory(state);
         self.submit_rect(id, scissor_bounds);
 
         self.ui.layer = layer;
