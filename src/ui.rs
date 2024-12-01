@@ -686,6 +686,27 @@ impl<'a> Ui<'a> {
         (self.current_id(), TypeId::of::<T>())
     }
 
+    fn vertical_scroll_bar(
+        &mut self,
+        last_id: u32,
+        scissor_bounds: &UiRect,
+        scroll_bar_width: i32,
+        layer: u16,
+    ) {
+        self.ui.id_stack.push(last_id);
+        self.begin_widget();
+        let id = self.current_id();
+        let bounds = UiRect {
+            x: scissor_bounds.x_end().saturating_sub(scroll_bar_width),
+            y: scissor_bounds.y,
+            w: scroll_bar_width,
+            h: scissor_bounds.h,
+        };
+        self.color_rect(bounds.x, bounds.y, bounds.w, bounds.h, 0xFF0000FF, layer);
+        self.submit_rect(id, bounds);
+        self.ui.id_stack.pop();
+    }
+
     fn vertical_scroll_pip(
         &mut self,
         last_id: u32,
@@ -733,7 +754,7 @@ impl<'a> Ui<'a> {
             control_box.w,
             control_box.h,
             0xFF0AA0FF,
-            layer + 3,
+            layer,
         );
         self.submit_rect(id, control_box);
         self.ui.id_stack.pop();
@@ -816,18 +837,10 @@ impl<'a> Ui<'a> {
             state.content_height = content_height;
         }
 
-        let s = self.theme.scroll_bar_size as i32;
-        // scroll bar
-        self.color_rect(
-            scissor_bounds.x_end().saturating_sub(s),
-            scissor_bounds.y,
-            s,
-            scissor_bounds.h,
-            0xFF0000FF,
-            layer + 2,
-        );
+        let scroll_bar_width = self.theme.scroll_bar_size as i32;
+        self.vertical_scroll_bar(last_id, &scissor_bounds, scroll_bar_width, layer + 2);
+        self.vertical_scroll_pip(last_id, &scissor_bounds, scroll_bar_width, layer + 3);
         self.submit_rect(id, scissor_bounds);
-        self.vertical_scroll_pip(last_id, &scissor_bounds, s, layer);
 
         self.ui.layer = layer;
         self.ui.bounds = old_bounds;
