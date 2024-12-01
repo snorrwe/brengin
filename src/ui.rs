@@ -809,7 +809,7 @@ impl<'a> Ui<'a> {
             max_y = max_y.max(r.y_end());
         }
 
-        let state = self.get_memory_or_default::<ScrollState>();
+        let state = self.get_memory_mut::<ScrollState>().unwrap();
 
         let content_height = if min_y <= max_y { max_y - min_y } else { 0 };
         if state.content_height.abs_diff(content_height) > 5 {
