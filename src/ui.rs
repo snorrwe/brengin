@@ -819,10 +819,7 @@ impl<'a> Ui<'a> {
 
         let state = self.get_memory_mut::<ScrollState>().unwrap();
 
-        let content_height = if min_y <= max_y { max_y - min_y } else { 0 };
-        if state.content_height.abs_diff(content_height) > 5 {
-            state.content_height = content_height;
-        }
+        state.content_height = if min_y <= max_y { max_y - min_y } else { 0 };
         let mut state = *state;
 
         let scroll_bar_width = self.theme.scroll_bar_size as i32;
