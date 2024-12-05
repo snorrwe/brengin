@@ -10,12 +10,13 @@ pub mod audio;
 pub mod ui;
 
 use anyhow::Context;
+use instant::Instant;
+use ui::UiPlugin;
+
 // reexport
 pub use cecs;
 pub use glam;
 pub use image;
-use instant::Instant;
-use ui::UiPlugin;
 pub use wgpu;
 pub use winit;
 
