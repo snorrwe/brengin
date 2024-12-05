@@ -158,20 +158,29 @@ struct RectRenderCommand;
 impl<'a> RenderCommand<'a> for RectRenderCommand {
     type Parameters = (
         Query<'a, (&'static RectInstanceBuffer, &'static UiScissor)>,
+        Res<'a, crate::renderer::WindowSize>,
         Res<'a, RectPipeline>,
     );
 
-    fn render<'r>(input: &'r mut RenderCommandInput<'a>, (rects, pipeline): &'r Self::Parameters) {
+    fn render<'r>(
+        input: &'r mut RenderCommandInput<'a>,
+        (rects, size, pipeline): &'r Self::Parameters,
+    ) {
         input
             .render_pass
             .set_pipeline(&pipeline.color_rect_pipeline);
         for (requests, scissor) in rects.iter() {
-            input.render_pass.set_scissor_rect(
-                scissor.0.x.max(0) as u32,
-                scissor.0.y.max(0) as u32,
-                scissor.0.w as u32,
-                scissor.0.h as u32,
-            );
+            let x = scissor.0.x.max(0) as u32;
+            let y = scissor.0.y.max(0) as u32;
+            let w = (scissor.0.w as u32).min(size.width.saturating_sub(x));
+            let h = (scissor.0.h as u32).min(size.height.saturating_sub(y));
+
+            if w == 0 || h == 0 {
+                tracing::warn!(?scissor, "Scissor is outside of render target {:?}", **size);
+                continue;
+            }
+
+            input.render_pass.set_scissor_rect(x, y, w, h);
             input
                 .render_pass
                 .set_vertex_buffer(0, requests.buffer.slice(..));

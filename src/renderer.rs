@@ -295,6 +295,16 @@ fn extract_passes(mut cmd: Commands, game_world: Res<GameWorld>) {
     )
 }
 
+fn extract_window_size(mut cmd: Commands, game_world: Res<GameWorld>) {
+    cmd.insert_resource(
+        game_world
+            .world()
+            .get_resource::<WindowSize>()
+            .cloned()
+            .unwrap(),
+    );
+}
+
 impl Plugin for RendererPlugin {
     fn build(self, app: &mut crate::App) {
         app.render_app_mut().with_stage(crate::Stage::Render, |s| {
@@ -305,6 +315,7 @@ impl Plugin for RendererPlugin {
             height: 0,
         });
         app.add_extract_system(extract_passes);
+        app.add_extract_system(extract_window_size);
         app.add_plugin(CameraPlugin);
         app.add_plugin(SpriteRendererPlugin);
         app.add_plugin(ExtractionPlugin::<RenderCommandInternal>::default());

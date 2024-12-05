@@ -228,22 +228,25 @@ impl TextPipeline {
 struct RectRenderCommand;
 
 impl<'a> RenderCommand<'a> for RectRenderCommand {
-    type Parameters = Res<'a, TextPipeline>;
+    type Parameters = (Res<'a, crate::renderer::WindowSize>, Res<'a, TextPipeline>);
 
-    fn render<'r>(input: &'r mut RenderCommandInput<'a>, pipeline: &'r Self::Parameters) {
+    fn render<'r>(input: &'r mut RenderCommandInput<'a>, (size, pipeline): &'r Self::Parameters) {
         input
             .render_pass
             .set_pipeline(&pipeline.color_rect_pipeline);
 
         for (scissor, requests) in pipeline.instances.iter() {
-            // TODO:
-            // should only use the overlapping area, instead of clamping the pos to 0
-            input.render_pass.set_scissor_rect(
-                scissor.0.x.max(0) as u32,
-                scissor.0.y.max(0) as u32,
-                scissor.0.w as u32,
-                scissor.0.h as u32,
-            );
+            let x = scissor.0.x.max(0) as u32;
+            let y = scissor.0.y.max(0) as u32;
+            let w = (scissor.0.w as u32).min(size.width.saturating_sub(x));
+            let h = (scissor.0.h as u32).min(size.height.saturating_sub(y));
+
+            if w == 0 || h == 0 {
+                tracing::warn!(?scissor, "Scissor is outside of render target {:?}", **size);
+                continue;
+            }
+
+            input.render_pass.set_scissor_rect(x, y, w, h);
             for requests in requests.iter() {
                 let Some(texture) = pipeline.textures.get(&requests.id) else {
                     continue;
