@@ -1,6 +1,6 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
 use brengin::prelude::*;
-use brengin::renderer::{GraphicsState, RenderCommand, RenderCommandPlugin};
+use brengin::renderer::{texture, GraphicsState, RenderCommand, RenderCommandPlugin};
 use brengin::{App, DefaultPlugins, Plugin};
 use glam::Vec3;
 use wgpu::include_wgsl;
@@ -76,7 +76,13 @@ impl MandelbrotPipeline {
                         // Requires Features::CONSERVATIVE_RASTERIZATION
                         conservative: false,
                     },
-                    depth_stencil: None,
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: texture::Texture::DEPTH_FORMAT,
+                        depth_write_enabled: true,
+                        depth_compare: wgpu::CompareFunction::Less,
+                        stencil: wgpu::StencilState::default(),
+                        bias: wgpu::DepthBiasState::default(),
+                    }),
                     multisample: wgpu::MultisampleState {
                         count: 1,
                         mask: !0,
