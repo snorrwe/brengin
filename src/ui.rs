@@ -12,7 +12,7 @@ use std::{any::TypeId, collections::HashMap, ptr::NonNull};
 
 use cecs::{prelude::*, query};
 use text_rect_pipeline::{DrawTextRect, TextRectRequests};
-use winit::event::MouseButton;
+use winit::event::{MouseButton, MouseScrollDelta};
 
 use {
     color_rect_pipeline::{DrawColorRect, RectRequests},
@@ -767,10 +767,10 @@ impl<'a> Ui<'a> {
             let mut dt = 0.0;
             for ds in self.mouse.scroll.iter() {
                 match ds {
-                    winit::event::MouseScrollDelta::LineDelta(_, dy) => {
+                    MouseScrollDelta::LineDelta(_, dy) => {
                         dt += *dy / line_height as f32;
                     }
-                    winit::event::MouseScrollDelta::PixelDelta(physical_position) => {
+                    MouseScrollDelta::PixelDelta(physical_position) => {
                         dt += physical_position.y as f32;
                     }
                 }
