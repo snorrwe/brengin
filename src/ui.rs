@@ -782,7 +782,7 @@ impl<'a> Ui<'a> {
                 state.t = state.t.clamp(-1.0 + 1.0 / (line_height as f32), 0.0);
             }
         }
-        let offset = state.t * state.content_height as f32;
+        let offset = state.t * state.content_size as f32;
         self.insert_memory(state);
 
         let old_bounds = self.ui.bounds;
@@ -819,12 +819,160 @@ impl<'a> Ui<'a> {
 
         let state = self.get_memory_mut::<ScrollState>().unwrap();
 
-        state.content_height = if min_y <= max_y { max_y - min_y } else { 0 };
+        state.content_size = if min_y <= max_y { max_y - min_y } else { 0 };
         let mut state = *state;
 
         let scroll_bar_width = self.theme.scroll_bar_size as i32;
         self.ui.id_stack.push(last_id);
         self.vertical_scroll_bar(&scissor_bounds, scroll_bar_width, layer + 2, &mut state);
+        self.ui.id_stack.pop();
+        self.insert_memory(state);
+        self.submit_rect(id, scissor_bounds);
+
+        self.ui.layer = layer;
+        self.ui.bounds = old_bounds;
+        self.ui.scissor_idx = scissor_idx;
+    }
+
+    fn horizontal_scroll_bar(
+        &mut self,
+        scissor_bounds: &UiRect,
+        scroll_bar_height: i32,
+        layer: u16,
+        parent_state: &mut ScrollState,
+    ) {
+        self.begin_widget();
+
+        // bar
+        let bounds = UiRect {
+            x: scissor_bounds.x,
+            y: scissor_bounds.y_end().saturating_sub(scroll_bar_height),
+            w: scissor_bounds.w,
+            h: scroll_bar_height,
+        };
+        self.color_rect(bounds.x, bounds.y, bounds.w, bounds.h, 0xFF0000FF, layer);
+        let id = self.current_id();
+        self.ui.bounding_boxes.insert(id, bounds);
+
+        // pip
+        let t = parent_state.t;
+        let id = self.current_id();
+        let active = self.is_active(id);
+        let contains_mouse = self.contains_mouse(id);
+        let mut x = scissor_bounds.x - (scissor_bounds.w as f32 * t) as i32;
+        if active {
+            if self.mouse_up() {
+                self.set_not_active(id);
+            } else {
+                let coord = self.mouse.cursor_position.x as i32;
+                let coord =
+                    coord.clamp(scissor_bounds.x, scissor_bounds.x_end() - scroll_bar_height);
+                x = coord as i32;
+                parent_state.t = -(x - scissor_bounds.x) as f32 / scissor_bounds.w as f32;
+            }
+        } else if self.is_hovered(id) {
+            if !contains_mouse {
+                self.set_not_hovered(id);
+            } else if self.mouse_down() {
+                self.set_active(id);
+            }
+        }
+        if contains_mouse {
+            self.set_hovered(id);
+        }
+        let control_box = UiRect {
+            y: scissor_bounds.y_end().saturating_sub(scroll_bar_height),
+            x,
+            w: scroll_bar_height,
+            h: scroll_bar_height,
+        };
+        self.color_rect(
+            control_box.x,
+            control_box.y,
+            control_box.w,
+            control_box.h,
+            0xFF0AA0FF,
+            layer + 1,
+        );
+        self.ui.bounding_boxes.insert(id, control_box);
+    }
+
+    pub fn scroll_horizontal(
+        &mut self,
+        width: Option<UiCoordinate>,
+        mut contents: impl FnMut(&mut Self),
+    ) {
+        self.begin_widget();
+        let id = self.current_id();
+        let width = width.unwrap_or(UiCoordinate::Percent(100));
+        let height = self.ui.bounds.h;
+        let width = width.as_abolute(self.ui.bounds.w);
+        let mut state = *self.get_memory_or_default::<ScrollState>();
+
+        let line_height = self.theme.font_size + self.theme.text_padding;
+
+        if self.contains_mouse(id) {
+            let mut dt = 0.0;
+            for ds in self.mouse.scroll.iter() {
+                match ds {
+                    MouseScrollDelta::LineDelta(_, dy) => {
+                        dt += *dy / line_height as f32;
+                    }
+                    MouseScrollDelta::PixelDelta(physical_position) => {
+                        dt += physical_position.y as f32;
+                    }
+                }
+            }
+            if dt != 0.0 {
+                state.t += dt;
+                // TODO: animation at edge?
+                // TODO: the min needs work, doesn't work as intended
+                state.t = state.t.clamp(-1.0 + 1.0 / (line_height as f32), 0.0);
+            }
+        }
+        let offset = state.t * state.content_size as f32;
+        self.insert_memory(state);
+
+        let old_bounds = self.ui.bounds;
+        let scissor_bounds = UiRect {
+            x: old_bounds.x,
+            y: old_bounds.y,
+            w: width,
+            h: height,
+        };
+        let mut bounds = scissor_bounds;
+        bounds.x += offset as i32;
+        bounds.h = bounds.h.saturating_sub(self.theme.scroll_bar_size as i32);
+
+        self.ui.bounds = bounds;
+        let scissor_idx = self.ui.scissor_idx;
+        self.ui.scissor_idx = self.ui.scissors.len() as u32;
+        self.ui.scissors.push(scissor_bounds);
+
+        let layer = self.ui.layer;
+        self.ui.layer += 1;
+        self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
+        self.ui.id_stack.push(0);
+        let history_start = self.ui.rect_history.len();
+        ///////////////////////
+        contents(self);
+        ///////////////////////
+        let last_id = self.ui.id_stack.pop().unwrap();
+        let mut max_x = std::i32::MIN;
+        let mut min_x = std::i32::MAX;
+        for r in &self.ui.rect_history[history_start..] {
+            min_x = min_x.min(r.x);
+            max_x = max_x.max(r.x_end());
+        }
+
+        let state = self.get_memory_mut::<ScrollState>().unwrap();
+
+        state.content_size = if min_x <= max_x { max_x - min_x } else { 0 };
+        let mut state = *state;
+
+        let scroll_bar_width = self.theme.scroll_bar_size as i32;
+        self.ui.id_stack.push(last_id);
+        self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_width, layer + 2, &mut state);
         self.ui.id_stack.pop();
         self.insert_memory(state);
         self.submit_rect(id, scissor_bounds);
@@ -1174,5 +1322,5 @@ impl ErasedMemoryEntry {
 struct ScrollState {
     /// goes from -1 to 0
     pub t: f32,
-    pub content_height: i32,
+    pub content_size: i32,
 }

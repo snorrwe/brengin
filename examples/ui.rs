@@ -69,21 +69,12 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>) {
         },
         |ui| {
             ui.scroll_vertical(None, |ui| {
+            ui.scroll_horizontal(None, |ui| {
                 ui.label(
                     r#"
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-Mauris a velit nec purus dignissim consequat.
-Sed vel enim viverra, pellentesque tellus sed, laoreet purus.
-Morbi vehicula iaculis diam, at tempus ligula viverra aliquet.
-Fusce vestibulum quis lectus ac feugiat.
-Donec ornare euismod felis id molestie.
-Proin ut enim nisl.
-Phasellus eu faucibus risus.
-Quisque et sollicitudin ante, ut fringilla nisl.
-Nullam ut lacus purus.
-Mauris placerat vulputate egestas.
-Donec quam eros, cursus at sodales blandit, ultrices nec lorem.
-Donec nec turpis nisl.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris a velit nec purus dignissim consequat. Sed vel enim viverra, pellentesque tellus sed, laoreet purus. Morbi vehicula iaculis diam, at tempus ligula viverra aliquet.
+Fusce vestibulum quis lectus ac feugiat. Donec ornare euismod felis id molestie. Proin ut enim nisl. Phasellus eu faucibus risus.
+Quisque et sollicitudin ante, ut fringilla nisl. Nullam ut lacus purus. Mauris placerat vulputate egestas. Donec quam eros, cursus at sodales blandit, ultrices nec lorem. Donec nec turpis nisl.
 Phasellus et efficitur orci, non fermentum est.
 
 Donec a venenatis nibh, vitae auctor quam.
@@ -138,6 +129,7 @@ Mauris ut pharetra orci.
 Maecenas ac convallis ligula, id interdum turpis.
 "#
                 );
+            });
             });
         },
     );
