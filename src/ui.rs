@@ -850,7 +850,7 @@ impl<'a> Ui<'a> {
             w: scissor_bounds.w,
             h: scroll_bar_height,
         };
-        self.color_rect(bounds.x, bounds.y, bounds.w, bounds.h, 0xFF0000FF, layer);
+        self.color_rect(bounds.x, bounds.y, bounds.w, bounds.h, 0xaaFF00FF, layer);
         let id = self.current_id();
         self.ui.bounding_boxes.insert(id, bounds);
 
