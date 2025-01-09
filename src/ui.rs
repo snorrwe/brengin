@@ -1215,17 +1215,17 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         })
     }
 
-    fn resources_mut(set: &mut std::collections::HashSet<std::any::TypeId>) {
-        set.insert(std::any::TypeId::of::<UiState>());
-        set.insert(std::any::TypeId::of::<TextTextureCache>());
-        set.insert(std::any::TypeId::of::<assets::Assets<ShapingResult>>());
-        set.insert(std::any::TypeId::of::<Theme>());
-        set.insert(std::any::TypeId::of::<UiMemory>());
+    fn resources_mut(set: &mut std::collections::HashSet<TypeId>) {
+        set.insert(TypeId::of::<UiState>());
+        set.insert(TypeId::of::<TextTextureCache>());
+        set.insert(TypeId::of::<assets::Assets<ShapingResult>>());
+        set.insert(TypeId::of::<Theme>());
+        set.insert(TypeId::of::<UiMemory>());
     }
 
-    fn resources_const(set: &mut std::collections::HashSet<std::any::TypeId>) {
-        set.insert(std::any::TypeId::of::<MouseInputs>());
-        set.insert(std::any::TypeId::of::<KeyBoardInputs>());
+    fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
+        set.insert(TypeId::of::<MouseInputs>());
+        set.insert(TypeId::of::<KeyBoardInputs>());
     }
 }
 
