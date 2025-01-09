@@ -1201,6 +1201,16 @@ impl<'a> UiRoot<'a> {
     pub fn theme_mut(&mut self) -> &mut ResMut<'a, Theme> {
         &mut self.0.theme
     }
+
+    pub fn with_theme(&mut self, theme: Theme, mut contents: impl FnMut(&mut Self)) {
+        let t = std::mem::replace(&mut *self.0.theme, theme);
+
+        ///////////////////////
+        contents(self);
+        ///////////////////////
+
+        *self.0.theme = t;
+    }
 }
 
 unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
