@@ -23,6 +23,8 @@ use {
     text::{OwnedTypeFace, TextDrawResponse},
 };
 
+pub type Color = u32;
+
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
@@ -112,12 +114,10 @@ pub struct UiState {
 
 #[derive(Debug, Clone)]
 pub struct Theme {
-    pub primary_color: u32,
-    pub secondary_color: u32,
-    // color
-    pub button_hovered: u32,
-    // color
-    pub button_pressed: u32,
+    pub primary_color: Color,
+    pub secondary_color: Color,
+    pub button_hovered: Color,
+    pub button_pressed: Color,
     pub text_padding: u16,
     pub font_size: u16,
     pub padding: u16,
@@ -389,7 +389,15 @@ impl<'a> Ui<'a> {
         self.submit_rect_group(history_start);
     }
 
-    pub fn color_rect(&mut self, x: i32, y: i32, width: i32, height: i32, color: u32, layer: u16) {
+    pub fn color_rect(
+        &mut self,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        color: Color,
+        layer: u16,
+    ) {
         self.ui.rect_history.push(UiRect {
             x,
             y,
@@ -415,7 +423,7 @@ impl<'a> Ui<'a> {
         y: i32,
         width: i32,
         height: i32,
-        color: u32,
+        color: Color,
         layer: u16,
         shaping: Handle<ShapingResult>,
     ) {
