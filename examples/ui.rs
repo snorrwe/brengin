@@ -1,5 +1,5 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
-use brengin::ui::{HorizontalAlignment, UiCoordinate, UiRoot, VerticalAlignment};
+use brengin::ui::{HorizontalAlignment, ScrollDescriptor, UiCoordinate, UiRoot, VerticalAlignment};
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
 
@@ -14,21 +14,27 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>) {
             vertical: VerticalAlignment::Bottom,
         },
         |ui| {
-            ui.scroll_vertical(None, |ui| {
-                ui.grid(4, |cols| {
-                    for col in 0..4 {
-                        cols.column(col, |ui| {
-                            for row in 0..10 {
-                                let fill = row * 2;
-                                let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
-                                if ui.button(&l).pressed() {
-                                    label.0 = l;
+            ui.scroll_area(
+                ScrollDescriptor {
+                    height: Some(UiCoordinate::Percent(100)),
+                    width: None,
+                },
+                |ui| {
+                    ui.grid(4, |cols| {
+                        for col in 0..4 {
+                            cols.column(col, |ui| {
+                                for row in 0..10 {
+                                    let fill = row * 2;
+                                    let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
+                                    if ui.button(&l).pressed() {
+                                        label.0 = l;
+                                    }
                                 }
-                            }
-                        });
-                    }
-                });
-            });
+                            });
+                        }
+                    });
+                },
+            );
         },
     );
     ctx.panel(
@@ -68,8 +74,10 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>) {
             vertical: VerticalAlignment::Top,
         },
         |ui| {
-            ui.scroll_vertical(None, |ui| {
-            ui.scroll_horizontal(None, |ui| {
+            ui.scroll_area(ScrollDescriptor{
+                width: Some(UiCoordinate::Percent(100)),
+                height: Some(UiCoordinate::Percent(100)),
+            }, |ui| {
                 ui.label(
                     r#"
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris a velit nec purus dignissim consequat. Sed vel enim viverra, pellentesque tellus sed, laoreet purus. Morbi vehicula iaculis diam, at tempus ligula viverra aliquet.
@@ -129,7 +137,6 @@ Mauris ut pharetra orci.
 Maecenas ac convallis ligula, id interdum turpis.
 "#
                 );
-            });
             });
         },
     );

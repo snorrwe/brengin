@@ -1,6 +1,6 @@
 use crate::{
     assets::{self, AssetsPlugin, Handle},
-    MouseInputs, Plugin,
+    KeyBoardInputs, MouseInputs, Plugin,
 };
 
 pub mod color_rect_pipeline;
@@ -12,7 +12,10 @@ use std::{any::TypeId, collections::HashMap, ptr::NonNull};
 
 use cecs::{prelude::*, query};
 use text_rect_pipeline::{DrawTextRect, TextRectRequests};
-use winit::event::{MouseButton, MouseScrollDelta};
+use winit::{
+    event::{MouseButton, MouseScrollDelta},
+    keyboard::KeyCode,
+};
 
 use {
     color_rect_pipeline::{DrawColorRect, RectRequests},
@@ -707,7 +710,7 @@ impl<'a> Ui<'a> {
         self.ui.bounding_boxes.insert(id, bounds);
 
         // pip
-        let t = parent_state.t;
+        let t = parent_state.ty;
         let id = self.current_id();
         let active = self.is_active(id);
         let contains_mouse = self.contains_mouse(id);
@@ -720,7 +723,7 @@ impl<'a> Ui<'a> {
                 let coord =
                     coord.clamp(scissor_bounds.y, scissor_bounds.y_end() - scroll_bar_width);
                 y = coord as i32;
-                parent_state.t = -(y - scissor_bounds.y) as f32 / scissor_bounds.h as f32;
+                parent_state.ty = -(y - scissor_bounds.y) as f32 / scissor_bounds.h as f32;
             }
         } else if self.is_hovered(id) {
             if !contains_mouse {
@@ -749,91 +752,6 @@ impl<'a> Ui<'a> {
         self.ui.bounding_boxes.insert(id, control_box);
     }
 
-    pub fn scroll_vertical(
-        &mut self,
-        height: Option<UiCoordinate>,
-        mut contents: impl FnMut(&mut Self),
-    ) {
-        self.begin_widget();
-        let id = self.current_id();
-        let height = height.unwrap_or(UiCoordinate::Percent(100));
-        let width = self.ui.bounds.w;
-        let height = height.as_abolute(self.ui.bounds.h);
-        let mut state = *self.get_memory_or_default::<ScrollState>();
-
-        let line_height = self.theme.font_size + self.theme.text_padding;
-
-        if self.contains_mouse(id) {
-            let mut dt = 0.0;
-            for ds in self.mouse.scroll.iter() {
-                match ds {
-                    MouseScrollDelta::LineDelta(_, dy) => {
-                        dt += *dy / line_height as f32;
-                    }
-                    MouseScrollDelta::PixelDelta(physical_position) => {
-                        dt += physical_position.y as f32;
-                    }
-                }
-            }
-            if dt != 0.0 {
-                state.t += dt;
-                // TODO: animation at edge?
-                // TODO: the min needs work, doesn't work as intended
-                state.t = state.t.clamp(-1.0 + 1.0 / (line_height as f32), 0.0);
-            }
-        }
-        let offset = state.t * state.content_size as f32;
-        self.insert_memory(state);
-
-        let old_bounds = self.ui.bounds;
-        let scissor_bounds = UiRect {
-            x: old_bounds.x,
-            y: old_bounds.y,
-            w: width,
-            h: height,
-        };
-        let mut bounds = scissor_bounds;
-        bounds.y += offset as i32;
-        bounds.w = bounds.w.saturating_sub(self.theme.scroll_bar_size as i32);
-
-        self.ui.bounds = bounds;
-        let scissor_idx = self.ui.scissor_idx;
-        self.ui.scissor_idx = self.ui.scissors.len() as u32;
-        self.ui.scissors.push(scissor_bounds);
-
-        let layer = self.ui.layer;
-        self.ui.layer += 1;
-        self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
-        self.ui.id_stack.push(0);
-        let history_start = self.ui.rect_history.len();
-        ///////////////////////
-        contents(self);
-        ///////////////////////
-        let last_id = self.ui.id_stack.pop().unwrap();
-        let mut max_y = std::i32::MIN;
-        let mut min_y = std::i32::MAX;
-        for r in &self.ui.rect_history[history_start..] {
-            min_y = min_y.min(r.y);
-            max_y = max_y.max(r.y_end());
-        }
-
-        let state = self.get_memory_mut::<ScrollState>().unwrap();
-
-        state.content_size = if min_y <= max_y { max_y - min_y } else { 0 };
-        let mut state = *state;
-
-        let scroll_bar_width = self.theme.scroll_bar_size as i32;
-        self.ui.id_stack.push(last_id);
-        self.vertical_scroll_bar(&scissor_bounds, scroll_bar_width, layer + 2, &mut state);
-        self.ui.id_stack.pop();
-        self.insert_memory(state);
-        self.submit_rect(id, scissor_bounds);
-
-        self.ui.layer = layer;
-        self.ui.bounds = old_bounds;
-        self.ui.scissor_idx = scissor_idx;
-    }
-
     fn horizontal_scroll_bar(
         &mut self,
         scissor_bounds: &UiRect,
@@ -855,7 +773,7 @@ impl<'a> Ui<'a> {
         self.ui.bounding_boxes.insert(id, bounds);
 
         // pip
-        let t = parent_state.t;
+        let t = parent_state.tx;
         let id = self.current_id();
         let active = self.is_active(id);
         let contains_mouse = self.contains_mouse(id);
@@ -868,7 +786,7 @@ impl<'a> Ui<'a> {
                 let coord =
                     coord.clamp(scissor_bounds.x, scissor_bounds.x_end() - scroll_bar_height);
                 x = coord as i32;
-                parent_state.t = -(x - scissor_bounds.x) as f32 / scissor_bounds.w as f32;
+                parent_state.tx = -(x - scissor_bounds.x) as f32 / scissor_bounds.w as f32;
             }
         } else if self.is_hovered(id) {
             if !contains_mouse {
@@ -897,40 +815,54 @@ impl<'a> Ui<'a> {
         self.ui.bounding_boxes.insert(id, control_box);
     }
 
-    pub fn scroll_horizontal(
-        &mut self,
-        width: Option<UiCoordinate>,
-        mut contents: impl FnMut(&mut Self),
-    ) {
+    pub fn scroll_area(&mut self, desc: ScrollDescriptor, mut contents: impl FnMut(&mut Self)) {
         self.begin_widget();
         let id = self.current_id();
-        let width = width.unwrap_or(UiCoordinate::Percent(100));
-        let height = self.ui.bounds.h;
+        let width = desc.width.unwrap_or(UiCoordinate::Percent(100));
+        let height = desc.height.unwrap_or(UiCoordinate::Percent(100));
         let width = width.as_abolute(self.ui.bounds.w);
+        let height = height.as_abolute(self.ui.bounds.h);
         let mut state = *self.get_memory_or_default::<ScrollState>();
 
         let line_height = self.theme.font_size + self.theme.text_padding;
 
-        if self.contains_mouse(id) {
-            let mut dt = 0.0;
-            for ds in self.mouse.scroll.iter() {
-                match ds {
-                    MouseScrollDelta::LineDelta(_, dy) => {
-                        dt += *dy / line_height as f32;
-                    }
-                    MouseScrollDelta::PixelDelta(physical_position) => {
-                        dt += physical_position.y as f32;
+        'scroll_handler: {
+            if self.contains_mouse(id) {
+                let mut dt = 0.0;
+                for ds in self.mouse.scroll.iter() {
+                    match ds {
+                        MouseScrollDelta::LineDelta(_, dy) => {
+                            dt += *dy / line_height as f32;
+                        }
+                        MouseScrollDelta::PixelDelta(physical_position) => {
+                            dt += physical_position.y as f32;
+                        }
                     }
                 }
-            }
-            if dt != 0.0 {
-                state.t += dt;
-                // TODO: animation at edge?
-                // TODO: the min needs work, doesn't work as intended
-                state.t = state.t.clamp(-1.0 + 1.0 / (line_height as f32), 0.0);
+                if dt != 0.0 {
+                    let t;
+                    if self.keyboard.pressed.contains(&KeyCode::ShiftLeft)
+                        || self.keyboard.pressed.contains(&KeyCode::ShiftRight)
+                    {
+                        if desc.width.is_none() {
+                            break 'scroll_handler;
+                        }
+                        t = &mut state.tx;
+                    } else {
+                        if desc.height.is_none() {
+                            break 'scroll_handler;
+                        }
+                        t = &mut state.ty;
+                    }
+                    *t += dt;
+                    // TODO: animation at edge?
+                    // TODO: the min needs work, doesn't work as intended
+                    *t = t.clamp(-1.0 + 1.0 / (line_height as f32), 0.0);
+                }
             }
         }
-        let offset = state.t * state.content_size as f32;
+        let offset_x = state.tx * state.content_width as f32;
+        let offset_y = state.ty * state.content_height as f32;
         self.insert_memory(state);
 
         let old_bounds = self.ui.bounds;
@@ -941,8 +873,14 @@ impl<'a> Ui<'a> {
             h: height,
         };
         let mut bounds = scissor_bounds;
-        bounds.x += offset as i32;
-        bounds.h = bounds.h.saturating_sub(self.theme.scroll_bar_size as i32);
+        bounds.x += offset_x as i32;
+        bounds.y += offset_y as i32;
+        if desc.width.is_some() {
+            bounds.w = bounds.w.saturating_sub(self.theme.scroll_bar_size as i32);
+        }
+        if desc.height.is_some() {
+            bounds.h = bounds.h.saturating_sub(self.theme.scroll_bar_size as i32);
+        }
 
         self.ui.bounds = bounds;
         let scissor_idx = self.ui.scissor_idx;
@@ -960,19 +898,35 @@ impl<'a> Ui<'a> {
         let last_id = self.ui.id_stack.pop().unwrap();
         let mut max_x = std::i32::MIN;
         let mut min_x = std::i32::MAX;
+        let mut max_y = std::i32::MIN;
+        let mut min_y = std::i32::MAX;
         for r in &self.ui.rect_history[history_start..] {
             min_x = min_x.min(r.x);
             max_x = max_x.max(r.x_end());
+
+            min_y = min_y.min(r.y);
+            max_y = max_y.max(r.y_end());
         }
 
         let state = self.get_memory_mut::<ScrollState>().unwrap();
 
-        state.content_size = if min_x <= max_x { max_x - min_x } else { 0 };
+        state.content_width = if min_x <= max_x { max_x - min_x } else { 0 };
+        state.content_height = if min_y <= max_y { max_y - min_y } else { 0 };
         let mut state = *state;
 
-        let scroll_bar_width = self.theme.scroll_bar_size as i32;
+        let scroll_bar_size = self.theme.scroll_bar_size as i32;
         self.ui.id_stack.push(last_id);
-        self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_width, layer + 2, &mut state);
+        if desc.width.is_some() {
+            let mut scissor_bounds = scissor_bounds;
+            if desc.height.is_some() {
+                // prevent overlap
+                scissor_bounds.w -= scroll_bar_size;
+            }
+            self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_size, layer + 2, &mut state);
+        }
+        if desc.height.is_some() {
+            self.vertical_scroll_bar(&scissor_bounds, scroll_bar_size, layer + 2, &mut state);
+        }
         self.ui.id_stack.pop();
         self.insert_memory(state);
         self.submit_rect(id, scissor_bounds);
@@ -981,6 +935,13 @@ impl<'a> Ui<'a> {
         self.ui.bounds = old_bounds;
         self.ui.scissor_idx = scissor_idx;
     }
+}
+
+/// If a field is None, then the area does not scroll on that axis
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScrollDescriptor {
+    pub width: Option<UiCoordinate>,
+    pub height: Option<UiCoordinate>,
 }
 
 type IdxType = u32;
@@ -1161,6 +1122,7 @@ pub struct Ui<'a> {
     shaping_results: ResMut<'a, assets::Assets<ShapingResult>>,
     theme: ResMut<'a, Theme>,
     mouse: Res<'a, MouseInputs>,
+    keyboard: Res<'a, KeyBoardInputs>,
     memory: ResMut<'a, UiMemory>,
 }
 
@@ -1241,12 +1203,14 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         let theme = ResMut::new(db);
         let memory = ResMut::new(db);
         let mouse = Res::new(db);
+        let keyboard = Res::new(db);
         Self(Ui {
             ui,
             texture_cache,
             shaping_results: text_assets,
             theme,
             mouse,
+            keyboard,
             memory,
         })
     }
@@ -1261,6 +1225,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
 
     fn resources_const(set: &mut std::collections::HashSet<std::any::TypeId>) {
         set.insert(std::any::TypeId::of::<MouseInputs>());
+        set.insert(std::any::TypeId::of::<KeyBoardInputs>());
     }
 }
 
@@ -1321,6 +1286,8 @@ impl ErasedMemoryEntry {
 #[derive(Default, Debug, Clone, Copy)]
 struct ScrollState {
     /// goes from -1 to 0
-    pub t: f32,
-    pub content_size: i32,
+    pub tx: f32,
+    pub ty: f32,
+    pub content_width: i32,
+    pub content_height: i32,
 }
