@@ -167,28 +167,28 @@ enum LayoutDirection {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UiCoordinate {
+pub enum UiCoord {
     Absolute(i32),
     Percent(i8),
 }
 
-impl Default for UiCoordinate {
+impl Default for UiCoord {
     fn default() -> Self {
         Self::Absolute(0)
     }
 }
 
-impl From<i32> for UiCoordinate {
+impl From<i32> for UiCoord {
     fn from(value: i32) -> Self {
         Self::Absolute(value)
     }
 }
 
-impl UiCoordinate {
+impl UiCoord {
     pub fn as_abolute(self, max: i32) -> i32 {
         match self {
-            UiCoordinate::Absolute(x) => x,
-            UiCoordinate::Percent(p) => {
+            UiCoord::Absolute(x) => x,
+            UiCoord::Percent(p) => {
                 let p = p as f64 / 100.0;
                 let x = max as f64 * p;
                 x as i32
@@ -199,8 +199,8 @@ impl UiCoordinate {
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct PanelDescriptor {
-    pub width: UiCoordinate,
-    pub height: UiCoordinate,
+    pub width: UiCoord,
+    pub height: UiCoord,
     pub horizonal: HorizontalAlignment,
     pub vertical: VerticalAlignment,
 }
@@ -818,8 +818,8 @@ impl<'a> Ui<'a> {
     pub fn scroll_area(&mut self, desc: ScrollDescriptor, mut contents: impl FnMut(&mut Self)) {
         self.begin_widget();
         let id = self.current_id();
-        let width = desc.width.unwrap_or(UiCoordinate::Percent(100));
-        let height = desc.height.unwrap_or(UiCoordinate::Percent(100));
+        let width = desc.width.unwrap_or(UiCoord::Percent(100));
+        let height = desc.height.unwrap_or(UiCoord::Percent(100));
         let width = width.as_abolute(self.ui.bounds.w);
         let height = height.as_abolute(self.ui.bounds.h);
         let mut state = *self.get_memory_or_default::<ScrollState>();
@@ -940,8 +940,8 @@ impl<'a> Ui<'a> {
 /// If a field is None, then the area does not scroll on that axis
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScrollDescriptor {
-    pub width: Option<UiCoordinate>,
-    pub height: Option<UiCoordinate>,
+    pub width: Option<UiCoord>,
+    pub height: Option<UiCoord>,
 }
 
 type IdxType = u32;

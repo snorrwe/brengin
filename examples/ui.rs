@@ -1,5 +1,5 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
-use brengin::ui::{HorizontalAlignment, ScrollDescriptor, UiCoordinate, UiRoot, VerticalAlignment};
+use brengin::ui::{HorizontalAlignment, ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment};
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
 
@@ -8,7 +8,7 @@ struct Label(String);
 fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>) {
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoordinate::Percent(100),
+            width: UiCoord::Percent(100),
             height: 300.into(),
             horizonal: HorizontalAlignment::Right,
             vertical: VerticalAlignment::Bottom,
@@ -16,7 +16,7 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>) {
         |ui| {
             ui.scroll_area(
                 ScrollDescriptor {
-                    height: Some(UiCoordinate::Percent(100)),
+                    height: Some(UiCoord::Percent(100)),
                     width: None,
                 },
                 |ui| {
@@ -39,7 +39,7 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>) {
     );
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoordinate::Percent(50),
+            width: UiCoord::Percent(50),
             height: 200.into(),
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
@@ -68,15 +68,15 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>) {
     );
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoordinate::Absolute(500),
+            width: UiCoord::Absolute(500),
             height: 200.into(),
             horizonal: HorizontalAlignment::Left,
             vertical: VerticalAlignment::Top,
         },
         |ui| {
             ui.scroll_area(ScrollDescriptor{
-                width: Some(UiCoordinate::Percent(100)),
-                height: Some(UiCoordinate::Percent(100)),
+                width: Some(UiCoord::Percent(100)),
+                height: Some(UiCoord::Percent(100)),
             }, |ui| {
                 ui.label(
                     r#"
