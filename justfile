@@ -1,5 +1,8 @@
 export CARGO_PROFILE_RELEASE_DEBUG := "true"
 
+_default:
+    @just --list
+
 boids flags="": (_example "boids" flags)
 
 sprites flags="": (_example "sprites" flags)
