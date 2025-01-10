@@ -140,6 +140,9 @@ Maecenas ac convallis ligula, id interdum turpis.
             });
         },
     );
+    ctx.window(brengin::ui::WindowDescriptor { name: "poggers" }, |ui| {
+        ui.label("epic widget dude");
+    });
 }
 
 fn setup(mut cmd: Commands) {

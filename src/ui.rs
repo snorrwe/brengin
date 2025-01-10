@@ -11,6 +11,7 @@ pub mod text_rect_pipeline;
 use std::{any::TypeId, collections::HashMap, ptr::NonNull};
 
 use cecs::{prelude::*, query};
+use glam::IVec2;
 use text_rect_pipeline::{DrawTextRect, TextRectRequests};
 use winit::{
     event::{MouseButton, MouseScrollDelta},
@@ -110,6 +111,9 @@ pub struct UiState {
     root_hash: u32,
 
     layout_dir: LayoutDirection,
+
+    /// TODO: gc?
+    windows: HashMap<String, WindowState>,
 }
 
 #[derive(Debug, Clone)]
@@ -156,6 +160,7 @@ impl UiState {
             rect_history: Default::default(),
             root_hash: 0,
             layout_dir: LayoutDirection::TopDown,
+            windows: Default::default(),
         }
     }
 }
@@ -1137,11 +1142,88 @@ pub struct Ui<'a> {
 /// Root of the UI used to instantiate UI containers
 pub struct UiRoot<'a>(Ui<'a>);
 
+struct WindowState {
+    pos: IVec2,
+    content_size: IVec2,
+}
+
+pub struct WindowDescriptor<'a> {
+    pub name: &'a str,
+}
+
 impl<'a> UiRoot<'a> {
+    pub fn window(&mut self, desc: WindowDescriptor, mut contents: impl FnMut(&mut Ui)) {
+        let state: &mut WindowState = self
+            .0
+            .ui
+            .windows
+            .entry(desc.name.to_owned())
+            .or_insert_with(|| {
+                // TODO: allocate window
+                WindowState {
+                    pos: IVec2::new(100, 100),
+                    content_size: IVec2::ZERO,
+                }
+            });
+
+        let width = state.content_size.x;
+        let height = state.content_size.y;
+        let old_bounds = self.0.ui.bounds;
+        let bounds = UiRect {
+            x: 0,
+            y: 0,
+            w: width,
+            h: height,
+        };
+
+        self.0.ui.root_hash = fnv_1a(desc.name.as_bytes());
+        self.0.ui.bounds = bounds;
+        let scissor = self.0.ui.scissor_idx;
+        self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
+        self.0.ui.scissors.push(bounds);
+
+        let layer = self.0.ui.layer;
+        self.0.ui.layer += 1;
+        self.0.color_rect(
+            bounds.x,
+            bounds.y,
+            width,
+            height,
+            0x0395d5ff,
+            self.0.ui.layer,
+        );
+        self.0.ui.id_stack.push(0);
+        let history_start = self.0.ui.rect_history.len();
+        ///////////////////////
+        contents(&mut self.0);
+        ///////////////////////
+        self.0.ui.layer = layer;
+        self.0.ui.id_stack.pop();
+        self.0.ui.bounds = old_bounds;
+        self.0.ui.scissor_idx = scissor;
+
+        let mut max_x = std::i32::MIN;
+        let mut min_x = std::i32::MAX;
+        let mut max_y = std::i32::MIN;
+        let mut min_y = std::i32::MAX;
+        for r in &self.0.ui.rect_history[history_start..] {
+            min_x = min_x.min(r.x);
+            max_x = max_x.max(r.x_end());
+
+            min_y = min_y.min(r.y);
+            max_y = max_y.max(r.y_end());
+        }
+
+        let state: &mut WindowState = self.0.ui.windows.get_mut(desc.name).unwrap();
+        state.content_size = IVec2::new(
+            if min_x <= max_x { max_x - min_x } else { 0 },
+            if min_y <= max_y { max_y - min_y } else { 0 },
+        );
+    }
+
     pub fn panel(&mut self, desc: PanelDescriptor, mut contents: impl FnMut(&mut Ui)) {
         let width = desc.width.as_abolute(self.0.ui.bounds.w);
         let height = desc.height.as_abolute(self.0.ui.bounds.h);
-        self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[width, height]));
 
         let old_bounds = self.0.ui.bounds;
         let mut bounds = UiRect {
@@ -1169,6 +1251,7 @@ impl<'a> UiRoot<'a> {
                 bounds.y = (old_bounds.h / 2).saturating_sub(height / 2) as i32;
             }
         }
+        self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[bounds.x, bounds.y, width, height]));
         self.0.ui.bounds = bounds;
         let scissor = self.0.ui.scissor_idx;
         self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
