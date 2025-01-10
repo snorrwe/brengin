@@ -948,6 +948,30 @@ impl<'a> Ui<'a> {
         self.ui.bounds = old_bounds;
         self.ui.scissor_idx = scissor_idx;
     }
+
+    fn history_bounding_rect(&self, history_start: usize) -> UiRect {
+        let mut max_x = std::i32::MIN;
+        let mut min_x = std::i32::MAX;
+        let mut max_y = std::i32::MIN;
+        let mut min_y = std::i32::MAX;
+        for r in &self.ui.rect_history[history_start..] {
+            min_x = min_x.min(r.x);
+            max_x = max_x.max(r.x_end());
+
+            min_y = min_y.min(r.y);
+            max_y = max_y.max(r.y_end());
+        }
+
+        let w = max_x - min_x;
+        let h = max_y - min_y;
+
+        UiRect {
+            x: min_x + w / 2,
+            y: min_y + h / 2,
+            w,
+            h,
+        }
+    }
 }
 
 /// If a field is None, then the area does not scroll on that axis
