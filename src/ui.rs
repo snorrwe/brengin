@@ -126,6 +126,7 @@ pub struct Theme {
     pub font_size: u16,
     pub padding: u16,
     pub scroll_bar_size: u16,
+    pub window_title_height: u8,
 }
 
 impl Default for Theme {
@@ -139,6 +140,7 @@ impl Default for Theme {
             font_size: 12,
             padding: 5,
             scroll_bar_size: 15,
+            window_title_height: 24,
         }
     }
 }
@@ -1159,6 +1161,7 @@ pub struct UiRoot<'a>(Ui<'a>);
 struct WindowState {
     pos: IVec2,
     content_size: IVec2,
+    size: IVec2,
 }
 
 pub struct WindowDescriptor<'a> {
@@ -1175,26 +1178,30 @@ impl<'a> UiRoot<'a> {
             .or_insert_with(|| {
                 // TODO: allocate window
                 WindowState {
-                    pos: IVec2::new(100, 100),
+                    pos: IVec2::new(500, 500),
                     content_size: IVec2::ZERO,
+                    size: IVec2::splat(100),
                 }
             });
 
-        let width = state.content_size.x;
-        let height = state.content_size.y;
-        let old_bounds = self.0.ui.bounds;
+        let width = state.size.x;
+        let height = state.size.y - self.0.theme.window_title_height as i32;
         let bounds = UiRect {
-            x: 0,
-            y: 0,
+            x: state.pos.x,
+            y: state.pos.y + self.0.theme.window_title_height as i32,
             w: width,
             h: height,
         };
+        let title_bounds = UiRect {
+            x: state.pos.x,
+            y: state.pos.y,
+            w: width,
+            h: self.0.theme.window_title_height as i32,
+        };
 
         self.0.ui.root_hash = fnv_1a(desc.name.as_bytes());
-        self.0.ui.bounds = bounds;
+        let old_bounds = self.0.ui.bounds;
         let scissor = self.0.ui.scissor_idx;
-        self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
-        self.0.ui.scissors.push(bounds);
 
         let layer = self.0.ui.layer;
         self.0.ui.layer += 1;
@@ -1209,7 +1216,32 @@ impl<'a> UiRoot<'a> {
         self.0.ui.id_stack.push(0);
         let history_start = self.0.ui.rect_history.len();
         ///////////////////////
-        contents(&mut self.0);
+        // Title
+        {
+            self.0.ui.bounds = title_bounds;
+            self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
+            self.0.ui.scissors.push(title_bounds);
+            self.0.color_rect(
+                title_bounds.x,
+                title_bounds.y,
+                title_bounds.w,
+                title_bounds.h,
+                0x00ffffff,
+                self.0.ui.layer,
+            );
+            self.0.label(desc.name);
+        }
+        ///////////////////////
+        ///////////////////////
+        // Content
+        {
+            self.0.ui.bounds = bounds;
+            self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
+            self.0.ui.scissors.push(bounds);
+            self.0.ui.layer = layer + 1;
+            *self.0.ui.id_stack.last_mut().unwrap() = 1;
+            contents(&mut self.0);
+        }
         ///////////////////////
         self.0.ui.layer = layer;
         self.0.ui.id_stack.pop();
@@ -1233,6 +1265,8 @@ impl<'a> UiRoot<'a> {
             if min_x <= max_x { max_x - min_x } else { 0 },
             if min_y <= max_y { max_y - min_y } else { 0 },
         );
+        state.size = state.content_size;
+        state.size.y = (state.size.y).max(5) + self.0.theme.window_title_height as i32;
     }
 
     pub fn panel(&mut self, desc: PanelDescriptor, mut contents: impl FnMut(&mut Ui)) {
