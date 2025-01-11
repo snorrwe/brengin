@@ -909,22 +909,12 @@ impl<'a> Ui<'a> {
         contents(self);
         ///////////////////////
         let last_id = self.ui.id_stack.pop().unwrap();
-        let mut max_x = std::i32::MIN;
-        let mut min_x = std::i32::MAX;
-        let mut max_y = std::i32::MIN;
-        let mut min_y = std::i32::MAX;
-        for r in &self.ui.rect_history[history_start..] {
-            min_x = min_x.min(r.x);
-            max_x = max_x.max(r.x_end());
-
-            min_y = min_y.min(r.y);
-            max_y = max_y.max(r.y_end());
-        }
+        let children_bounds = self.history_bounding_rect(history_start);
 
         let state = self.get_memory_mut::<ScrollState>().unwrap();
 
-        state.content_width = if min_x <= max_x { max_x - min_x } else { 0 };
-        state.content_height = if min_y <= max_y { max_y - min_y } else { 0 };
+        state.content_width = children_bounds.w;
+        state.content_height = children_bounds.h;
         let mut state = *state;
 
         let scroll_bar_size = self.theme.scroll_bar_size as i32;
