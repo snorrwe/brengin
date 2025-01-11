@@ -1204,7 +1204,7 @@ impl<'a> UiRoot<'a> {
         let scissor = self.0.ui.scissor_idx;
 
         let layer = self.0.ui.layer;
-        self.0.ui.layer += 1;
+        self.0.ui.layer += 2;
         self.0.color_rect(
             bounds.x,
             bounds.y,
@@ -1238,7 +1238,7 @@ impl<'a> UiRoot<'a> {
             self.0.ui.bounds = bounds;
             self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
             self.0.ui.scissors.push(bounds);
-            self.0.ui.layer = layer + 1;
+            self.0.ui.layer = layer + 2;
             *self.0.ui.id_stack.last_mut().unwrap() = 1;
             contents(&mut self.0);
         }
