@@ -1213,6 +1213,22 @@ struct WindowState {
 
 pub struct WindowDescriptor<'a> {
     pub name: &'a str,
+    pub show_title: bool,
+    /// Initial window position
+    pub pos: Option<IVec2>,
+    /// Initial window size
+    pub size: Option<IVec2>,
+}
+
+impl<'a> Default for WindowDescriptor<'a> {
+    fn default() -> Self {
+        Self {
+            name: "some window",
+            show_title: true,
+            pos: None,
+            size: None,
+        }
+    }
 }
 
 const WINDOW_LAYER: u16 = 100;
@@ -1227,11 +1243,11 @@ impl<'a> UiRoot<'a> {
             .or_insert_with(|| {
                 // TODO: allocate window
                 WindowState {
-                    pos: IVec2::new(500, 500),
+                    pos: desc.pos.unwrap_or(IVec2::new(500, 500)),
+                    size: desc.size.unwrap_or(IVec2::splat(100)),
                     drag_anchor: Default::default(),
                     drag_start: Default::default(),
                     content_size: IVec2::ZERO,
-                    size: IVec2::splat(100),
                 }
             });
 

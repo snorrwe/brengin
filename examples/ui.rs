@@ -143,6 +143,7 @@ Maecenas ac convallis ligula, id interdum turpis.
     ctx.window(
         brengin::ui::WindowDescriptor {
             name: "poggers window",
+            ..Default::default()
         },
         |ui| {
             ui.with_theme(
