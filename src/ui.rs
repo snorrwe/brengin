@@ -1227,15 +1227,8 @@ impl<'a> UiRoot<'a> {
             self.0.ui.bounds = title_bounds;
             self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
             self.0.ui.scissors.push(title_bounds);
-            self.0.color_rect(
-                title_bounds.x,
-                title_bounds.y,
-                title_bounds.w,
-                title_bounds.h,
-                0x00ffffff,
-                self.0.ui.layer,
-            );
             self.0.label(desc.name);
+            self.0.begin_widget();
             let title_id = self.0.current_id();
             if self.0.is_active(title_id) {
                 if self.0.mouse_up() {
@@ -1260,6 +1253,15 @@ impl<'a> UiRoot<'a> {
                     self.0.set_active(title_id);
                 }
             }
+            self.0.submit_rect(title_id, title_bounds);
+            self.0.color_rect(
+                title_bounds.x,
+                title_bounds.y,
+                title_bounds.w,
+                title_bounds.h,
+                0x00ffffff,
+                self.0.ui.layer,
+            );
         }
         ///////////////////////
         ///////////////////////
@@ -1269,7 +1271,7 @@ impl<'a> UiRoot<'a> {
             self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
             self.0.ui.scissors.push(bounds);
             self.0.ui.layer = layer + 2;
-            *self.0.ui.id_stack.last_mut().unwrap() = 1;
+            self.0.begin_widget();
             contents(&mut self.0);
         }
         ///////////////////////
