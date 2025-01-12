@@ -1215,6 +1215,8 @@ pub struct WindowDescriptor<'a> {
     pub name: &'a str,
 }
 
+const WINDOW_LAYER: u16 = 100;
+
 impl<'a> UiRoot<'a> {
     pub fn window(&mut self, desc: WindowDescriptor, mut contents: impl FnMut(&mut Ui)) {
         let state: &mut WindowState = self
@@ -1254,14 +1256,14 @@ impl<'a> UiRoot<'a> {
         let scissor = self.0.ui.scissor_idx;
 
         let layer = self.0.ui.layer;
-        self.0.ui.layer += 2;
+        self.0.ui.layer = WINDOW_LAYER;
         self.0.color_rect(
             bounds.x,
             bounds.y,
             width + padding * 2,
             height + padding * 2,
             0x0395d5ff,
-            self.0.ui.layer,
+            WINDOW_LAYER,
         );
         self.0.ui.id_stack.push(0);
         ///////////////////////
@@ -1303,7 +1305,7 @@ impl<'a> UiRoot<'a> {
                 title_bounds.w,
                 title_bounds.h,
                 0x00ffffff,
-                self.0.ui.layer,
+                WINDOW_LAYER,
             );
         }
         ///////////////////////
@@ -1319,7 +1321,7 @@ impl<'a> UiRoot<'a> {
             bounds.w -= 2 * padding;
             bounds.h -= 2 * padding;
             self.0.ui.bounds = bounds;
-            self.0.ui.layer = layer + 2;
+            self.0.ui.layer = WINDOW_LAYER + 2;
             self.0.begin_widget();
             contents(&mut self.0);
         }
