@@ -264,6 +264,14 @@ pub enum VerticalAlignment {
 }
 
 impl<'a> Ui<'a> {
+    /// returns the last scissor_idx
+    pub fn push_scissor(&mut self, scissor_bounds: UiRect) -> u32 {
+        let res = self.ui.scissor_idx;
+        self.ui.scissor_idx = self.ui.scissors.len() as u32;
+        self.ui.scissors.push(scissor_bounds);
+        res
+    }
+
     #[inline]
     fn set_hovered(&mut self, id: UiId) {
         self.ui.hovered = id;
@@ -1287,8 +1295,7 @@ impl<'a> UiRoot<'a> {
         // Title
         {
             self.0.ui.bounds = title_bounds;
-            self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
-            self.0.ui.scissors.push(title_bounds);
+            self.0.push_scissor(title_bounds);
             self.0.label(desc.name);
             self.0.begin_widget();
             let title_id = self.0.current_id();
@@ -1330,8 +1337,7 @@ impl<'a> UiRoot<'a> {
         // Content
         let history_start = self.0.ui.rect_history.len();
         {
-            self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
-            self.0.ui.scissors.push(bounds);
+            self.0.push_scissor(bounds);
             let mut bounds = bounds;
             bounds.x += padding;
             bounds.y += padding;
@@ -1388,9 +1394,7 @@ impl<'a> UiRoot<'a> {
         }
         self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[bounds.x, bounds.y, width, height]));
         self.0.ui.bounds = bounds;
-        let scissor = self.0.ui.scissor_idx;
-        self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
-        self.0.ui.scissors.push(bounds);
+        let scissor = self.0.push_scissor(bounds);
 
         let layer = self.0.ui.layer;
         self.0.ui.layer += 1;
