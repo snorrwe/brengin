@@ -1273,6 +1273,7 @@ impl<'a> UiRoot<'a> {
 
         let layer = self.0.ui.layer;
         self.0.ui.layer = WINDOW_LAYER;
+        // window background
         self.0.color_rect(
             bounds.x,
             bounds.y,
