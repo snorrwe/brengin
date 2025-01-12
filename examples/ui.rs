@@ -140,17 +140,23 @@ Maecenas ac convallis ligula, id interdum turpis.
             });
         },
     );
-    ctx.window(brengin::ui::WindowDescriptor { name: "poggers" }, |ui| {
-        ui.with_theme(
-            brengin::ui::Theme {
-                font_size: 24,
-                ..ui.theme().clone()
-            },
-            |ui| {
-                ui.label("epic widget dude");
-            },
-        );
-    });
+    ctx.window(
+        brengin::ui::WindowDescriptor {
+            name: "poggers window",
+        },
+        |ui| {
+            ui.with_theme(
+                brengin::ui::Theme {
+                    font_size: 24,
+                    ..ui.theme().clone()
+                },
+                |ui| {
+                    ui.label("epic widget dude");
+                },
+            );
+            ui.label("so goood");
+        },
+    );
 }
 
 fn setup(mut cmd: Commands) {
