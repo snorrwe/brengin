@@ -160,6 +160,7 @@ pub struct Theme {
     pub scroll_bar_size: u16,
     pub window_title_height: u8,
     pub font: Handle<OwnedTypeFace>,
+    pub window_padding: u8,
 }
 
 impl Default for Theme {
@@ -175,6 +176,7 @@ impl Default for Theme {
             scroll_bar_size: 12,
             window_title_height: 24,
             font: Default::default(),
+            window_padding: 4,
         }
     }
 }
@@ -1231,6 +1233,7 @@ impl<'a> UiRoot<'a> {
                 }
             });
 
+        let padding = self.0.theme.window_padding as i32;
         let width = state.size.x;
         let height = state.size.y - self.0.theme.window_title_height as i32;
         let bounds = UiRect {
@@ -1242,7 +1245,7 @@ impl<'a> UiRoot<'a> {
         let title_bounds = UiRect {
             x: state.pos.x,
             y: state.pos.y,
-            w: width,
+            w: width + 2 * padding,
             h: self.0.theme.window_title_height as i32,
         };
 
@@ -1255,13 +1258,12 @@ impl<'a> UiRoot<'a> {
         self.0.color_rect(
             bounds.x,
             bounds.y,
-            width,
-            height,
+            width + padding * 2,
+            height + padding * 2,
             0x0395d5ff,
             self.0.ui.layer,
         );
         self.0.ui.id_stack.push(0);
-        let history_start = self.0.ui.rect_history.len();
         ///////////////////////
         // Title
         {
@@ -1307,10 +1309,16 @@ impl<'a> UiRoot<'a> {
         ///////////////////////
         ///////////////////////
         // Content
+        let history_start = self.0.ui.rect_history.len();
         {
-            self.0.ui.bounds = bounds;
             self.0.ui.scissor_idx = self.0.ui.scissors.len() as u32;
             self.0.ui.scissors.push(bounds);
+            let mut bounds = bounds;
+            bounds.x += padding;
+            bounds.y += padding;
+            bounds.w -= 2 * padding;
+            bounds.h -= 2 * padding;
+            self.0.ui.bounds = bounds;
             self.0.ui.layer = layer + 2;
             self.0.begin_widget();
             contents(&mut self.0);
@@ -1321,24 +1329,11 @@ impl<'a> UiRoot<'a> {
         self.0.ui.bounds = old_bounds;
         self.0.ui.scissor_idx = scissor;
 
-        let mut max_x = std::i32::MIN;
-        let mut min_x = std::i32::MAX;
-        let mut max_y = std::i32::MIN;
-        let mut min_y = std::i32::MAX;
-        for r in &self.0.ui.rect_history[history_start..] {
-            min_x = min_x.min(r.x);
-            max_x = max_x.max(r.x_end());
-
-            min_y = min_y.min(r.y);
-            max_y = max_y.max(r.y_end());
-        }
+        let r = self.0.history_bounding_rect(history_start);
 
         let state: &mut WindowState = self.0.ui.windows.get_mut(desc.name).unwrap();
-        state.content_size = IVec2::new(
-            if min_x <= max_x { max_x - min_x } else { 0 },
-            if min_y <= max_y { max_y - min_y } else { 0 },
-        );
-        state.size = state.content_size;
+        state.content_size = IVec2::new(r.w, r.h);
+        state.size = state.content_size + 2 * IVec2::splat(padding);
         state.size.y = (state.size.y).max(5) + self.0.theme.window_title_height as i32;
     }
 
