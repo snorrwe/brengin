@@ -140,7 +140,7 @@ impl Default for Theme {
             text_padding: 5,
             font_size: 12,
             padding: 5,
-            scroll_bar_size: 15,
+            scroll_bar_size: 12,
             window_title_height: 24,
         }
     }
