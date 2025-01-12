@@ -14,6 +14,7 @@ use cecs::{prelude::*, query};
 use glam::IVec2;
 use text_rect_pipeline::{DrawTextRect, TextRectRequests};
 use winit::{
+    dpi::PhysicalPosition,
     event::{MouseButton, MouseScrollDelta},
     keyboard::KeyCode,
 };
@@ -1158,8 +1159,11 @@ pub struct Ui<'a> {
 /// Root of the UI used to instantiate UI containers
 pub struct UiRoot<'a>(Ui<'a>);
 
+#[derive(Debug)]
 struct WindowState {
     pos: IVec2,
+    drag_anchor: IVec2,
+    drag_start: PhysicalPosition<f64>,
     content_size: IVec2,
     size: IVec2,
 }
@@ -1179,6 +1183,8 @@ impl<'a> UiRoot<'a> {
                 // TODO: allocate window
                 WindowState {
                     pos: IVec2::new(500, 500),
+                    drag_anchor: Default::default(),
+                    drag_start: Default::default(),
                     content_size: IVec2::ZERO,
                     size: IVec2::splat(100),
                 }
@@ -1231,8 +1237,28 @@ impl<'a> UiRoot<'a> {
             );
             self.0.label(desc.name);
             let title_id = self.0.current_id();
-            if self.0.contains_mouse(title_id) {
-                // TODO: drag
+            if self.0.is_active(title_id) {
+                if self.0.mouse_up() {
+                    self.0.set_not_active(title_id);
+                }
+                let state: &mut WindowState = self.0.ui.windows.get_mut(desc.name).unwrap();
+
+                let drag_anchor = state.drag_anchor;
+                let drag_start = state.drag_start;
+
+                let offset = IVec2::new(
+                    (self.0.mouse.cursor_position.x - drag_start.x) as i32,
+                    (self.0.mouse.cursor_position.y - drag_start.y) as i32,
+                );
+
+                state.pos = drag_anchor + offset;
+            } else {
+                if self.0.contains_mouse(title_id) && self.0.mouse_down() {
+                    let state: &mut WindowState = self.0.ui.windows.get_mut(desc.name).unwrap();
+                    state.drag_start = self.0.mouse.cursor_position;
+                    state.drag_anchor = state.pos;
+                    self.0.set_active(title_id);
+                }
             }
         }
         ///////////////////////
