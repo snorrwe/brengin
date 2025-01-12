@@ -1230,6 +1230,10 @@ impl<'a> UiRoot<'a> {
                 self.0.ui.layer,
             );
             self.0.label(desc.name);
+            let title_id = self.0.current_id();
+            if self.0.contains_mouse(title_id) {
+                // TODO: drag
+            }
         }
         ///////////////////////
         ///////////////////////
