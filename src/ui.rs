@@ -1,5 +1,5 @@
 use crate::{
-    assets::{self, AssetsPlugin, Handle},
+    assets::{self, Assets, AssetsPlugin, Handle, WeakHandle},
     KeyBoardInputs, MouseInputs, Plugin,
 };
 
@@ -29,24 +29,40 @@ pub type Color = u32;
 
 pub struct UiPlugin;
 
+fn setup_ui(
+    mut cmd: Commands,
+    theme: Option<Res<OwnedTypeFace>>,
+    mut fonts: ResMut<Assets<OwnedTypeFace>>,
+) {
+    let font = text::parse_font(
+        include_bytes!("./ui/Roboto-Regular.ttf")
+            .to_vec()
+            .into_boxed_slice(),
+        0,
+    )
+    .unwrap();
+    let font = fonts.insert(font);
+    if theme.is_none() {
+        cmd.insert_resource(Theme {
+            font,
+            ..Theme::default()
+        });
+    }
+}
+
 impl Plugin for UiPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(color_rect_pipeline::UiColorRectPlugin);
         app.add_plugin(text_rect_pipeline::UiTextRectPlugin);
-        let font = text::parse_font(
-            include_bytes!("./ui/Roboto-Regular.ttf")
-                .to_vec()
-                .into_boxed_slice(),
-            0,
-        )
-        .unwrap();
-        app.insert_resource(UiState::new(font));
+        app.add_plugin(AssetsPlugin::<OwnedTypeFace>::default());
+        app.add_plugin(AssetsPlugin::<ShapingResult>::default());
+
+        app.insert_resource(UiState::new());
         app.insert_resource(TextTextureCache::default());
         app.insert_resource(UiMemory::default());
-        if app.get_resource::<Theme>().is_none() {
-            app.insert_resource(Theme::default());
-        }
-        app.add_plugin(AssetsPlugin::<ShapingResult>::default());
+
+        app.add_startup_system(setup_ui);
+
         app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(begin_frame);
         });
@@ -70,11 +86,28 @@ fn fnv_1a_u32(value: u32) -> u32 {
     fnv_1a(bytemuck::cast_slice(&[value]))
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct ShapeKey {
     pub text: String,
     pub size: u32,
+    pub font: WeakHandle<OwnedTypeFace>,
     // TODO: include font handle, shaping info etc
+}
+
+impl Eq for ShapeKey {}
+
+impl PartialEq for ShapeKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.text == other.text && self.size == other.size && self.font.id() == other.font.id()
+    }
+}
+
+impl std::hash::Hash for ShapeKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.text.hash(state);
+        self.size.hash(state);
+        self.font.id().hash(state);
+    }
 }
 
 #[derive(Default)]
@@ -99,8 +132,6 @@ pub struct UiState {
     scissor_idx: u32,
     bounds: UiRect,
 
-    font: OwnedTypeFace,
-
     /// layers go from back to front
     layer: u16,
 
@@ -117,7 +148,7 @@ pub struct UiState {
     windows: HashMap<String, WindowState>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Theme {
     pub primary_color: Color,
     pub secondary_color: Color,
@@ -128,6 +159,7 @@ pub struct Theme {
     pub padding: u16,
     pub scroll_bar_size: u16,
     pub window_title_height: u8,
+    pub font: Handle<OwnedTypeFace>,
 }
 
 impl Default for Theme {
@@ -142,12 +174,13 @@ impl Default for Theme {
             padding: 5,
             scroll_bar_size: 12,
             window_title_height: 24,
+            font: Default::default(),
         }
     }
 }
 
 impl UiState {
-    pub fn new(font: OwnedTypeFace) -> Self {
+    pub fn new() -> Self {
         Self {
             hovered: Default::default(),
             active: Default::default(),
@@ -158,7 +191,6 @@ impl UiState {
             scissor_idx: 0,
             bounds: Default::default(),
             layer: 0,
-            font,
             bounding_boxes: Default::default(),
             rect_history: Default::default(),
             root_hash: 0,
@@ -466,12 +498,20 @@ impl<'a> Ui<'a> {
             .entry(ShapeKey {
                 text: line.clone(),
                 size,
+                font: self.theme.font.downgrade(),
             })
             .or_insert_with(|| {
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
-                let glyphs = rustybuzz::shape(self.ui.font.face(), &[], buffer);
-                let pic = text::draw_glyph_buffer(self.ui.font.face(), &glyphs, size).unwrap();
+                // FIXME: what if font is not yet loaded?
+                assert!(
+                    self.fonts.contains(self.theme.font.id()),
+                    "Theme font is not loaded"
+                );
+                let font = self.fonts.get(&self.theme.font);
+
+                let glyphs = rustybuzz::shape(font.face(), &[], buffer);
+                let pic = text::draw_glyph_buffer(font.face(), &glyphs, size).unwrap();
 
                 let shaping = ShapingResult {
                     glyphs,
@@ -1154,6 +1194,7 @@ pub struct Ui<'a> {
     mouse: Res<'a, MouseInputs>,
     keyboard: Res<'a, KeyBoardInputs>,
     memory: ResMut<'a, UiMemory>,
+    fonts: Res<'a, Assets<OwnedTypeFace>>,
 }
 
 /// Root of the UI used to instantiate UI containers
@@ -1385,6 +1426,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         let memory = ResMut::new(db);
         let mouse = Res::new(db);
         let keyboard = Res::new(db);
+        let fonts = Res::new(db);
         Self(Ui {
             ui,
             texture_cache,
@@ -1393,13 +1435,14 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
             mouse,
             keyboard,
             memory,
+            fonts,
         })
     }
 
     fn resources_mut(set: &mut std::collections::HashSet<TypeId>) {
         set.insert(TypeId::of::<UiState>());
         set.insert(TypeId::of::<TextTextureCache>());
-        set.insert(TypeId::of::<assets::Assets<ShapingResult>>());
+        set.insert(TypeId::of::<Assets<ShapingResult>>());
         set.insert(TypeId::of::<Theme>());
         set.insert(TypeId::of::<UiMemory>());
     }
@@ -1407,6 +1450,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
     fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
         set.insert(TypeId::of::<MouseInputs>());
         set.insert(TypeId::of::<KeyBoardInputs>());
+        set.insert(TypeId::of::<Assets<OwnedTypeFace>>());
     }
 }
 
