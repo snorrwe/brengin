@@ -64,6 +64,10 @@ impl<T> WeakHandle<T> {
     pub fn id(&self) -> AssetId {
         self.id
     }
+
+    pub fn is_valid(&self) -> bool {
+        self.id != ASSET_ID_SENTINEL
+    }
 }
 
 unsafe impl<T> Send for Handle<T> {}
@@ -141,6 +145,10 @@ impl<T> Handle<T> {
     pub fn downgrade(&self) -> WeakHandle<T> {
         let weak = self.weak.clone();
         weak
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.id != ASSET_ID_SENTINEL
     }
 }
 
