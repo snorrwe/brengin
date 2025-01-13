@@ -29,16 +29,6 @@ pub type Color = u32;
 
 pub struct UiPlugin;
 
-fn fallback_font() -> OwnedTypeFace {
-    text::parse_font(
-        include_bytes!("./ui/Roboto-Regular.ttf")
-            .to_vec()
-            .into_boxed_slice(),
-        0,
-    )
-    .unwrap()
-}
-
 impl Plugin for UiPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(color_rect_pipeline::UiColorRectPlugin);
@@ -190,7 +180,13 @@ impl UiState {
             root_hash: 0,
             layout_dir: LayoutDirection::TopDown,
             windows: Default::default(),
-            fallback_font: fallback_font(),
+            fallback_font: text::parse_font(
+                include_bytes!("./ui/Roboto-Regular.ttf")
+                    .to_vec()
+                    .into_boxed_slice(),
+                0,
+            )
+            .unwrap(),
         }
     }
 }
