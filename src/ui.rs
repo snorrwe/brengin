@@ -29,25 +29,14 @@ pub type Color = u32;
 
 pub struct UiPlugin;
 
-fn setup_ui(
-    mut cmd: Commands,
-    theme: Option<Res<OwnedTypeFace>>,
-    mut fonts: ResMut<Assets<OwnedTypeFace>>,
-) {
-    let font = text::parse_font(
+fn fallback_font() -> OwnedTypeFace {
+    text::parse_font(
         include_bytes!("./ui/Roboto-Regular.ttf")
             .to_vec()
             .into_boxed_slice(),
         0,
     )
-    .unwrap();
-    let font = fonts.insert(font);
-    if theme.is_none() {
-        cmd.insert_resource(Theme {
-            font,
-            ..Theme::default()
-        });
-    }
+    .unwrap()
 }
 
 impl Plugin for UiPlugin {
@@ -61,7 +50,9 @@ impl Plugin for UiPlugin {
         app.insert_resource(TextTextureCache::default());
         app.insert_resource(UiMemory::default());
 
-        app.add_startup_system(setup_ui);
+        if app.get_resource::<Theme>().is_none() {
+            app.insert_resource(Theme::default());
+        }
 
         app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(begin_frame);
@@ -146,6 +137,7 @@ pub struct UiState {
 
     /// TODO: gc?
     windows: HashMap<String, WindowState>,
+    fallback_font: OwnedTypeFace,
 }
 
 #[derive(Clone)]
@@ -198,6 +190,7 @@ impl UiState {
             root_hash: 0,
             layout_dir: LayoutDirection::TopDown,
             windows: Default::default(),
+            fallback_font: fallback_font(),
         }
     }
 }
@@ -513,12 +506,11 @@ impl<'a> Ui<'a> {
             .or_insert_with(|| {
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
-                // FIXME: what if font is not yet loaded?
-                assert!(
-                    self.fonts.contains(self.theme.font.id()),
-                    "Theme font is not loaded"
-                );
-                let font = self.fonts.get(&self.theme.font);
+                let font = if self.fonts.contains(self.theme.font.id()) {
+                    self.fonts.get(&self.theme.font)
+                } else {
+                    &self.ui.fallback_font
+                };
 
                 let glyphs = rustybuzz::shape(font.face(), &[], buffer);
                 let pic = text::draw_glyph_buffer(font.face(), &glyphs, size).unwrap();
