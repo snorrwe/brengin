@@ -1592,6 +1592,10 @@ struct ScrollState {
 }
 
 fn bounding_rect(history: &[UiRect]) -> UiRect {
+    if history.is_empty() {
+        return Default::default();
+    }
+
     let mut max_x = std::i32::MIN;
     let mut min_x = std::i32::MAX;
     let mut max_y = std::i32::MIN;
