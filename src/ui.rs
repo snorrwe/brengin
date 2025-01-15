@@ -699,12 +699,12 @@ impl<'a> Ui<'a> {
         &mut self.theme
     }
 
-    pub fn get_memory_or_default<T: Default + 'static>(&mut self) -> &mut T {
-        self.get_memory_or_insert(Default::default)
+    pub fn get_memory_or_default<T: Default + 'static>(&mut self, id: UiId) -> &mut T {
+        self.get_memory_or_insert(id, Default::default)
     }
 
-    pub fn get_memory_or_insert<T: 'static>(&mut self, f: impl FnOnce() -> T) -> &mut T {
-        let key = self.memory_key::<T>();
+    pub fn get_memory_or_insert<T: 'static>(&mut self, id: UiId, f: impl FnOnce() -> T) -> &mut T {
+        let key = self.memory_key::<T>(id);
         let res = self
             .memory
             .0
@@ -713,34 +713,34 @@ impl<'a> Ui<'a> {
         unsafe { res.as_inner_mut() }
     }
 
-    pub fn get_memory<T: 'static>(&self) -> Option<&T> {
-        let key = self.memory_key::<T>();
+    pub fn get_memory<T: 'static>(&self, id: UiId) -> Option<&T> {
+        let key = self.memory_key::<T>(id);
         self.memory.0.get(&key).map(|res| unsafe { res.as_inner() })
     }
 
-    pub fn get_memory_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        let key = self.memory_key::<T>();
+    pub fn get_memory_mut<T: 'static>(&mut self, id: UiId) -> Option<&mut T> {
+        let key = self.memory_key::<T>(id);
         self.memory
             .0
             .get_mut(&key)
             .map(|res| unsafe { res.as_inner_mut() })
     }
 
-    pub fn insert_memory<T: 'static>(&mut self, item: T) {
-        let key = self.memory_key::<T>();
+    pub fn insert_memory<T: 'static>(&mut self, id: UiId, item: T) {
+        let key = self.memory_key::<T>(id);
         self.memory.0.insert(key, ErasedMemoryEntry::new(item));
     }
 
-    pub fn remove_memory<T: 'static>(&mut self) -> Option<Box<T>> {
-        let key = self.memory_key::<T>();
+    pub fn remove_memory<T: 'static>(&mut self, id: UiId) -> Option<Box<T>> {
+        let key = self.memory_key::<T>(id);
         self.memory
             .0
             .remove(&key)
             .map(|res| unsafe { res.into_inner() })
     }
 
-    fn memory_key<T: 'static>(&self) -> (UiId, TypeId) {
-        (self.current_id(), TypeId::of::<T>())
+    fn memory_key<T: 'static>(&self, id: UiId) -> (UiId, TypeId) {
+        (id, TypeId::of::<T>())
     }
 
     fn vertical_scroll_bar(
@@ -876,7 +876,7 @@ impl<'a> Ui<'a> {
         let height = desc.height.unwrap_or(UiCoord::Percent(100));
         let width = width.as_abolute(self.ui.bounds.w);
         let height = height.as_abolute(self.ui.bounds.h);
-        let mut state = *self.get_memory_or_default::<ScrollState>();
+        let mut state = *self.get_memory_or_default::<ScrollState>(id);
 
         let line_height = self.theme.font_size + self.theme.text_padding;
 
@@ -917,7 +917,7 @@ impl<'a> Ui<'a> {
         }
         let offset_x = state.tx * state.content_width as f32;
         let offset_y = state.ty * state.content_height as f32;
-        self.insert_memory(state);
+        self.insert_memory(id, state);
 
         let old_bounds = self.ui.bounds;
         let scissor_bounds = UiRect {
@@ -952,7 +952,7 @@ impl<'a> Ui<'a> {
         let last_id = self.ui.id_stack.pop().unwrap();
         let children_bounds = self.history_bounding_rect(history_start);
 
-        let state = self.get_memory_mut::<ScrollState>().unwrap();
+        let state = self.get_memory_mut::<ScrollState>(id).unwrap();
 
         state.content_width = children_bounds.w;
         state.content_height = children_bounds.h;
@@ -972,7 +972,7 @@ impl<'a> Ui<'a> {
             self.vertical_scroll_bar(&scissor_bounds, scroll_bar_size, layer + 2, &mut state);
         }
         self.ui.id_stack.pop();
-        self.insert_memory(state);
+        self.insert_memory(id, state);
         self.submit_rect(id, scissor_bounds);
 
         self.ui.layer = layer;
@@ -1003,7 +1003,72 @@ impl<'a> Ui<'a> {
             h,
         }
     }
+
+    pub fn drag_source(&mut self, mut contents: impl FnMut(&mut Self)) -> DragResponse {
+        self.begin_widget();
+        let id = self.current_id();
+        let old_bounds = self.ui.bounds;
+
+        let mut state = self
+            .remove_memory::<DragState>(id)
+            .map(|x| *x)
+            .unwrap_or_default();
+        if self.is_active(id) {
+            if self.mouse_up() {
+                self.set_not_active(id);
+                state.pos = state.drag_anchor;
+            } else {
+                let drag_anchor = state.drag_anchor;
+                let drag_start = state.drag_start;
+
+                let offset = IVec2::new(
+                    (self.mouse.cursor_position.x - drag_start.x) as i32,
+                    (self.mouse.cursor_position.y - drag_start.y) as i32,
+                );
+
+                state.pos = drag_anchor + offset;
+            }
+        } else {
+            state.pos = IVec2::new(old_bounds.x, old_bounds.y);
+            if self.contains_mouse(id) && self.mouse_down() {
+                state.drag_start = self.mouse.cursor_position;
+                state.drag_anchor = IVec2::new(old_bounds.x, old_bounds.y);
+                self.set_active(id);
+            }
+        }
+
+        let history_start = self.ui.rect_history.len();
+        self.ui.bounds.x = state.pos.x;
+        self.ui.bounds.y = state.pos.y;
+        self.ui.bounds.w = state.size.x;
+        self.ui.bounds.h = state.size.y;
+        self.ui.layer += 1;
+        self.ui.id_stack.push(0);
+        ///////////////////////
+        contents(self);
+        ///////////////////////
+        self.ui.layer -= 1;
+        self.ui.id_stack.pop();
+        self.ui.bounds = old_bounds;
+        let bounds = self.history_bounding_rect(history_start);
+        self.submit_rect(id, bounds);
+        state.size = IVec2::new(bounds.w, bounds.h);
+
+        self.insert_memory(id, state);
+
+        DragResponse {}
+    }
 }
+
+#[derive(Debug, Default)]
+struct DragState {
+    pub drag_start: PhysicalPosition<f64>,
+    pub drag_anchor: IVec2,
+    pub pos: IVec2,
+    pub size: IVec2,
+}
+
+pub struct DragResponse {}
 
 /// If a field is None, then the area does not scroll on that axis
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -156,6 +156,9 @@ Maecenas ac convallis ligula, id interdum turpis.
                 },
             );
             ui.label("so goood");
+            ui.drag_source(|ui| {
+                ui.label("drag me");
+            });
         },
     );
 }
