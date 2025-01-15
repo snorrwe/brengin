@@ -156,8 +156,16 @@ Maecenas ac convallis ligula, id interdum turpis.
                 },
             );
             ui.label("so goood");
-            ui.drag_source(|ui| {
-                ui.label("drag me");
+            ui.grid(4, |cols| {
+                for col in 0..4 {
+                    cols.column(col, |ui| {
+                        for row in 0..4 {
+                            ui.drag_source(|ui| {
+                                ui.label(format!("drag me {col} {row}"));
+                            });
+                        }
+                    });
+                }
             });
         },
     );
