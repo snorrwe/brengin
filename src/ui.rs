@@ -1002,7 +1002,6 @@ impl<'a> Ui<'a> {
         if self.is_active(id) {
             if self.mouse_up() {
                 self.set_not_active(id);
-                state.pos = state.drag_anchor;
             } else {
                 is_being_dragged = true;
                 let drag_anchor = state.drag_anchor;
@@ -1020,7 +1019,6 @@ impl<'a> Ui<'a> {
             if !self.is_anything_active() && self.contains_mouse(id) && self.mouse_down() {
                 is_being_dragged = true;
                 state.drag_start = self.mouse.cursor_position;
-                state.drag_anchor = IVec2::new(old_bounds.x, old_bounds.y);
                 self.set_active(id);
             }
         }
@@ -1049,6 +1047,8 @@ impl<'a> Ui<'a> {
             self.ui.rect_history.push(content_bounds);
         } else {
             self.ui.rect_history.extend_from_slice(&child_history);
+            state.drag_anchor = IVec2::new(content_bounds.x, content_bounds.y);
+            state.pos = state.drag_anchor;
         }
 
         self.submit_rect(id, content_bounds);
