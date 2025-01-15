@@ -309,6 +309,11 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
+    pub fn is_anything_active(&self) -> bool {
+        self.ui.active != UiId::SENTINEL
+    }
+
+    #[inline]
     fn is_hovered(&self, id: UiId) -> bool {
         self.ui.hovered == id
     }
@@ -981,27 +986,7 @@ impl<'a> Ui<'a> {
     }
 
     fn history_bounding_rect(&self, history_start: usize) -> UiRect {
-        let mut max_x = std::i32::MIN;
-        let mut min_x = std::i32::MAX;
-        let mut max_y = std::i32::MIN;
-        let mut min_y = std::i32::MAX;
-        for r in &self.ui.rect_history[history_start..] {
-            min_x = min_x.min(r.x);
-            max_x = max_x.max(r.x_end());
-
-            min_y = min_y.min(r.y);
-            max_y = max_y.max(r.y_end());
-        }
-
-        let w = max_x - min_x;
-        let h = max_y - min_y;
-
-        UiRect {
-            x: min_x + w / 2,
-            y: min_y + h / 2,
-            w,
-            h,
-        }
+        bounding_rect(&self.ui.rect_history[history_start..])
     }
 
     pub fn drag_source(&mut self, mut contents: impl FnMut(&mut Self)) -> DragResponse {
@@ -1013,11 +998,13 @@ impl<'a> Ui<'a> {
             .remove_memory::<DragState>(id)
             .map(|x| *x)
             .unwrap_or_default();
+        let mut is_being_dragged = false;
         if self.is_active(id) {
             if self.mouse_up() {
                 self.set_not_active(id);
                 state.pos = state.drag_anchor;
             } else {
+                is_being_dragged = true;
                 let drag_anchor = state.drag_anchor;
                 let drag_start = state.drag_start;
 
@@ -1030,18 +1017,21 @@ impl<'a> Ui<'a> {
             }
         } else {
             state.pos = IVec2::new(old_bounds.x, old_bounds.y);
-            if self.contains_mouse(id) && self.mouse_down() {
+            if !self.is_anything_active() && self.contains_mouse(id) && self.mouse_down() {
+                is_being_dragged = true;
                 state.drag_start = self.mouse.cursor_position;
                 state.drag_anchor = IVec2::new(old_bounds.x, old_bounds.y);
                 self.set_active(id);
             }
         }
 
-        let history_start = self.ui.rect_history.len();
+        let history = std::mem::take(&mut self.ui.rect_history);
         self.ui.bounds.x = state.pos.x;
         self.ui.bounds.y = state.pos.y;
         self.ui.bounds.w = state.size.x;
         self.ui.bounds.h = state.size.y;
+        let last_scissor = self.ui.scissor_idx;
+        self.push_scissor(self.ui.bounds);
         self.ui.layer += 1;
         self.ui.id_stack.push(0);
         ///////////////////////
@@ -1050,13 +1040,23 @@ impl<'a> Ui<'a> {
         self.ui.layer -= 1;
         self.ui.id_stack.pop();
         self.ui.bounds = old_bounds;
-        let bounds = self.history_bounding_rect(history_start);
-        self.submit_rect(id, bounds);
-        state.size = IVec2::new(bounds.w, bounds.h);
+        self.ui.scissor_idx = last_scissor;
+        let child_history = std::mem::replace(&mut self.ui.rect_history, history);
+        let mut content_bounds = bounding_rect(&child_history);
+        if is_being_dragged {
+            content_bounds.x = state.drag_anchor.x;
+            content_bounds.y = state.drag_anchor.y;
+            self.ui.rect_history.push(content_bounds);
+        } else {
+            self.ui.rect_history.extend_from_slice(&child_history);
+        }
+
+        self.submit_rect(id, content_bounds);
+        state.size = IVec2::new(content_bounds.w, content_bounds.h);
 
         self.insert_memory(id, state);
 
-        DragResponse {}
+        DragResponse { is_being_dragged }
     }
 }
 
@@ -1068,7 +1068,10 @@ struct DragState {
     pub size: IVec2,
 }
 
-pub struct DragResponse {}
+#[derive(Debug, Clone, Copy)]
+pub struct DragResponse {
+    pub is_being_dragged: bool,
+}
 
 /// If a field is None, then the area does not scroll on that axis
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1586,4 +1589,28 @@ struct ScrollState {
     pub ty: f32,
     pub content_width: i32,
     pub content_height: i32,
+}
+
+fn bounding_rect(history: &[UiRect]) -> UiRect {
+    let mut max_x = std::i32::MIN;
+    let mut min_x = std::i32::MAX;
+    let mut max_y = std::i32::MIN;
+    let mut min_y = std::i32::MAX;
+    for r in history {
+        min_x = min_x.min(r.x);
+        max_x = max_x.max(r.x_end());
+
+        min_y = min_y.min(r.y);
+        max_y = max_y.max(r.y_end());
+    }
+
+    let w = max_x - min_x;
+    let h = max_y - min_y;
+
+    UiRect {
+        x: min_x + w / 2,
+        y: min_y + h / 2,
+        w,
+        h,
+    }
 }
