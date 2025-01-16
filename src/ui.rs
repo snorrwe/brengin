@@ -1000,10 +1000,13 @@ impl<'a> Ui<'a> {
             .unwrap_or_default();
         let mut is_being_dragged = false;
         if self.is_active(id) {
+            // mark as dragged even if it was just released,
+            // otherwise the parent bounds will end
+            // up weird for 1 frame
+            is_being_dragged = true;
             if self.mouse_up() {
                 self.set_not_active(id);
             } else {
-                is_being_dragged = true;
                 let drag_anchor = state.drag_anchor;
                 let drag_start = state.drag_start;
 
