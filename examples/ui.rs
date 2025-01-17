@@ -155,7 +155,7 @@ Maecenas ac convallis ligula, id interdum turpis.
                     ui.label("epic widget dude");
                 },
             );
-            ui.label("so goood");
+            ui.label("start drag");
             ui.grid(4, |cols| {
                 for col in 0..4 {
                     cols.column(col, |ui| {
@@ -167,6 +167,7 @@ Maecenas ac convallis ligula, id interdum turpis.
                     });
                 }
             });
+            ui.label("end drag");
         },
     );
 }
