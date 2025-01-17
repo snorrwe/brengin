@@ -1406,7 +1406,10 @@ impl<'a> UiRoot<'a> {
 
                 state.pos = drag_anchor + offset;
             } else {
-                if self.0.contains_mouse(title_id) && self.0.mouse_down() {
+                if !self.0.is_anything_active()
+                    && self.0.contains_mouse(title_id)
+                    && self.0.mouse_down()
+                {
                     let state: &mut WindowState = self.0.ui.windows.get_mut(desc.name).unwrap();
                     state.drag_start = self.0.mouse.cursor_position;
                     state.drag_anchor = state.pos;
