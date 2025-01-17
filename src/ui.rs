@@ -1069,10 +1069,12 @@ impl<'a> Ui<'a> {
         self.ui.layer = layer;
         self.ui.id_stack.pop();
         self.ui.bounds = old_bounds;
-        self.ui.scissor_idx = last_scissor;
         let child_history = std::mem::replace(&mut self.ui.rect_history, history);
         let mut content_bounds = bounding_rect(&child_history);
+
         if is_being_dragged {
+            self.color_rect_from_rect(content_bounds, self.theme.primary_color, layer);
+            self.ui.rect_history.pop();
             content_bounds.move_to_x(state.drag_anchor.x + state.size.x / 2);
             content_bounds.move_to_y(state.drag_anchor.y + state.size.y / 2);
             self.ui.rect_history.push(content_bounds);
@@ -1081,6 +1083,7 @@ impl<'a> Ui<'a> {
             state.drag_anchor = IVec2::new(content_bounds.min_x, content_bounds.min_y);
             state.pos = state.drag_anchor;
         }
+        self.ui.scissor_idx = last_scissor;
 
         self.submit_rect(id, content_bounds);
         state.size = IVec2::new(content_bounds.width(), content_bounds.height());
@@ -1411,11 +1414,8 @@ impl<'a> UiRoot<'a> {
                 }
             }
             self.0.submit_rect(title_id, title_bounds);
-            self.0.color_rect_from_rect(
-                title_bounds,
-                0x00ffffff,
-                WINDOW_LAYER,
-            );
+            self.0
+                .color_rect_from_rect(title_bounds, 0x00ffffff, WINDOW_LAYER);
         }
         ///////////////////////
         ///////////////////////
