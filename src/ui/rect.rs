@@ -1,3 +1,5 @@
+use super::div_half_ceil;
+
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UiRect {
     /// center x
@@ -39,29 +41,29 @@ impl UiRect {
 
     #[inline]
     pub fn y_start(self) -> i32 {
-        self.y - self.h
+        self.y - self.h / 2
     }
 
     #[inline]
     pub fn x_start(self) -> i32 {
-        self.x - self.w
+        self.x - self.w / 2
     }
 
     #[inline]
     pub fn y_end(self) -> i32 {
-        self.y + self.h
+        self.y + div_half_ceil(self.h)
     }
 
     #[inline]
     pub fn x_end(self) -> i32 {
-        self.x + self.w
+        self.x + div_half_ceil(self.w)
     }
 
     pub fn contains_point(&self, x: i32, y: i32) -> bool {
         let dx = x as i64 - self.x as i64;
         let dy = y as i64 - self.y as i64;
 
-        0 <= dx && dx < self.w as i64 && 0 <= dy && dy < self.h as i64
+        0 <= dx && dx < div_half_ceil(self.w) as i64 && 0 <= dy && dy < div_half_ceil(self.h) as i64
     }
 }
 
