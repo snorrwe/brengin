@@ -901,10 +901,14 @@ impl<'a> Ui<'a> {
     pub fn scroll_area(&mut self, desc: ScrollDescriptor, mut contents: impl FnMut(&mut Self)) {
         self.begin_widget();
         let id = self.current_id();
-        let width = desc.width.unwrap_or(UiCoord::Percent(100));
-        let height = desc.height.unwrap_or(UiCoord::Percent(100));
-        let width = width.as_abolute(self.ui.bounds.width());
-        let height = height.as_abolute(self.ui.bounds.height());
+        let width = desc
+            .width
+            .unwrap_or(UiCoord::Percent(100))
+            .as_abolute(self.ui.bounds.width());
+        let height = desc
+            .height
+            .unwrap_or(UiCoord::Percent(100))
+            .as_abolute(self.ui.bounds.height());
         let mut state = *self.get_memory_or_default::<ScrollState>(id);
 
         let line_height = self.theme.font_size + self.theme.text_padding;
@@ -1631,11 +1635,14 @@ fn bounding_rect(history: &[UiRect]) -> UiRect {
         return Default::default();
     }
 
-    let mut max_x = std::i32::MIN;
-    let mut min_x = std::i32::MAX;
-    let mut max_y = std::i32::MIN;
-    let mut min_y = std::i32::MAX;
-    for r in history {
+    let UiRect {
+        mut min_x,
+        mut min_y,
+        mut max_x,
+        mut max_y,
+    } = history[0];
+
+    for r in &history[1..] {
         min_x = min_x.min(r.min_x);
         max_x = max_x.max(r.max_x);
 
