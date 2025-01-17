@@ -1065,12 +1065,13 @@ impl<'a> Ui<'a> {
             UiRect::from_pos_size(state.pos.x, state.pos.y, state.size.x, state.size.y);
         let last_scissor = self.ui.scissor_idx;
         self.push_scissor(self.ui.bounds);
+        let layer = self.ui.layer;
         self.ui.layer += 1;
         self.ui.id_stack.push(0);
         ///////////////////////
         contents(self);
         ///////////////////////
-        self.ui.layer -= 1;
+        self.ui.layer = layer;
         self.ui.id_stack.pop();
         self.ui.bounds = old_bounds;
         self.ui.scissor_idx = last_scissor;
