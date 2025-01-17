@@ -54,18 +54,20 @@ impl UiRect {
         self.max_y - self.min_y
     }
 
+    /// shrink by `v` units
     pub fn shrink_x(&mut self, v: i32) {
-        self.min_x += v;
-        self.max_x -= v;
+        self.min_x += v / 2;
+        self.max_x -= div_half_ceil(v);
 
         if self.min_x > self.max_x {
             std::mem::swap(&mut self.max_x, &mut self.min_x);
         }
     }
 
+    /// shrink by `v` units
     pub fn shrink_y(&mut self, v: i32) {
-        self.min_y += v;
-        self.max_y -= v;
+        self.min_y += v / 2;
+        self.max_y -= div_half_ceil(v);
 
         if self.min_y > self.max_y {
             std::mem::swap(&mut self.max_y, &mut self.min_y);
@@ -100,5 +102,15 @@ impl UiRect {
         let delta = y - self.center_y();
         self.min_y += delta;
         self.max_y += delta;
+    }
+
+    pub fn resize_w(&mut self, new_width: i32) {
+        let delta = new_width - self.width();
+        self.grow_x(delta);
+    }
+
+    pub fn resize_h(&mut self, new_height: i32) {
+        let delta = new_height - self.height();
+        self.grow_y(delta);
     }
 }
