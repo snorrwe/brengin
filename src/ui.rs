@@ -271,6 +271,10 @@ impl<'a> Ui<'a> {
         self.ui.active = id;
     }
 
+    pub fn clear_active(&mut self) {
+        self.ui.active = UiId::SENTINEL;
+    }
+
     #[inline]
     fn parent(&self) -> IdxType {
         if self.ui.id_stack.len() >= 2 {
