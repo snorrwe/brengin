@@ -761,12 +761,12 @@ impl<'a> Ui<'a> {
         self.begin_widget();
 
         // bar
-        let bounds = UiRect::from_pos_size(
-            scissor_bounds.max_x.saturating_sub(scroll_bar_width),
-            scissor_bounds.center_y(),
-            scroll_bar_width,
-            scissor_bounds.height(),
-        );
+        let bounds = UiRect {
+            min_x: scissor_bounds.max_x - scroll_bar_width,
+            min_y: scissor_bounds.min_y,
+            max_x: scissor_bounds.max_x,
+            max_y: scissor_bounds.max_y,
+        };
         self.color_rect(
             bounds.min_x,
             bounds.min_y,
@@ -783,7 +783,7 @@ impl<'a> Ui<'a> {
         let id = self.current_id();
         let active = self.is_active(id);
         let contains_mouse = self.contains_mouse(id);
-        let mut y = scissor_bounds.min_y - (scissor_bounds.height() as f32 * t) as i32;
+        let mut y = scissor_bounds.min_y + (scissor_bounds.height() as f32 * t) as i32;
         if active {
             if self.mouse_up() {
                 self.set_not_active(id);
@@ -794,8 +794,8 @@ impl<'a> Ui<'a> {
                     scissor_bounds.max_y - scroll_bar_width,
                 );
                 y = coord as i32;
-                parent_state.ty =
-                    -(y - scissor_bounds.min_y) as f32 / scissor_bounds.height() as f32;
+                parent_state.ty = (y - scissor_bounds.min_y) as f32
+                    / (scissor_bounds.height() - scroll_bar_width) as f32;
             }
         } else if self.is_hovered(id) {
             if !contains_mouse {
@@ -835,12 +835,12 @@ impl<'a> Ui<'a> {
         self.begin_widget();
 
         // bar
-        let bounds = UiRect::from_pos_size(
-            scissor_bounds.center_x(),
-            scissor_bounds.max_y.saturating_sub(scroll_bar_height),
-            scissor_bounds.width(),
-            scroll_bar_height,
-        );
+        let bounds = UiRect {
+            min_x: scissor_bounds.min_x,
+            min_y: scissor_bounds.max_y - scroll_bar_height,
+            max_x: scissor_bounds.max_x,
+            max_y: scissor_bounds.max_y,
+        };
         self.color_rect(
             bounds.min_x,
             bounds.min_y,
@@ -855,10 +855,9 @@ impl<'a> Ui<'a> {
         // pip
         let t = parent_state.tx;
         let id = self.current_id();
-        let active = self.is_active(id);
         let contains_mouse = self.contains_mouse(id);
-        let mut x = scissor_bounds.center_x() - (scissor_bounds.width() as f32 * t) as i32;
-        if active {
+        let mut x = scissor_bounds.min_x + (scissor_bounds.width() as f32 * t) as i32;
+        if self.is_active(id) {
             if self.mouse_up() {
                 self.set_not_active(id);
             } else {
@@ -868,8 +867,8 @@ impl<'a> Ui<'a> {
                     scissor_bounds.max_x - scroll_bar_height,
                 );
                 x = coord as i32;
-                parent_state.tx =
-                    -(x - scissor_bounds.min_x) as f32 / scissor_bounds.width() as f32;
+                parent_state.tx = (x - scissor_bounds.min_x) as f32
+                    / (scissor_bounds.width() - scroll_bar_height) as f32;
             }
         } else if self.is_hovered(id) {
             if !contains_mouse {
@@ -878,15 +877,15 @@ impl<'a> Ui<'a> {
                 self.set_active(id);
             }
         }
-        if contains_mouse {
+        if contains_mouse && !self.is_anything_active() {
             self.set_hovered(id);
         }
-        let control_box = UiRect::from_pos_size(
-            x,
-            scissor_bounds.max_y.saturating_sub(scroll_bar_height),
-            scroll_bar_height,
-            scroll_bar_height,
-        );
+        let control_box = UiRect {
+            min_x: x,
+            min_y: scissor_bounds.max_y - scroll_bar_height,
+            max_x: x + scroll_bar_height,
+            max_y: scissor_bounds.max_y,
+        };
         self.color_rect(
             control_box.min_x,
             control_box.min_y,
@@ -919,10 +918,10 @@ impl<'a> Ui<'a> {
                 for ds in self.mouse.scroll.iter() {
                     match ds {
                         MouseScrollDelta::LineDelta(_, dy) => {
-                            dt += *dy / line_height as f32;
+                            dt -= *dy / line_height as f32;
                         }
                         MouseScrollDelta::PixelDelta(physical_position) => {
-                            dt += physical_position.y as f32;
+                            dt -= physical_position.y as f32;
                         }
                     }
                 }
@@ -944,7 +943,7 @@ impl<'a> Ui<'a> {
                     *t += dt;
                     // TODO: animation at edge?
                     // TODO: the min needs work, doesn't work as intended
-                    *t = t.clamp(-1.0 + 1.0 / (line_height as f32), 0.0);
+                    *t = t.clamp(0.0, 1.0 - 1.0 / (line_height as f32));
                 }
             }
         }
@@ -959,8 +958,8 @@ impl<'a> Ui<'a> {
         let scissor_bounds = scissor_bounds;
 
         let mut bounds = scissor_bounds;
-        bounds.offset_x(offset_x as i32);
-        bounds.offset_y(offset_y as i32);
+        bounds.offset_x(-offset_x as i32);
+        bounds.offset_y(-offset_y as i32);
         if desc.width.is_some() {
             bounds.shrink_x(self.theme.scroll_bar_size as i32);
         }
@@ -1001,7 +1000,7 @@ impl<'a> Ui<'a> {
             let mut scissor_bounds = scissor_bounds;
             if desc.height.is_some() {
                 // prevent overlap
-                scissor_bounds.shrink_x(scroll_bar_size);
+                scissor_bounds.max_x -= scroll_bar_size;
             }
             self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_size, layer + 2, &mut state);
         }
