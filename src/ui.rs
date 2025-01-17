@@ -1357,7 +1357,7 @@ impl<'a> UiRoot<'a> {
             min_x: state.pos.x,
             min_y: state.pos.y + self.0.theme.window_title_height as i32,
             max_x: state.pos.x + width,
-            max_y: state.pos.y + height,
+            max_y: state.pos.y + self.0.theme.window_title_height as i32 + height,
         };
         let title_bounds = UiRect {
             min_x: state.pos.x,
