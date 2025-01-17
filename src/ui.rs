@@ -1354,18 +1354,18 @@ impl<'a> UiRoot<'a> {
         let padding = self.0.theme.window_padding as i32;
         let width = state.size.x;
         let height = state.size.y - self.0.theme.window_title_height as i32;
-        let bounds = UiRect::from_pos_size(
-            state.pos.x,
-            state.pos.y + self.0.theme.window_title_height as i32,
-            width,
-            height,
-        );
-        let title_bounds = UiRect::from_pos_size(
-            state.pos.x,
-            state.pos.y,
-            width + 2 * padding,
-            self.0.theme.window_title_height as i32,
-        );
+        let bounds = UiRect {
+            min_x: state.pos.x,
+            min_y: state.pos.y + self.0.theme.window_title_height as i32,
+            max_x: state.pos.x + width,
+            max_y: state.pos.y + height,
+        };
+        let title_bounds = UiRect {
+            min_x: state.pos.x,
+            min_y: state.pos.y,
+            max_x: state.pos.x + width + 2 * padding,
+            max_y: state.pos.y + self.0.theme.window_title_height as i32,
+        };
 
         self.0.ui.root_hash = fnv_1a(desc.name.as_bytes());
         let old_bounds = self.0.ui.bounds;
