@@ -34,6 +34,14 @@ impl UiRect {
         }
     }
 
+    pub fn grow_over_point(mut self, x: i32, y: i32) -> Self {
+        self.min_x = self.min_x.min(x);
+        self.max_x = self.max_x.max(x);
+        self.min_y = self.min_y.min(y);
+        self.max_y = self.max_y.max(y);
+        self
+    }
+
     pub fn contains_point(&self, x: i32, y: i32) -> bool {
         self.min_x <= x && x <= self.max_x && self.min_y <= y && y <= self.max_y
     }
