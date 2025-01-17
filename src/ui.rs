@@ -1194,7 +1194,7 @@ impl<'a> Columns<'a> {
     }
 }
 
-fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) {
+fn begin_frame(mut ui: ResMut<UiState>, window_size: Res<crate::renderer::WindowSize>) {
     ui.layout_dir = LayoutDirection::TopDown;
     ui.root_hash = 0;
     ui.rect_history.clear();
@@ -1203,8 +1203,8 @@ fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) 
     ui.bounds = UiRect {
         min_x: 0,
         min_y: 0,
-        max_x: size.width as i32,
-        max_y: size.height as i32,
+        max_x: window_size.width as i32,
+        max_y: window_size.height as i32,
     };
     let b = ui.bounds;
     ui.scissors.clear();
@@ -1450,7 +1450,9 @@ impl<'a> UiRoot<'a> {
         let height = desc.height.as_abolute(self.0.ui.bounds.height());
 
         let old_bounds = self.0.ui.bounds;
-        let mut bounds = UiRect::from_pos_size(0, 0, width, height);
+        let mut bounds = old_bounds;
+        bounds.resize_w(width);
+        bounds.resize_h(height);
 
         match desc.horizonal {
             HorizontalAlignment::Left => {}
