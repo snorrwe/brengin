@@ -1455,18 +1455,24 @@ impl<'a> UiRoot<'a> {
         bounds.resize_h(height);
 
         match desc.horizonal {
-            HorizontalAlignment::Left => {}
+            HorizontalAlignment::Left => {
+                let delta = -bounds.min_x;
+                bounds.offset_x(delta);
+            }
             HorizontalAlignment::Right => {
-                bounds.move_to_x(old_bounds.width().saturating_sub(width + 1) as i32);
+                let delta = old_bounds.max_x - bounds.max_x;
+                bounds.offset_x(delta);
             }
-            HorizontalAlignment::Center => {
-                bounds.move_to_x((old_bounds.width() / 2).saturating_sub(width / 2) as i32);
-            }
+            HorizontalAlignment::Center => {}
         }
         match desc.vertical {
-            VerticalAlignment::Top => {}
+            VerticalAlignment::Top => {
+                let delta = -bounds.min_y;
+                bounds.offset_y(delta);
+            }
             VerticalAlignment::Bottom => {
-                bounds.move_to_y(old_bounds.height().saturating_sub(height + 1) as i32);
+                let delta = old_bounds.max_y - bounds.max_y;
+                bounds.offset_y(delta);
             }
             VerticalAlignment::Center => {
                 bounds.move_to_y((old_bounds.height() / 2).saturating_sub(height / 2) as i32);
