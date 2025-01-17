@@ -437,6 +437,17 @@ impl<'a> Ui<'a> {
         self.submit_rect_group(history_start);
     }
 
+    pub fn color_rect_from_rect(&mut self, rect: UiRect, color: Color, layer: u16) {
+        self.color_rect(
+            rect.min_x,
+            rect.min_y,
+            rect.width(),
+            rect.height(),
+            color,
+            layer,
+        );
+    }
+
     pub fn color_rect(
         &mut self,
         x: i32,
@@ -777,14 +788,7 @@ impl<'a> Ui<'a> {
             max_x: scissor_bounds.max_x,
             max_y: scissor_bounds.max_y,
         };
-        self.color_rect(
-            bounds.min_x,
-            bounds.min_y,
-            bounds.width(),
-            bounds.height(),
-            0xFF0000FF,
-            layer,
-        );
+        self.color_rect_from_rect(bounds, 0xFF0000FF, layer);
         let id = self.current_id();
         self.ui.bounding_boxes.insert(id, bounds);
 
@@ -824,14 +828,7 @@ impl<'a> Ui<'a> {
             max_x: scissor_bounds.max_x,
             max_y: y + scroll_bar_width,
         };
-        self.color_rect(
-            control_box.min_x,
-            control_box.min_y,
-            control_box.width(),
-            control_box.height(),
-            0xFF0AA0FF,
-            layer + 1,
-        );
+        self.color_rect_from_rect(control_box, 0xFF0AA0FF, layer + 1);
         self.ui.bounding_boxes.insert(id, control_box);
     }
 
@@ -851,14 +848,7 @@ impl<'a> Ui<'a> {
             max_x: scissor_bounds.max_x,
             max_y: scissor_bounds.max_y,
         };
-        self.color_rect(
-            bounds.min_x,
-            bounds.min_y,
-            bounds.width(),
-            bounds.height(),
-            0xaaFF00FF,
-            layer,
-        );
+        self.color_rect_from_rect(bounds, 0xaaFF00FF, layer);
         let id = self.current_id();
         self.ui.bounding_boxes.insert(id, bounds);
 
@@ -896,14 +886,7 @@ impl<'a> Ui<'a> {
             max_x: x + scroll_bar_height,
             max_y: scissor_bounds.max_y,
         };
-        self.color_rect(
-            control_box.min_x,
-            control_box.min_y,
-            control_box.width(),
-            control_box.height(),
-            0xFF0AA0FF,
-            layer + 1,
-        );
+        self.color_rect_from_rect(control_box, 0xFF0AA0FF, layer + 1);
         self.ui.bounding_boxes.insert(id, control_box);
     }
 
@@ -1428,11 +1411,8 @@ impl<'a> UiRoot<'a> {
                 }
             }
             self.0.submit_rect(title_id, title_bounds);
-            self.0.color_rect(
-                title_bounds.min_x,
-                title_bounds.min_y,
-                title_bounds.width(),
-                title_bounds.height(),
+            self.0.color_rect_from_rect(
+                title_bounds,
                 0x00ffffff,
                 WINDOW_LAYER,
             );
