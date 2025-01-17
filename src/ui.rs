@@ -552,15 +552,19 @@ impl<'a> Ui<'a> {
         let padding = self.theme.padding as i32;
         let [x, y] = [x + padding, y + padding];
         let mut text_y = y;
-        for line in label.split('\n').filter(|l| !l.is_empty()) {
+        let mut line_height = 0;
+        for line in label.split('\n') {
+            if line.is_empty() {
+                text_y += line_height;
+                continue;
+            }
             let (handle, e) =
                 self.shape_and_draw_line(line.to_owned(), self.theme.font_size as u32);
             let pic = &e.texture;
             let line_width = pic.width() as i32;
-            let line_height = pic.height() as i32;
+            line_height = pic.height() as i32;
             w = w.max(line_width);
             h += line_height;
-            let ph = pic.height() as i32;
 
             self.text_rect(
                 x,
@@ -571,7 +575,7 @@ impl<'a> Ui<'a> {
                 layer + 1,
                 handle,
             );
-            text_y += ph;
+            text_y += line_height;
         }
         let rect = UiRect { x, y, w, h };
         self.submit_rect(id, rect);
