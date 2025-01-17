@@ -1608,10 +1608,10 @@ fn bounding_rect(history: &[UiRect]) -> UiRect {
     let mut max_y = std::i32::MIN;
     let mut min_y = std::i32::MAX;
     for r in history {
-        min_x = min_x.min(r.x);
+        min_x = min_x.min(r.x_start());
         max_x = max_x.max(r.x_end());
 
-        min_y = min_y.min(r.y);
+        min_y = min_y.min(r.y_start());
         max_y = max_y.max(r.y_end());
     }
 

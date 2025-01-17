@@ -38,6 +38,16 @@ impl UiRect {
     }
 
     #[inline]
+    pub fn y_start(self) -> i32 {
+        self.y - self.h
+    }
+
+    #[inline]
+    pub fn x_start(self) -> i32 {
+        self.x - self.w
+    }
+
+    #[inline]
     pub fn y_end(self) -> i32 {
         self.y + self.h
     }
