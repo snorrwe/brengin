@@ -949,30 +949,23 @@ impl<'a> Ui<'a> {
         self.insert_memory(id, state);
 
         let old_bounds = self.ui.bounds;
-        let scissor_bounds =
-            UiRect::from_pos_size(old_bounds.center_x(), old_bounds.center_y(), width, height);
+        let mut scissor_bounds = old_bounds;
+        scissor_bounds.resize_w(width);
+        scissor_bounds.resize_h(height);
+        let scissor_bounds = scissor_bounds;
+
         let mut bounds = scissor_bounds;
         bounds.offset_x(offset_x as i32);
         bounds.offset_y(offset_y as i32);
         if desc.width.is_some() {
-            bounds.shrink_x(
-                bounds
-                    .width()
-                    .saturating_sub(self.theme.scroll_bar_size as i32),
-            );
+            bounds.shrink_x(self.theme.scroll_bar_size as i32);
         }
         if desc.height.is_some() {
-            bounds.shrink_y(
-                bounds
-                    .height()
-                    .saturating_sub(self.theme.scroll_bar_size as i32),
-            );
+            bounds.shrink_y(self.theme.scroll_bar_size as i32);
         }
 
         self.ui.bounds = bounds;
-        let scissor_idx = self.ui.scissor_idx;
-        self.ui.scissor_idx = self.ui.scissors.len() as u32;
-        self.ui.scissors.push(scissor_bounds);
+        let scissor_idx = self.push_scissor(scissor_bounds);
 
         let layer = self.ui.layer;
         self.ui.layer += 1;
