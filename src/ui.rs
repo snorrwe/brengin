@@ -818,7 +818,7 @@ impl<'a> Ui<'a> {
                 self.set_active(id);
             }
         }
-        if contains_mouse {
+        if !self.is_anything_active() && contains_mouse {
             self.set_hovered(id);
         }
         let x = scissor_bounds.max_x.saturating_sub(scroll_bar_width);
