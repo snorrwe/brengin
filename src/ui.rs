@@ -1019,10 +1019,10 @@ impl<'a> Ui<'a> {
         }
         self.ui.id_stack.pop();
         self.insert_memory(id, state);
+        self.ui.bounds = old_bounds;
         self.submit_rect(id, scissor_bounds);
 
         self.ui.layer = layer;
-        self.ui.bounds = old_bounds;
         self.ui.scissor_idx = scissor_idx;
     }
 
