@@ -1082,8 +1082,8 @@ impl<'a> Ui<'a> {
         let child_history = std::mem::replace(&mut self.ui.rect_history, history);
         let mut content_bounds = bounding_rect(&child_history);
         if is_being_dragged {
-            content_bounds.move_to_x(state.drag_anchor.x);
-            content_bounds.move_to_y(state.drag_anchor.y);
+            content_bounds.move_to_x(state.drag_anchor.x + state.size.x / 2);
+            content_bounds.move_to_y(state.drag_anchor.y + state.size.y / 2);
             self.ui.rect_history.push(content_bounds);
         } else {
             self.ui.rect_history.extend_from_slice(&child_history);
