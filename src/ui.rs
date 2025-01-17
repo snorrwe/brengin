@@ -593,12 +593,10 @@ impl<'a> Ui<'a> {
             LayoutDirection::TopDown => {
                 let dy = rect.height() + 2 * padding;
                 self.ui.bounds.min_y += dy;
-                self.ui.bounds.max_y = self.ui.bounds.max_y.saturating_sub(dy);
             }
             LayoutDirection::LeftRight => {
                 let dx = rect.width() + 2 * padding;
                 self.ui.bounds.min_x += dx;
-                self.ui.bounds.max_x = self.ui.bounds.max_x.saturating_sub(dx);
             }
         }
         self.ui.bounding_boxes.insert(id, rect);
@@ -641,8 +639,8 @@ impl<'a> Ui<'a> {
         // shape the text
         let mut w = 0;
         let mut h = 0;
-        let x = self.ui.bounds.center_x();
-        let y = self.ui.bounds.center_y();
+        let x = self.ui.bounds.min_x;
+        let y = self.ui.bounds.min_y;
         let padding = self.theme.padding as i32;
         let [x, y] = [x + padding, y + padding];
         let text_padding = self.theme.text_padding as i32;
@@ -689,7 +687,12 @@ impl<'a> Ui<'a> {
         let h = h + 2 * text_padding;
         self.color_rect(x, y, w, h, color, layer);
 
-        let rect = UiRect::from_pos_size(x, y, w, h);
+        let rect = UiRect {
+            min_x: x,
+            min_y: y,
+            max_x: x + w,
+            max_y: y + h,
+        };
         self.submit_rect(id, rect);
         ButtonResponse {
             hovered: self.ui.hovered == id,
@@ -1176,6 +1179,7 @@ impl<'a> Columns<'a> {
         let layer = ctx.ui.layer;
         ctx.ui.layer += 1;
         ctx.ui.id_stack.push(0);
+        let history_start = ctx.ui.rect_history.len();
 
         ///////////////////////
         contents(ctx);
@@ -1183,7 +1187,7 @@ impl<'a> Columns<'a> {
 
         // restore state
         ctx.ui.id_stack.pop();
-        let rect = ctx.ui.bounds;
+        let rect = ctx.history_bounding_rect(history_start);
         ctx.ui.bounds.min_y = bounds.min_y;
         ctx.ui.bounds.max_y = bounds.max_y;
         if rect.width() > w && i + 1 < self.cols {
