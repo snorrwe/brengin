@@ -10,4 +10,4 @@ linker = "rust-lld.exe"
 rustflags = ["-Zshare-generics=y"]
 
 [profile.dev]
-debug = 1
+debug = true
