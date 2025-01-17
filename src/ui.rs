@@ -632,7 +632,7 @@ impl<'a> Ui<'a> {
                 self.set_active(id);
             }
         }
-        if contains_mouse {
+        if contains_mouse && !self.is_anything_active() {
             self.set_hovered(id);
         }
 
