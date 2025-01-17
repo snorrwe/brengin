@@ -1654,9 +1654,5 @@ fn bounding_rect(history: &[UiRect]) -> UiRect {
 fn div_half_ceil(n: i32) -> i32 {
     let d = n / 2;
     let r = n % 2;
-    if r > 0 {
-        d + 1
-    } else {
-        d
-    }
+    d + r
 }
