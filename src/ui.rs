@@ -468,9 +468,12 @@ impl<'a> Ui<'a> {
         layer: u16,
         shaping: Handle<ShapingResult>,
     ) {
-        self.ui
-            .rect_history
-            .push(UiRect::from_pos_size(x, y, width, height));
+        self.ui.rect_history.push(UiRect {
+            min_x: x,
+            min_y: y,
+            max_x: x + width,
+            max_y: y + height,
+        });
         assert!(!self.ui.scissors.is_empty());
         let scissor = self.ui.scissor_idx;
         self.ui.text_rects.push(DrawTextRect {
