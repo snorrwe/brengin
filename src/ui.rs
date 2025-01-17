@@ -1062,6 +1062,9 @@ impl<'a> Ui<'a> {
         self.push_scissor(self.ui.bounds);
         let layer = self.ui.layer;
         self.ui.layer += 1;
+        if is_being_dragged {
+            self.ui.layer += 100;
+        }
         self.ui.id_stack.push(0);
         ///////////////////////
         contents(self);
