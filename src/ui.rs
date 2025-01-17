@@ -768,8 +768,8 @@ impl<'a> Ui<'a> {
             scissor_bounds.height(),
         );
         self.color_rect(
-            bounds.center_x(),
-            bounds.center_y(),
+            bounds.min_x,
+            bounds.min_y,
             bounds.width(),
             bounds.height(),
             0xFF0000FF,
@@ -815,8 +815,8 @@ impl<'a> Ui<'a> {
             max_y: y + scroll_bar_width,
         };
         self.color_rect(
-            control_box.center_x(),
-            control_box.center_y(),
+            control_box.min_x,
+            control_box.min_y,
             control_box.width(),
             control_box.height(),
             0xFF0AA0FF,
@@ -842,8 +842,8 @@ impl<'a> Ui<'a> {
             scroll_bar_height,
         );
         self.color_rect(
-            bounds.center_x(),
-            bounds.center_y(),
+            bounds.min_x,
+            bounds.min_y,
             bounds.width(),
             bounds.height(),
             0xaaFF00FF,
@@ -888,8 +888,8 @@ impl<'a> Ui<'a> {
             scroll_bar_height,
         );
         self.color_rect(
-            control_box.center_x(),
-            control_box.center_y(),
+            control_box.min_x,
+            control_box.min_y,
             control_box.width(),
             control_box.height(),
             0xFF0AA0FF,
@@ -974,8 +974,8 @@ impl<'a> Ui<'a> {
         let layer = self.ui.layer;
         self.ui.layer += 1;
         self.color_rect(
-            bounds.center_x(),
-            bounds.center_y(),
+            bounds.min_x,
+            bounds.min_y,
             width,
             height,
             0x04a5e5ff,
@@ -1372,8 +1372,8 @@ impl<'a> UiRoot<'a> {
         self.0.ui.layer = WINDOW_LAYER;
         // window background
         self.0.color_rect(
-            bounds.center_x(),
-            bounds.center_y(),
+            bounds.min_x,
+            bounds.min_y,
             width + padding * 2,
             height + padding * 2,
             0x0395d5ff,
@@ -1413,8 +1413,8 @@ impl<'a> UiRoot<'a> {
             }
             self.0.submit_rect(title_id, title_bounds);
             self.0.color_rect(
-                title_bounds.center_x(),
-                title_bounds.center_y(),
+                title_bounds.min_x,
+                title_bounds.min_y,
                 title_bounds.width(),
                 title_bounds.height(),
                 0x00ffffff,
@@ -1494,8 +1494,8 @@ impl<'a> UiRoot<'a> {
         let layer = self.0.ui.layer;
         self.0.ui.layer += 1;
         self.0.color_rect(
-            bounds.center_x(),
-            bounds.center_y(),
+            bounds.min_x,
+            bounds.min_y,
             width,
             height,
             0x04a5e5ff,
