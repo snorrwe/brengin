@@ -88,15 +88,13 @@ pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBo
         maxx += pos.x_advance as i32;
         maxy += pos.y_advance as i32;
     }
-    let extx = maxx / 2;
-    let exty = maxy / 2;
 
     GlyphBufferBounds {
         bounds: UiRect {
-            x: extx,
-            y: exty,
-            w: maxx,
-            h: maxy,
+            min_x: 0,
+            min_y: 0,
+            max_x: maxx,
+            max_y: maxy,
         },
         padding_x,
         padding_y,
@@ -127,7 +125,7 @@ pub fn draw_glyph_buffer(
 ) -> anyhow::Result<TextDrawResponse> {
     let bounds = get_bounds(face, glyphs);
 
-    let scaling_factor = height as f32 / bounds.bounds.h as f32;
+    let scaling_factor = height as f32 / bounds.bounds.height() as f32;
 
     let mut builder = TextOutlineBuilder::new();
     builder.scaling_factor = scaling_factor;
@@ -136,8 +134,8 @@ pub fn draw_glyph_buffer(
     builder.yoffset = bounds.padding_y as f32 * builder.scaling_factor;
 
     let mut pixmap = tiny_skia::Pixmap::new(
-        ((bounds.bounds.w + bounds.padding_x as i32) as f32 * builder.scaling_factor) as u32,
-        ((bounds.bounds.h + bounds.padding_y as i32) as f32 * builder.scaling_factor) as u32,
+        ((bounds.bounds.width() + bounds.padding_x as i32) as f32 * builder.scaling_factor) as u32,
+        ((bounds.bounds.height() + bounds.padding_y as i32) as f32 * builder.scaling_factor) as u32,
     )
     .context("Failed to create pixmap")?;
 

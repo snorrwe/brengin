@@ -170,10 +170,10 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
             .render_pass
             .set_pipeline(&pipeline.color_rect_pipeline);
         for (requests, scissor) in rects.iter() {
-            let x = scissor.0.x.max(0) as u32;
-            let y = scissor.0.y.max(0) as u32;
-            let w = (scissor.0.w as u32).min(size.width.saturating_sub(x));
-            let h = (scissor.0.h as u32).min(size.height.saturating_sub(y));
+            let x = scissor.0.min_x.max(0) as u32;
+            let y = scissor.0.min_y.max(0) as u32;
+            let w = (scissor.0.width() as u32).min(size.width.saturating_sub(x));
+            let h = (scissor.0.height() as u32).min(size.height.saturating_sub(y));
 
             if w == 0 || h == 0 {
                 tracing::warn!(?scissor, "Scissor is outside of render target {:?}", **size);

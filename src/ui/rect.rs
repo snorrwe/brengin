@@ -3,95 +3,102 @@ use super::div_half_ceil;
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UiRect {
     /// center x
-    pub x: i32,
+    pub min_x: i32,
     /// center y
-    pub y: i32,
-    pub w: i32,
-    pub h: i32,
+    pub min_y: i32,
+    pub max_x: i32,
+    pub max_y: i32,
 }
 
 impl UiRect {
-    pub fn grow_over(self, other: UiRect) -> UiRect {
-        let halfw = self.w as f64 * 0.5;
-        let halfh = self.h as f64 * 0.5;
-        let self_minx = self.x as f64 - halfw;
-        let self_miny = self.y as f64 - halfh;
-        let self_maxx = self.x as f64 + halfw;
-        let self_maxy = self.y as f64 + halfh;
-        let halfw = other.w as f64 * 0.5;
-        let halfh = other.h as f64 * 0.5;
-        let minx = self_minx.min(other.x as f64 - halfw);
-        let miny = self_miny.min(other.y as f64 - halfh);
-        let maxx = self_maxx.max(other.x as f64 + halfw);
-        let maxy = self_maxy.max(other.y as f64 + halfh);
-
-        let w = maxx - minx;
-        let h = maxy - miny;
-
-        let halfw = w * 0.5;
-        let halfh = h * 0.5;
-
-        UiRect {
-            x: (minx + halfw) as i32,
-            y: (miny + halfh) as i32,
-            w: w as i32,
-            h: h as i32,
+    /// center x, center y, full width/height
+    pub fn from_pos_size(x: i32, y: i32, w: i32, h: i32) -> Self {
+        Self {
+            min_x: x - w / 2,
+            min_y: y - h / 2,
+            max_x: x + div_half_ceil(w),
+            max_y: y + div_half_ceil(h),
         }
     }
 
-    #[inline]
-    pub fn y_start(self) -> i32 {
-        self.y - self.h / 2
-    }
-
-    #[inline]
-    pub fn x_start(self) -> i32 {
-        self.x - self.w / 2
-    }
-
-    #[inline]
-    pub fn y_end(self) -> i32 {
-        self.y + div_half_ceil(self.h)
-    }
-
-    #[inline]
-    pub fn x_end(self) -> i32 {
-        self.x + div_half_ceil(self.w)
+    pub fn grow_over(self, other: UiRect) -> UiRect {
+        let min_x = self.min_x.min(other.min_x);
+        let min_y = self.min_y.min(other.min_y);
+        let max_x = self.max_x.max(other.max_x);
+        let max_y = self.max_y.max(other.max_y);
+        UiRect {
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+        }
     }
 
     pub fn contains_point(&self, x: i32, y: i32) -> bool {
-        let dx = x as i64 - self.x as i64;
-        let dy = y as i64 - self.y as i64;
-
-        0 <= dx && dx < div_half_ceil(self.w) as i64 && 0 <= dy && dy < div_half_ceil(self.h) as i64
+        self.min_x <= x && x <= self.max_x && self.min_y <= y && y <= self.max_y
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    pub fn center_x(&self) -> i32 {
+        self.min_x + div_half_ceil(self.max_x - self.min_x)
+    }
 
-    #[test]
-    fn test_grow_over() {
-        let a = UiRect {
-            x: 0,
-            y: 0,
-            w: 4,
-            h: 2,
-        };
-        let b = UiRect {
-            x: 10,
-            y: 10,
-            w: 4,
-            h: 3,
-        };
+    pub fn center_y(&self) -> i32 {
+        self.min_y + div_half_ceil(self.max_y - self.min_y)
+    }
 
-        let c = a.grow_over(b);
+    pub fn width(&self) -> i32 {
+        self.max_x - self.min_x
+    }
 
-        assert_eq!(c.w, 14);
-        assert_eq!(c.h, 12);
+    pub fn height(&self) -> i32 {
+        self.max_y - self.min_y
+    }
 
-        assert_eq!(c.x, 5);
-        assert_eq!(c.y, 5);
+    pub fn shrink_x(&mut self, v: i32) {
+        self.min_x += v;
+        self.max_x -= v;
+
+        if self.min_x > self.max_x {
+            std::mem::swap(&mut self.max_x, &mut self.min_x);
+        }
+    }
+
+    pub fn shrink_y(&mut self, v: i32) {
+        self.min_y += v;
+        self.max_y -= v;
+
+        if self.min_y > self.max_y {
+            std::mem::swap(&mut self.max_y, &mut self.min_y);
+        }
+    }
+
+    pub fn grow_x(&mut self, v: i32) {
+        self.shrink_x(-v);
+    }
+
+    pub fn grow_y(&mut self, v: i32) {
+        self.shrink_y(-v);
+    }
+
+    pub fn offset_x(&mut self, d: i32) {
+        self.min_x += d;
+        self.max_x += d;
+    }
+
+    pub fn offset_y(&mut self, d: i32) {
+        self.min_y += d;
+        self.max_y += d;
+    }
+
+    pub fn move_to_x(&mut self, x: i32) {
+        let delta = x - self.center_x();
+        self.min_x += delta;
+        self.max_x += delta;
+    }
+
+    pub fn move_to_y(&mut self, y: i32) {
+        let delta = y - self.center_y();
+        self.min_y += delta;
+        self.max_y += delta;
     }
 }

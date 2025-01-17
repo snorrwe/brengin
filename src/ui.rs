@@ -413,10 +413,10 @@ impl<'a> Ui<'a> {
         let cols = columns as i32;
         let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
-        let width = (bounds.w / cols + 1) as i32;
+        let width = (bounds.width() / cols + 1) as i32;
 
         let dims = (0..cols as i32)
-            .map(|i| [bounds.x + i * width, bounds.x + (i + 1) * width])
+            .map(|i| [bounds.min_x + i * width, bounds.min_x + (i + 1) * width])
             .collect();
 
         let mut cols = Columns {
@@ -442,12 +442,9 @@ impl<'a> Ui<'a> {
         color: Color,
         layer: u16,
     ) {
-        self.ui.rect_history.push(UiRect {
-            x,
-            y,
-            w: width,
-            h: height,
-        });
+        self.ui
+            .rect_history
+            .push(UiRect::from_pos_size(x, y, width, height));
         assert!(!self.ui.scissors.is_empty());
         let scissor = self.ui.scissor_idx;
         self.ui.color_rects.push(DrawColorRect {
@@ -471,12 +468,9 @@ impl<'a> Ui<'a> {
         layer: u16,
         shaping: Handle<ShapingResult>,
     ) {
-        self.ui.rect_history.push(UiRect {
-            x,
-            y,
-            w: width,
-            h: height,
-        });
+        self.ui
+            .rect_history
+            .push(UiRect::from_pos_size(x, y, width, height));
         assert!(!self.ui.scissors.is_empty());
         let scissor = self.ui.scissor_idx;
         self.ui.text_rects.push(DrawTextRect {
@@ -547,8 +541,8 @@ impl<'a> Ui<'a> {
         // shape the text
         let mut w = 0;
         let mut h = 0;
-        let x = self.ui.bounds.x;
-        let y = self.ui.bounds.y;
+        let x = self.ui.bounds.min_x;
+        let y = self.ui.bounds.min_y;
         let padding = self.theme.padding as i32;
         let [x, y] = [x + padding, y + padding];
         let mut text_y = y;
@@ -577,7 +571,12 @@ impl<'a> Ui<'a> {
             );
             text_y += line_height;
         }
-        let rect = UiRect { x, y, w, h };
+        let rect = UiRect {
+            min_x: x,
+            min_y: y,
+            max_x: x + w,
+            max_y: y + h,
+        };
         self.submit_rect(id, rect);
         Response {
             hovered: self.ui.hovered == id,
@@ -592,14 +591,14 @@ impl<'a> Ui<'a> {
         let padding = self.theme.padding as i32;
         match self.ui.layout_dir {
             LayoutDirection::TopDown => {
-                let dy = rect.h + 2 * padding;
-                self.ui.bounds.y += dy as i32;
-                self.ui.bounds.h = self.ui.bounds.h.saturating_sub(dy);
+                let dy = rect.height() + 2 * padding;
+                self.ui.bounds.min_y += dy;
+                self.ui.bounds.max_y = self.ui.bounds.max_y.saturating_sub(dy);
             }
             LayoutDirection::LeftRight => {
-                let dx = rect.w + 2 * padding;
-                self.ui.bounds.x += dx as i32;
-                self.ui.bounds.w = self.ui.bounds.w.saturating_sub(dx);
+                let dx = rect.width() + 2 * padding;
+                self.ui.bounds.min_x += dx;
+                self.ui.bounds.max_x = self.ui.bounds.max_x.saturating_sub(dx);
             }
         }
         self.ui.bounding_boxes.insert(id, rect);
@@ -642,8 +641,8 @@ impl<'a> Ui<'a> {
         // shape the text
         let mut w = 0;
         let mut h = 0;
-        let x = self.ui.bounds.x as i32;
-        let y = self.ui.bounds.y as i32;
+        let x = self.ui.bounds.center_x();
+        let y = self.ui.bounds.center_y();
         let padding = self.theme.padding as i32;
         let [x, y] = [x + padding, y + padding];
         let text_padding = self.theme.text_padding as i32;
@@ -690,7 +689,7 @@ impl<'a> Ui<'a> {
         let h = h + 2 * text_padding;
         self.color_rect(x, y, w, h, color, layer);
 
-        let rect = UiRect { x, y, w, h };
+        let rect = UiRect::from_pos_size(x, y, w, h);
         self.submit_rect(id, rect);
         ButtonResponse {
             hovered: self.ui.hovered == id,
@@ -762,13 +761,20 @@ impl<'a> Ui<'a> {
         self.begin_widget();
 
         // bar
-        let bounds = UiRect {
-            x: scissor_bounds.x_end().saturating_sub(scroll_bar_width),
-            y: scissor_bounds.y,
-            w: scroll_bar_width,
-            h: scissor_bounds.h,
-        };
-        self.color_rect(bounds.x, bounds.y, bounds.w, bounds.h, 0xFF0000FF, layer);
+        let bounds = UiRect::from_pos_size(
+            scissor_bounds.max_x.saturating_sub(scroll_bar_width),
+            scissor_bounds.center_y(),
+            scroll_bar_width,
+            scissor_bounds.height(),
+        );
+        self.color_rect(
+            bounds.center_x(),
+            bounds.center_y(),
+            bounds.width(),
+            bounds.height(),
+            0xFF0000FF,
+            layer,
+        );
         let id = self.current_id();
         self.ui.bounding_boxes.insert(id, bounds);
 
@@ -777,16 +783,19 @@ impl<'a> Ui<'a> {
         let id = self.current_id();
         let active = self.is_active(id);
         let contains_mouse = self.contains_mouse(id);
-        let mut y = scissor_bounds.y - (scissor_bounds.h as f32 * t) as i32;
+        let mut y = scissor_bounds.min_y - (scissor_bounds.height() as f32 * t) as i32;
         if active {
             if self.mouse_up() {
                 self.set_not_active(id);
             } else {
                 let coord = self.mouse.cursor_position.y as i32;
-                let coord =
-                    coord.clamp(scissor_bounds.y, scissor_bounds.y_end() - scroll_bar_width);
+                let coord = coord.clamp(
+                    scissor_bounds.min_y,
+                    scissor_bounds.max_y - scroll_bar_width,
+                );
                 y = coord as i32;
-                parent_state.ty = -(y - scissor_bounds.y) as f32 / scissor_bounds.h as f32;
+                parent_state.ty =
+                    -(y - scissor_bounds.min_y) as f32 / scissor_bounds.height() as f32;
             }
         } else if self.is_hovered(id) {
             if !contains_mouse {
@@ -798,17 +807,18 @@ impl<'a> Ui<'a> {
         if contains_mouse {
             self.set_hovered(id);
         }
+        let x = scissor_bounds.max_x.saturating_sub(scroll_bar_width);
         let control_box = UiRect {
-            x: scissor_bounds.x_end().saturating_sub(scroll_bar_width),
-            y,
-            w: scroll_bar_width,
-            h: scroll_bar_width,
+            min_x: x,
+            min_y: y,
+            max_x: scissor_bounds.max_x,
+            max_y: y + scroll_bar_width,
         };
         self.color_rect(
-            control_box.x,
-            control_box.y,
-            control_box.w,
-            control_box.h,
+            control_box.center_x(),
+            control_box.center_y(),
+            control_box.width(),
+            control_box.height(),
             0xFF0AA0FF,
             layer + 1,
         );
@@ -825,13 +835,20 @@ impl<'a> Ui<'a> {
         self.begin_widget();
 
         // bar
-        let bounds = UiRect {
-            x: scissor_bounds.x,
-            y: scissor_bounds.y_end().saturating_sub(scroll_bar_height),
-            w: scissor_bounds.w,
-            h: scroll_bar_height,
-        };
-        self.color_rect(bounds.x, bounds.y, bounds.w, bounds.h, 0xaaFF00FF, layer);
+        let bounds = UiRect::from_pos_size(
+            scissor_bounds.center_x(),
+            scissor_bounds.max_y.saturating_sub(scroll_bar_height),
+            scissor_bounds.width(),
+            scroll_bar_height,
+        );
+        self.color_rect(
+            bounds.center_x(),
+            bounds.center_y(),
+            bounds.width(),
+            bounds.height(),
+            0xaaFF00FF,
+            layer,
+        );
         let id = self.current_id();
         self.ui.bounding_boxes.insert(id, bounds);
 
@@ -840,16 +857,19 @@ impl<'a> Ui<'a> {
         let id = self.current_id();
         let active = self.is_active(id);
         let contains_mouse = self.contains_mouse(id);
-        let mut x = scissor_bounds.x - (scissor_bounds.w as f32 * t) as i32;
+        let mut x = scissor_bounds.center_x() - (scissor_bounds.width() as f32 * t) as i32;
         if active {
             if self.mouse_up() {
                 self.set_not_active(id);
             } else {
                 let coord = self.mouse.cursor_position.x as i32;
-                let coord =
-                    coord.clamp(scissor_bounds.x, scissor_bounds.x_end() - scroll_bar_height);
+                let coord = coord.clamp(
+                    scissor_bounds.min_x,
+                    scissor_bounds.max_x - scroll_bar_height,
+                );
                 x = coord as i32;
-                parent_state.tx = -(x - scissor_bounds.x) as f32 / scissor_bounds.w as f32;
+                parent_state.tx =
+                    -(x - scissor_bounds.min_x) as f32 / scissor_bounds.width() as f32;
             }
         } else if self.is_hovered(id) {
             if !contains_mouse {
@@ -861,17 +881,17 @@ impl<'a> Ui<'a> {
         if contains_mouse {
             self.set_hovered(id);
         }
-        let control_box = UiRect {
-            y: scissor_bounds.y_end().saturating_sub(scroll_bar_height),
+        let control_box = UiRect::from_pos_size(
             x,
-            w: scroll_bar_height,
-            h: scroll_bar_height,
-        };
+            scissor_bounds.max_y.saturating_sub(scroll_bar_height),
+            scroll_bar_height,
+            scroll_bar_height,
+        );
         self.color_rect(
-            control_box.x,
-            control_box.y,
-            control_box.w,
-            control_box.h,
+            control_box.center_x(),
+            control_box.center_y(),
+            control_box.width(),
+            control_box.height(),
             0xFF0AA0FF,
             layer + 1,
         );
@@ -883,8 +903,8 @@ impl<'a> Ui<'a> {
         let id = self.current_id();
         let width = desc.width.unwrap_or(UiCoord::Percent(100));
         let height = desc.height.unwrap_or(UiCoord::Percent(100));
-        let width = width.as_abolute(self.ui.bounds.w);
-        let height = height.as_abolute(self.ui.bounds.h);
+        let width = width.as_abolute(self.ui.bounds.width());
+        let height = height.as_abolute(self.ui.bounds.height());
         let mut state = *self.get_memory_or_default::<ScrollState>(id);
 
         let line_height = self.theme.font_size + self.theme.text_padding;
@@ -929,20 +949,24 @@ impl<'a> Ui<'a> {
         self.insert_memory(id, state);
 
         let old_bounds = self.ui.bounds;
-        let scissor_bounds = UiRect {
-            x: old_bounds.x,
-            y: old_bounds.y,
-            w: width,
-            h: height,
-        };
+        let scissor_bounds =
+            UiRect::from_pos_size(old_bounds.center_x(), old_bounds.center_y(), width, height);
         let mut bounds = scissor_bounds;
-        bounds.x += offset_x as i32;
-        bounds.y += offset_y as i32;
+        bounds.offset_x(offset_x as i32);
+        bounds.offset_y(offset_y as i32);
         if desc.width.is_some() {
-            bounds.w = bounds.w.saturating_sub(self.theme.scroll_bar_size as i32);
+            bounds.shrink_x(
+                bounds
+                    .width()
+                    .saturating_sub(self.theme.scroll_bar_size as i32),
+            );
         }
         if desc.height.is_some() {
-            bounds.h = bounds.h.saturating_sub(self.theme.scroll_bar_size as i32);
+            bounds.shrink_y(
+                bounds
+                    .height()
+                    .saturating_sub(self.theme.scroll_bar_size as i32),
+            );
         }
 
         self.ui.bounds = bounds;
@@ -952,7 +976,14 @@ impl<'a> Ui<'a> {
 
         let layer = self.ui.layer;
         self.ui.layer += 1;
-        self.color_rect(bounds.x, bounds.y, width, height, 0x04a5e5ff, self.ui.layer);
+        self.color_rect(
+            bounds.center_x(),
+            bounds.center_y(),
+            width,
+            height,
+            0x04a5e5ff,
+            self.ui.layer,
+        );
         self.ui.id_stack.push(0);
         let history_start = self.ui.rect_history.len();
         ///////////////////////
@@ -963,8 +994,8 @@ impl<'a> Ui<'a> {
 
         let state = self.get_memory_mut::<ScrollState>(id).unwrap();
 
-        state.content_width = children_bounds.w;
-        state.content_height = children_bounds.h;
+        state.content_width = children_bounds.width();
+        state.content_height = children_bounds.height();
         let mut state = *state;
 
         let scroll_bar_size = self.theme.scroll_bar_size as i32;
@@ -973,7 +1004,7 @@ impl<'a> Ui<'a> {
             let mut scissor_bounds = scissor_bounds;
             if desc.height.is_some() {
                 // prevent overlap
-                scissor_bounds.w -= scroll_bar_size;
+                scissor_bounds.shrink_x(scroll_bar_size);
             }
             self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_size, layer + 2, &mut state);
         }
@@ -1022,7 +1053,7 @@ impl<'a> Ui<'a> {
                 state.pos = drag_anchor + offset;
             }
         } else {
-            state.pos = IVec2::new(old_bounds.x, old_bounds.y);
+            state.pos = IVec2::new(old_bounds.center_x(), old_bounds.center_y());
             if !self.is_anything_active() && self.contains_mouse(id) && self.mouse_down() {
                 is_being_dragged = true;
                 state.drag_start = self.mouse.cursor_position;
@@ -1031,10 +1062,8 @@ impl<'a> Ui<'a> {
         }
 
         let history = std::mem::take(&mut self.ui.rect_history);
-        self.ui.bounds.x = state.pos.x;
-        self.ui.bounds.y = state.pos.y;
-        self.ui.bounds.w = state.size.x;
-        self.ui.bounds.h = state.size.y;
+        self.ui.bounds =
+            UiRect::from_pos_size(state.pos.x, state.pos.y, state.size.x, state.size.y);
         let last_scissor = self.ui.scissor_idx;
         self.push_scissor(self.ui.bounds);
         self.ui.layer += 1;
@@ -1049,17 +1078,17 @@ impl<'a> Ui<'a> {
         let child_history = std::mem::replace(&mut self.ui.rect_history, history);
         let mut content_bounds = bounding_rect(&child_history);
         if is_being_dragged {
-            content_bounds.x = state.drag_anchor.x;
-            content_bounds.y = state.drag_anchor.y;
+            content_bounds.move_to_x(state.drag_anchor.x);
+            content_bounds.move_to_y(state.drag_anchor.y);
             self.ui.rect_history.push(content_bounds);
         } else {
             self.ui.rect_history.extend_from_slice(&child_history);
-            state.drag_anchor = IVec2::new(content_bounds.x, content_bounds.y);
+            state.drag_anchor = IVec2::new(content_bounds.center_x(), content_bounds.center_y());
             state.pos = state.drag_anchor;
         }
 
         self.submit_rect(id, content_bounds);
-        state.size = IVec2::new(content_bounds.w, content_bounds.h);
+        state.size = IVec2::new(content_bounds.width(), content_bounds.height());
 
         self.insert_memory(id, state);
 
@@ -1144,9 +1173,9 @@ impl<'a> Columns<'a> {
         let ctx = unsafe { self.ctx.as_mut() };
         let idx = i as usize;
         let bounds = ctx.ui.bounds;
-        ctx.ui.bounds.x = self.dims[idx][0];
-        ctx.ui.bounds.w = self.dims[idx][1] - self.dims[idx][0];
-        let w = ctx.ui.bounds.w;
+        ctx.ui.bounds.min_x = self.dims[idx][0];
+        ctx.ui.bounds.max_x = self.dims[idx][1];
+        let w = ctx.ui.bounds.width();
         *ctx.ui.id_stack.last_mut().unwrap() = i;
         let layer = ctx.ui.layer;
         ctx.ui.layer += 1;
@@ -1159,10 +1188,10 @@ impl<'a> Columns<'a> {
         // restore state
         ctx.ui.id_stack.pop();
         let rect = ctx.ui.bounds;
-        ctx.ui.bounds.y = bounds.y;
-        ctx.ui.bounds.h = bounds.h;
-        if rect.w > w && i + 1 < self.cols {
-            let diff = rect.w - w;
+        ctx.ui.bounds.min_y = bounds.min_y;
+        ctx.ui.bounds.max_y = bounds.max_y;
+        if rect.width() > w && i + 1 < self.cols {
+            let diff = rect.width() - w;
             for d in &mut self.dims[idx + 1..] {
                 d[0] += diff;
                 d[1] += diff;
@@ -1179,10 +1208,10 @@ fn begin_frame(mut ui: ResMut<UiState>, size: Res<crate::renderer::WindowSize>) 
     ui.color_rects.clear();
     ui.text_rects.clear();
     ui.bounds = UiRect {
-        x: 0,
-        y: 0,
-        w: size.width as i32,
-        h: size.height as i32,
+        min_x: 0,
+        min_y: 0,
+        max_x: size.width as i32,
+        max_y: size.height as i32,
     };
     let b = ui.bounds;
     ui.scissors.clear();
@@ -1325,18 +1354,18 @@ impl<'a> UiRoot<'a> {
         let padding = self.0.theme.window_padding as i32;
         let width = state.size.x;
         let height = state.size.y - self.0.theme.window_title_height as i32;
-        let bounds = UiRect {
-            x: state.pos.x,
-            y: state.pos.y + self.0.theme.window_title_height as i32,
-            w: width,
-            h: height,
-        };
-        let title_bounds = UiRect {
-            x: state.pos.x,
-            y: state.pos.y,
-            w: width + 2 * padding,
-            h: self.0.theme.window_title_height as i32,
-        };
+        let bounds = UiRect::from_pos_size(
+            state.pos.x,
+            state.pos.y + self.0.theme.window_title_height as i32,
+            width,
+            height,
+        );
+        let title_bounds = UiRect::from_pos_size(
+            state.pos.x,
+            state.pos.y,
+            width + 2 * padding,
+            self.0.theme.window_title_height as i32,
+        );
 
         self.0.ui.root_hash = fnv_1a(desc.name.as_bytes());
         let old_bounds = self.0.ui.bounds;
@@ -1346,8 +1375,8 @@ impl<'a> UiRoot<'a> {
         self.0.ui.layer = WINDOW_LAYER;
         // window background
         self.0.color_rect(
-            bounds.x,
-            bounds.y,
+            bounds.center_x(),
+            bounds.center_y(),
             width + padding * 2,
             height + padding * 2,
             0x0395d5ff,
@@ -1387,10 +1416,10 @@ impl<'a> UiRoot<'a> {
             }
             self.0.submit_rect(title_id, title_bounds);
             self.0.color_rect(
-                title_bounds.x,
-                title_bounds.y,
-                title_bounds.w,
-                title_bounds.h,
+                title_bounds.center_x(),
+                title_bounds.center_y(),
+                title_bounds.width(),
+                title_bounds.height(),
                 0x00ffffff,
                 WINDOW_LAYER,
             );
@@ -1402,10 +1431,8 @@ impl<'a> UiRoot<'a> {
         {
             self.0.push_scissor(bounds);
             let mut bounds = bounds;
-            bounds.x += padding;
-            bounds.y += padding;
-            bounds.w -= 2 * padding;
-            bounds.h -= 2 * padding;
+            bounds.shrink_x(padding);
+            bounds.shrink_y(padding);
             self.0.ui.bounds = bounds;
             self.0.ui.layer = WINDOW_LAYER + 2;
             self.0.begin_widget();
@@ -1420,50 +1447,50 @@ impl<'a> UiRoot<'a> {
         let r = self.0.history_bounding_rect(history_start);
 
         let state: &mut WindowState = self.0.ui.windows.get_mut(desc.name).unwrap();
-        state.content_size = IVec2::new(r.w, r.h);
+        state.content_size = IVec2::new(r.width(), r.height());
         state.size = state.content_size + 2 * IVec2::splat(padding);
         state.size.y = (state.size.y).max(5) + self.0.theme.window_title_height as i32;
     }
 
     pub fn panel(&mut self, desc: PanelDescriptor, mut contents: impl FnMut(&mut Ui)) {
-        let width = desc.width.as_abolute(self.0.ui.bounds.w);
-        let height = desc.height.as_abolute(self.0.ui.bounds.h);
+        let width = desc.width.as_abolute(self.0.ui.bounds.width());
+        let height = desc.height.as_abolute(self.0.ui.bounds.height());
 
         let old_bounds = self.0.ui.bounds;
-        let mut bounds = UiRect {
-            x: 0,
-            y: 0,
-            w: width,
-            h: height,
-        };
+        let mut bounds = UiRect::from_pos_size(0, 0, width, height);
 
         match desc.horizonal {
             HorizontalAlignment::Left => {}
             HorizontalAlignment::Right => {
-                bounds.x = old_bounds.w.saturating_sub(width + 1) as i32;
+                bounds.move_to_x(old_bounds.width().saturating_sub(width + 1) as i32);
             }
             HorizontalAlignment::Center => {
-                bounds.x = (old_bounds.w / 2).saturating_sub(width / 2) as i32;
+                bounds.move_to_x((old_bounds.width() / 2).saturating_sub(width / 2) as i32);
             }
         }
         match desc.vertical {
             VerticalAlignment::Top => {}
             VerticalAlignment::Bottom => {
-                bounds.y = old_bounds.h.saturating_sub(height + 1) as i32;
+                bounds.move_to_y(old_bounds.height().saturating_sub(height + 1) as i32);
             }
             VerticalAlignment::Center => {
-                bounds.y = (old_bounds.h / 2).saturating_sub(height / 2) as i32;
+                bounds.move_to_y((old_bounds.height() / 2).saturating_sub(height / 2) as i32);
             }
         }
-        self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[bounds.x, bounds.y, width, height]));
+        self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[
+            bounds.min_x,
+            bounds.min_y,
+            width,
+            height,
+        ]));
         self.0.ui.bounds = bounds;
         let scissor = self.0.push_scissor(bounds);
 
         let layer = self.0.ui.layer;
         self.0.ui.layer += 1;
         self.0.color_rect(
-            bounds.x,
-            bounds.y,
+            bounds.center_x(),
+            bounds.center_y(),
             width,
             height,
             0x04a5e5ff,
@@ -1608,21 +1635,18 @@ fn bounding_rect(history: &[UiRect]) -> UiRect {
     let mut max_y = std::i32::MIN;
     let mut min_y = std::i32::MAX;
     for r in history {
-        min_x = min_x.min(r.x_start());
-        max_x = max_x.max(r.x_end());
+        min_x = min_x.min(r.min_x);
+        max_x = max_x.max(r.max_x);
 
-        min_y = min_y.min(r.y_start());
-        max_y = max_y.max(r.y_end());
+        min_y = min_y.min(r.min_y);
+        max_y = max_y.max(r.max_y);
     }
 
-    let w = max_x - min_x;
-    let h = max_y - min_y;
-
     UiRect {
-        x: min_x + div_half_ceil(w),
-        y: min_y + div_half_ceil(h),
-        w,
-        h,
+        min_x,
+        min_y,
+        max_x,
+        max_y,
     }
 }
 
