@@ -1619,9 +1619,20 @@ fn bounding_rect(history: &[UiRect]) -> UiRect {
     let h = max_y - min_y;
 
     UiRect {
-        x: min_x + w / 2,
-        y: min_y + h / 2,
+        x: min_x + div_half_ceil(w),
+        y: min_y + div_half_ceil(h),
         w,
         h,
+    }
+}
+
+#[inline]
+fn div_half_ceil(n: i32) -> i32 {
+    let d = n / 2;
+    let r = n % 2;
+    if r > 0 {
+        d + 1
+    } else {
+        d
     }
 }
