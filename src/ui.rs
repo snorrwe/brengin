@@ -1068,11 +1068,12 @@ impl<'a> Ui<'a> {
         }
 
         let history = std::mem::take(&mut self.ui.rect_history);
+        let padding = self.theme.padding as i32;
         self.ui.bounds = UiRect {
             min_x: state.pos.x,
             min_y: state.pos.y,
-            max_x: state.pos.x + state.size.x,
-            max_y: state.pos.y + state.size.y,
+            max_x: state.pos.x + state.size.x + padding,
+            max_y: state.pos.y + state.size.y + padding,
         };
         let last_scissor = self.ui.scissor_idx;
         self.push_scissor(self.ui.bounds);
