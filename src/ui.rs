@@ -1052,7 +1052,7 @@ impl<'a> Ui<'a> {
                 state.pos = drag_anchor + offset;
             }
         } else {
-            state.pos = IVec2::new(old_bounds.center_x(), old_bounds.center_y());
+            state.pos = IVec2::new(old_bounds.min_x, old_bounds.min_y);
             if !self.is_anything_active() && self.contains_mouse(id) && self.mouse_down() {
                 is_being_dragged = true;
                 state.drag_start = self.mouse.cursor_position;
@@ -1061,8 +1061,12 @@ impl<'a> Ui<'a> {
         }
 
         let history = std::mem::take(&mut self.ui.rect_history);
-        self.ui.bounds =
-            UiRect::from_pos_size(state.pos.x, state.pos.y, state.size.x, state.size.y);
+        self.ui.bounds = UiRect {
+            min_x: state.pos.x,
+            min_y: state.pos.y,
+            max_x: state.pos.x + state.size.x,
+            max_y: state.pos.y + state.size.y,
+        };
         let last_scissor = self.ui.scissor_idx;
         self.push_scissor(self.ui.bounds);
         let layer = self.ui.layer;
@@ -1083,7 +1087,7 @@ impl<'a> Ui<'a> {
             self.ui.rect_history.push(content_bounds);
         } else {
             self.ui.rect_history.extend_from_slice(&child_history);
-            state.drag_anchor = IVec2::new(content_bounds.center_x(), content_bounds.center_y());
+            state.drag_anchor = IVec2::new(content_bounds.min_x, content_bounds.min_y);
             state.pos = state.drag_anchor;
         }
 
