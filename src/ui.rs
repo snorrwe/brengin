@@ -1264,6 +1264,8 @@ fn submit_frame_color_rects(
             UiScissor(ui.scissors[g[0].scissor as usize]),
         ));
     }
+    ui.color_rects = color_rects;
+    ui.color_rects.clear();
 }
 
 // preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
@@ -1298,6 +1300,8 @@ fn submit_text_rects(
             TextRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
         ));
     }
+    ui.text_rects = text_rects;
+    ui.text_rects.clear();
 }
 
 pub struct Ui<'a> {
