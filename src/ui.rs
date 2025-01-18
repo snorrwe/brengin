@@ -1511,6 +1511,7 @@ impl<'a> UiRoot<'a> {
             0x04a5e5ff,
             self.0.ui.layer,
         );
+        self.0.ui.layer += 1;
         self.0.ui.id_stack.push(0);
         ///////////////////////
         contents(&mut self.0);
