@@ -1093,7 +1093,15 @@ impl<'a> Ui<'a> {
 
         self.insert_memory(id, state);
 
-        DragResponse { is_being_dragged }
+        DragResponse {
+            is_being_dragged,
+            inner: Response {
+                hovered: self.is_hovered(id),
+                active: is_being_dragged,
+                rect: content_bounds,
+                inner: (),
+            },
+        }
     }
 }
 
@@ -1105,9 +1113,10 @@ struct DragState {
     pub size: IVec2,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct DragResponse {
     pub is_being_dragged: bool,
+    pub inner: Response<()>,
 }
 
 /// If a field is None, then the area does not scroll on that axis
@@ -1141,6 +1150,7 @@ impl Default for UiId {
     }
 }
 
+#[derive(Debug)]
 pub struct Response<T> {
     pub hovered: bool,
     pub active: bool,
