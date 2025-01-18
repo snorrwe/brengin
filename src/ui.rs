@@ -1490,9 +1490,7 @@ impl<'a> UiRoot<'a> {
                 let delta = old_bounds.max_y - bounds.max_y;
                 bounds.offset_y(delta);
             }
-            VerticalAlignment::Center => {
-                bounds.move_to_y((old_bounds.height() / 2).saturating_sub(height / 2) as i32);
-            }
+            VerticalAlignment::Center => {}
         }
         self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[
             bounds.min_x,
