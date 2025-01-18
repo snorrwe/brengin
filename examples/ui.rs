@@ -5,7 +5,90 @@ use brengin::{App, DefaultPlugins};
 
 struct Label(String);
 
-fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>) {
+#[derive(Default)]
+struct UiState {}
+
+enum MenuState {
+    Main,
+    DragNDrop,
+    Buttons,
+}
+
+fn back(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
+    if let MenuState::Main = *state {
+        return;
+    };
+    ctx.panel(
+        brengin::ui::PanelDescriptor {
+            width: UiCoord::Absolute(100),
+            height: UiCoord::Absolute(50),
+            horizonal: HorizontalAlignment::Right,
+            vertical: VerticalAlignment::Top,
+        },
+        |ui| {
+            if ui.button("Back").inner.pressed {
+                *state = MenuState::Main;
+            }
+        },
+    );
+}
+
+fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
+    let MenuState::Main = *state else { return };
+    ctx.panel(
+        brengin::ui::PanelDescriptor {
+            width: UiCoord::Absolute(500),
+            height: UiCoord::Percent(50),
+            horizonal: HorizontalAlignment::Center,
+            vertical: VerticalAlignment::Center,
+        },
+        |ui| {
+            ui.label("Choose example");
+            if ui.button("Drag and drop").inner.pressed {
+                *state = MenuState::DragNDrop;
+            }
+            if ui.button("Buttons").inner.pressed {
+                *state = MenuState::Buttons;
+            }
+        },
+    );
+}
+
+fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>) {
+    let MenuState::DragNDrop = *state else { return };
+    ctx.window(
+        brengin::ui::WindowDescriptor {
+            name: "poggers window",
+            ..Default::default()
+        },
+        |ui| {
+            ui.with_theme(
+                brengin::ui::Theme {
+                    font_size: 24,
+                    ..ui.theme().clone()
+                },
+                |ui| {
+                    ui.label("epic widget dude");
+                },
+            );
+            ui.label("some label");
+            ui.grid(4, |cols| {
+                for col in 0..4 {
+                    cols.column(col, |ui| {
+                        for row in 0..4 {
+                            ui.drag_source(|ui| {
+                                ui.label(format!("drag me {col} {row}"));
+                            });
+                        }
+                    });
+                }
+            });
+        },
+    );
+}
+
+fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, state: Res<MenuState>) {
+    let MenuState::Buttons = *state else { return };
     ctx.panel(
         brengin::ui::PanelDescriptor {
             width: UiCoord::Percent(100),
@@ -140,35 +223,6 @@ Maecenas ac convallis ligula, id interdum turpis.
             });
         },
     );
-    ctx.window(
-        brengin::ui::WindowDescriptor {
-            name: "poggers window",
-            ..Default::default()
-        },
-        |ui| {
-            ui.with_theme(
-                brengin::ui::Theme {
-                    font_size: 24,
-                    ..ui.theme().clone()
-                },
-                |ui| {
-                    ui.label("epic widget dude");
-                },
-            );
-            ui.label("some label");
-            ui.grid(4, |cols| {
-                for col in 0..4 {
-                    cols.column(col, |ui| {
-                        for row in 0..4 {
-                            ui.drag_source(|ui| {
-                                ui.label(format!("drag me {col} {row}"));
-                            });
-                        }
-                    });
-                }
-            });
-        },
-    );
 }
 
 fn setup(mut cmd: Commands) {
@@ -182,10 +236,15 @@ fn setup(mut cmd: Commands) {
 async fn game() {
     let mut app = App::default();
     app.insert_resource(Label(Default::default()));
+    app.insert_resource(MenuState::Main);
+    app.insert_resource(UiState::default());
     app.add_plugin(DefaultPlugins);
     app.add_startup_system(setup);
     app.with_stage(brengin::Stage::Update, |s| {
         s.add_system(buttons_ui);
+        s.add_system(menu);
+        s.add_system(dnd_ui);
+        s.add_system(back);
     });
     app.run().await.unwrap();
 }
