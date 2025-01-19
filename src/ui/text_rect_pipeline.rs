@@ -325,7 +325,7 @@ fn update_instances(
             }
         };
 
-        let instance_data_bytes = bytemuck::cast_slice::<_, u8>(&cpu);
+        let instance_data_bytes = bytemuck::cast_slice::<_, u8>(cpu.as_slice());
         let size = instance_data_bytes.len() as u64;
         if rendering_data.instance_gpu.size() < size {
             // resize the buffer
