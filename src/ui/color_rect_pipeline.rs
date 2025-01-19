@@ -17,7 +17,8 @@ pub struct RectRequests(pub Vec<DrawColorRect>);
 
 struct RectInstanceBuffer {
     buffer: wgpu::Buffer,
-    n: usize,
+    len: usize,
+    capacity: usize,
 }
 
 impl Extract for RectRequests {
@@ -184,7 +185,7 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
             input
                 .render_pass
                 .set_vertex_buffer(0, requests.buffer.slice(..));
-            input.render_pass.draw(0..6, 0..requests.n as u32);
+            input.render_pass.draw(0..6, 0..requests.len as u32);
         }
     }
 }
@@ -195,7 +196,7 @@ fn setup_renderer(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
 }
 
 fn update_instances(
-    q: Query<(EntityId, &RectRequests, Option<&RectInstanceBuffer>)>,
+    mut q: Query<(EntityId, &RectRequests, Option<&mut RectInstanceBuffer>)>,
     renderer: Res<GraphicsState>,
     mut cmd: Commands,
 ) {
@@ -203,7 +204,7 @@ fn update_instances(
     let mut buff = Vec::new();
     let w = renderer.size().width as f32;
     let h = renderer.size().height as f32;
-    for (id, rects, buffer) in q.iter() {
+    for (id, rects, buffer) in q.iter_mut() {
         buff.clear();
         buff.reserve(rects.0.len());
         buff.extend(rects.0.iter().map(|rect| {
@@ -226,12 +227,13 @@ fn update_instances(
         }));
 
         match buffer {
-            Some(buffer) if rects.0.len() <= buffer.n => {
+            Some(buffer) if rects.0.len() <= buffer.capacity => {
                 renderer.queue().write_buffer(
                     &buffer.buffer,
                     0,
                     bytemuck::cast_slice(buff.as_slice()),
                 );
+                buffer.len = buff.len();
             }
             _ => {
                 let buffer =
@@ -244,7 +246,8 @@ fn update_instances(
                         });
                 cmd.entity(id).insert(RectInstanceBuffer {
                     buffer,
-                    n: rects.0.len(),
+                    len: rects.0.len(),
+                    capacity: rects.0.len(),
                 });
             }
         }
