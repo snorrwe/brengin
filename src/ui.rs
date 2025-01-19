@@ -1280,10 +1280,12 @@ fn submit_text_rects(
     text_rects.sort_unstable_by_key(|r| r.scissor);
 
     let mut buffers_reused = 0;
+    let mut rects_consumed = 0;
     for (g, (rects, sc, _id)) in
         (text_rects.chunk_by_mut(|a, b| a.scissor == b.scissor)).zip(text_rect_q.iter_mut())
     {
         buffers_reused += 1;
+        rects_consumed += g.len();
         *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
         rects.0.clear();
         rects.0.extend(g.iter_mut().map(|x| std::mem::take(x)));
@@ -1291,10 +1293,7 @@ fn submit_text_rects(
     for (_, _, id) in text_rect_q.iter().skip(buffers_reused) {
         cmd.delete(id);
     }
-    for g in text_rects
-        .chunk_by_mut(|a, b| a.scissor == b.scissor)
-        .skip(buffers_reused)
-    {
+    for g in text_rects[rects_consumed..].chunk_by_mut(|a, b| a.scissor == b.scissor) {
         cmd.spawn().insert_bundle((
             UiScissor(ui.scissors[g[0].scissor as usize]),
             TextRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
