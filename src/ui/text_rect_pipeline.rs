@@ -332,7 +332,7 @@ fn update_instances(
             rendering_data.instance_gpu =
                 renderer.device().create_buffer(&wgpu::BufferDescriptor {
                     label: Some(&format!("UI Text Instance Buffer - {:?} {}", scissor, id)),
-                    size: size * 2,
+                    size,
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
                 });
