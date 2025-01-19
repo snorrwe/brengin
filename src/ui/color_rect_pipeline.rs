@@ -70,12 +70,12 @@ impl DrawRectInstance {
                     format: wgpu::VertexFormat::Float32x4,
                 },
                 wgpu::VertexAttribute {
-                    offset: size_of::<[u32; 4]>() as wgpu::BufferAddress,
+                    offset: size_of::<[f32; 4]>() as wgpu::BufferAddress,
                     shader_location: 1,
                     format: wgpu::VertexFormat::Uint32,
                 },
                 wgpu::VertexAttribute {
-                    offset: (size_of::<[u32; 4]>() + size_of::<u32>()) as wgpu::BufferAddress,
+                    offset: (size_of::<[f32; 4]>() + size_of::<u32>()) as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float32,
                 },
