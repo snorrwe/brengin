@@ -17,6 +17,7 @@ struct RefCount {
     weak_references: AtomicUsize,
 }
 
+#[derive(Debug)]
 pub struct Handle<T> {
     id: AssetId,
     weak: WeakHandle<T>,
@@ -32,6 +33,23 @@ pub struct WeakHandle<T> {
     id: AssetId,
     references: NonNull<RefCount>,
     _m: PhantomData<T>,
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for WeakHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let references = unsafe { self.references.as_ref() };
+        f.debug_struct("WeakHandle")
+            .field("id", &self.id)
+            .field(
+                "data_references",
+                &references.data_references.load(Ordering::Relaxed),
+            )
+            .field(
+                "weak_references",
+                &references.weak_references.load(Ordering::Relaxed),
+            )
+            .finish()
+    }
 }
 
 impl<T> WeakHandle<T> {
