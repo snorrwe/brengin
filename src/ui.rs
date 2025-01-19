@@ -49,7 +49,7 @@ impl Plugin for UiPlugin {
         });
         app.with_stage(crate::Stage::PostUpdate, |s| {
             s.add_system(submit_frame_color_rects)
-                .add_system(submit_text_rects);
+                .add_system(submit_frame_text_rects);
         });
     }
 }
@@ -1270,7 +1270,7 @@ fn submit_frame_color_rects(
 // preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
 // GC if too many
 // most frames should have the same items
-fn submit_text_rects(
+fn submit_frame_text_rects(
     mut ui: ResMut<UiState>,
     mut cmd: Commands,
     mut text_rect_q: Query<(&mut TextRectRequests, &mut UiScissor, EntityId)>,
