@@ -1260,7 +1260,7 @@ fn submit_frame_color_rects(
         .skip(buffers_reused)
     {
         cmd.spawn().insert_bundle((
-            RectRequests(g.iter().copied().collect()),
+            RectRequests(g.to_vec()),
             UiScissor(ui.scissors[g[0].scissor as usize]),
         ));
     }
