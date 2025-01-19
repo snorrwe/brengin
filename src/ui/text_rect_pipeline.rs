@@ -34,7 +34,7 @@ impl Extract for TextRectRequests {
 }
 
 /// XY are top-left corner, WH are full-extents
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct DrawTextRect {
     pub x: i32,
     pub y: i32,
