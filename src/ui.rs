@@ -1244,10 +1244,12 @@ fn submit_frame_color_rects(
     color_rects.sort_unstable_by_key(|r| r.scissor);
 
     let mut buffers_reused = 0;
+    let mut rects_consumed = 0;
     for (g, (rects, sc, _id)) in
         (color_rects.chunk_by(|a, b| a.scissor == b.scissor)).zip(color_rect_q.iter_mut())
     {
         buffers_reused += 1;
+        rects_consumed += g.len();
         rects.0.clear();
         rects.0.extend_from_slice(g);
         *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
@@ -1255,10 +1257,7 @@ fn submit_frame_color_rects(
     for (_, _, id) in color_rect_q.iter().skip(buffers_reused) {
         cmd.delete(id);
     }
-    for g in color_rects
-        .chunk_by(|a, b| a.scissor == b.scissor)
-        .skip(buffers_reused)
-    {
+    for g in color_rects[rects_consumed..].chunk_by(|a, b| a.scissor == b.scissor) {
         cmd.spawn().insert_bundle((
             RectRequests(g.to_vec()),
             UiScissor(ui.scissors[g[0].scissor as usize]),
