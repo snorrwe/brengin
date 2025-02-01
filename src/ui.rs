@@ -104,6 +104,7 @@ pub struct ShapingResult {
 pub struct UiState {
     hovered: UiId,
     active: UiId,
+    dragged: UiId,
     /// stack of parents in the ui tree
     id_stack: Vec<IdxType>,
 
@@ -168,6 +169,7 @@ impl UiState {
         Self {
             hovered: Default::default(),
             active: Default::default(),
+            dragged: Default::default(),
             id_stack: Default::default(),
             color_rects: Default::default(),
             text_rects: Default::default(),
@@ -269,6 +271,11 @@ impl<'a> Ui<'a> {
     #[inline]
     fn set_active(&mut self, id: UiId) {
         self.ui.active = id;
+    }
+
+    #[inline]
+    pub fn is_anything_dragged(&self) -> bool {
+        self.ui.dragged != UiId::SENTINEL
     }
 
     pub fn clear_active(&mut self) {
@@ -1030,6 +1037,7 @@ impl<'a> Ui<'a> {
             is_being_dragged = true;
             if self.mouse_up() {
                 self.set_not_active(id);
+                self.ui.dragged = UiId::SENTINEL;
             } else {
                 let drag_anchor = state.drag_anchor;
                 let drag_start = state.drag_start;
@@ -1047,6 +1055,7 @@ impl<'a> Ui<'a> {
                 is_being_dragged = true;
                 state.drag_start = self.mouse.cursor_position;
                 self.set_active(id);
+                self.ui.dragged = id;
             }
         }
 
@@ -1109,6 +1118,41 @@ impl<'a> Ui<'a> {
             },
         }
     }
+
+    pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self)) -> DropResponse {
+        self.begin_widget();
+        let id = self.current_id();
+        let old_bounds = self.ui.bounds;
+        let layer = self.ui.layer;
+        self.ui.layer += 1;
+        self.ui.id_stack.push(0);
+        let history_start = self.ui.rect_history.len();
+        ///////////////////////
+        contents(self);
+        ///////////////////////
+        self.ui.layer = layer;
+        self.ui.id_stack.pop();
+        self.ui.bounds = old_bounds;
+
+        let bounding_rect = self.history_bounding_rect(history_start);
+        self.submit_rect(id, bounding_rect);
+        let mut dropped = false;
+        if self.is_anything_dragged() {
+            if self.contains_mouse(id) && self.mouse_up() {
+                dropped = true;
+            }
+        }
+
+        DropResponse {
+            dropped,
+            inner: Response {
+                hovered: self.is_hovered(id),
+                active: dropped,
+                rect: bounding_rect,
+                inner: (),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -1122,6 +1166,12 @@ struct DragState {
 #[derive(Debug)]
 pub struct DragResponse {
     pub is_being_dragged: bool,
+    pub inner: Response<()>,
+}
+
+#[derive(Debug)]
+pub struct DropResponse {
+    pub dropped: bool,
     pub inner: Response<()>,
 }
 

@@ -76,9 +76,14 @@ fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>) {
                 for col in 0..4 {
                     cols.column(col, |ui| {
                         for row in 0..4 {
-                            ui.drag_source(|ui| {
-                                ui.label(format!("drag me {col} {row}"));
+                            let resp = ui.drop_target(|ui| {
+                                ui.drag_source(|ui| {
+                                    ui.label(format!("drag me {col} {row}"));
+                                });
                             });
+                            if resp.dropped {
+                                println!("dropped on {col} {row}");
+                            }
                         }
                     });
                 }
