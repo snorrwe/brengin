@@ -49,7 +49,8 @@ impl Plugin for UiPlugin {
         });
         app.with_stage(crate::Stage::PostUpdate, |s| {
             s.add_system(submit_frame_color_rects)
-                .add_system(submit_frame_text_rects);
+                .add_system(submit_frame_text_rects)
+                .add_system(update_drag_history);
         });
     }
 }
@@ -100,10 +101,15 @@ pub struct ShapingResult {
     pub texture: TextDrawResponse,
 }
 
+fn update_drag_history(mut h: ResMut<UiState>) {
+    h.dragged = h.next_dragged;
+}
+
 /// UI context object. Use this to builder your user interface
 pub struct UiState {
     hovered: UiId,
     active: UiId,
+    next_dragged: UiId,
     dragged: UiId,
     /// stack of parents in the ui tree
     id_stack: Vec<IdxType>,
@@ -169,6 +175,7 @@ impl UiState {
         Self {
             hovered: Default::default(),
             active: Default::default(),
+            next_dragged: Default::default(),
             dragged: Default::default(),
             id_stack: Default::default(),
             color_rects: Default::default(),
@@ -970,8 +977,7 @@ impl<'a> Ui<'a> {
         self.ui.bounds = bounds;
         let scissor_idx = self.push_scissor(scissor_bounds);
 
-        let layer = self.ui.layer;
-        self.ui.layer += 1;
+        let layer = self.push_layer();
         self.color_rect(
             bounds.min_x,
             bounds.min_y,
@@ -1037,7 +1043,7 @@ impl<'a> Ui<'a> {
             is_being_dragged = true;
             if self.mouse_up() {
                 self.set_not_active(id);
-                self.ui.dragged = UiId::SENTINEL;
+                self.ui.next_dragged = UiId::SENTINEL;
             } else {
                 let drag_anchor = state.drag_anchor;
                 let drag_start = state.drag_start;
@@ -1055,7 +1061,7 @@ impl<'a> Ui<'a> {
                 is_being_dragged = true;
                 state.drag_start = self.mouse.cursor_position;
                 self.set_active(id);
-                self.ui.dragged = id;
+                self.ui.next_dragged = id;
             }
         }
 
@@ -1119,14 +1125,18 @@ impl<'a> Ui<'a> {
         }
     }
 
+    fn push_layer(&mut self) -> u16 {
+        let l = self.ui.layer;
+        self.ui.layer += 1;
+        l
+    }
+
     pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self, DropState)) -> DropResponse {
         self.begin_widget();
         let id = self.current_id();
         let old_bounds = self.ui.bounds;
-        let layer = self.ui.layer;
-        self.ui.layer += 1;
+        let layer = self.push_layer();
         self.ui.id_stack.push(0);
-        let history_start = self.ui.rect_history.len();
         let mut state = DropState::default();
         state.id = id;
         state.dragged = self.ui.dragged;
@@ -1138,6 +1148,7 @@ impl<'a> Ui<'a> {
                 }
             }
         }
+        let history_start = self.ui.rect_history.len();
         ///////////////////////
         contents(self, state);
         ///////////////////////
@@ -1145,15 +1156,21 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.pop();
         self.ui.bounds = old_bounds;
 
-        let bounding_rect = self.history_bounding_rect(history_start);
-        self.submit_rect(id, bounding_rect);
+        let content_bounds = self.history_bounding_rect(history_start);
+        self.submit_rect(id, content_bounds);
+
+        if state.hovered {
+            let color = self.theme.primary_color;
+            self.color_rect_from_rect(content_bounds, color, layer);
+            self.ui.rect_history.pop();
+        }
 
         DropResponse {
             dropped: state.dropped,
             inner: Response {
                 hovered: self.is_hovered(id),
                 active: state.dropped,
-                rect: bounding_rect,
+                rect: content_bounds,
                 inner: (),
             },
         }
