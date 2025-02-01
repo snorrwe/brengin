@@ -141,6 +141,8 @@ pub struct UiState {
     /// TODO: gc?
     windows: HashMap<String, WindowState>,
     fallback_font: OwnedTypeFace,
+
+    window_allocator: WindowAllocator,
 }
 
 #[derive(Clone)]
@@ -198,6 +200,9 @@ impl UiState {
                 0,
             )
             .unwrap(),
+            window_allocator: WindowAllocator {
+                next: IVec2::new(100, 100),
+            },
         }
     }
 }
@@ -1455,8 +1460,31 @@ impl<'a> Default for WindowDescriptor<'a> {
 
 const WINDOW_LAYER: u16 = 100;
 
+#[derive(Default, Debug)]
+struct WindowAllocator {
+    pub next: IVec2,
+}
+
+impl WindowAllocator {
+    pub fn next_pos(&mut self, size: IVec2, bounds: UiRect) -> IVec2 {
+        let res = self.next;
+        if self.next.x + size.x < bounds.max_x {
+            self.next.x += size.x;
+        } else {
+            self.next.y += size.y;
+            self.next.x = bounds.min_x;
+            if self.next.y > bounds.max_y {
+                self.next.y = bounds.min_y;
+            }
+        }
+        res
+    }
+}
+
 impl<'a> UiRoot<'a> {
     pub fn window(&mut self, desc: WindowDescriptor, mut contents: impl FnMut(&mut Ui)) {
+        let mut allocator = std::mem::take(&mut self.0.ui.window_allocator);
+        let old_bounds = self.0.ui.bounds;
         let state: &mut WindowState = self
             .0
             .ui
@@ -1464,9 +1492,11 @@ impl<'a> UiRoot<'a> {
             .entry(desc.name.to_owned())
             .or_insert_with(|| {
                 // TODO: allocate window
+                let initial_size = IVec2::splat(200);
+                let pos = allocator.next_pos(initial_size, old_bounds);
                 WindowState {
-                    pos: desc.pos.unwrap_or(IVec2::new(500, 500)),
-                    size: desc.size.unwrap_or(IVec2::splat(100)),
+                    pos: desc.pos.unwrap_or(pos),
+                    size: desc.size.unwrap_or(initial_size),
                     drag_anchor: Default::default(),
                     drag_start: Default::default(),
                     content_size: IVec2::ZERO,
@@ -1490,7 +1520,6 @@ impl<'a> UiRoot<'a> {
         };
 
         self.0.ui.root_hash = fnv_1a(desc.name.as_bytes());
-        let old_bounds = self.0.ui.bounds;
         let scissor = self.0.ui.scissor_idx;
 
         let layer = self.0.ui.layer;
@@ -1569,6 +1598,7 @@ impl<'a> UiRoot<'a> {
         state.content_size = IVec2::new(r.width(), r.height());
         state.size = state.content_size + 2 * IVec2::splat(padding);
         state.size.y = (state.size.y).max(5) + self.0.theme.window_title_height as i32;
+        self.0.ui.window_allocator = allocator;
     }
 
     pub fn panel(&mut self, desc: PanelDescriptor, mut contents: impl FnMut(&mut Ui)) {
