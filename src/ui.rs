@@ -1028,6 +1028,24 @@ impl<'a> Ui<'a> {
         bounding_rect(&self.ui.rect_history[history_start..])
     }
 
+    pub fn empty(&mut self, width: i32, height: i32) -> Response<()> {
+        let mut bounds = self.ui.bounds;
+        bounds.resize_w(width);
+        bounds.resize_h(height);
+        // TODO: layout
+
+        self.begin_widget();
+        let id = self.current_id();
+        self.submit_rect(id, bounds);
+        self.ui.rect_history.push(bounds);
+        Response {
+            hovered: self.is_hovered(id),
+            active: self.is_active(id),
+            rect: bounds,
+            inner: (),
+        }
+    }
+
     pub fn drag_source(&mut self, mut contents: impl FnMut(&mut Self)) -> DragResponse {
         self.begin_widget();
         let id = self.current_id();

@@ -85,6 +85,14 @@ fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>) {
                                 println!("dropped on {col} {row}");
                             }
                         }
+                        if ui
+                            .drop_target(|ui, _| {
+                                ui.empty(128, 32);
+                            })
+                            .dropped
+                        {
+                            println!("dropped on {col} end");
+                        }
                     });
                 }
             });
