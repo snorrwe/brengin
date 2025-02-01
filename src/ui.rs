@@ -37,6 +37,8 @@ impl Plugin for UiPlugin {
         app.add_plugin(AssetsPlugin::<ShapingResult>::default());
 
         app.insert_resource(UiState::new());
+        app.insert_resource(UiIds::default());
+        app.insert_resource(NextUiIds(UiIds::default()));
         app.insert_resource(TextTextureCache::default());
         app.insert_resource(UiMemory::default());
 
@@ -50,7 +52,7 @@ impl Plugin for UiPlugin {
         app.with_stage(crate::Stage::PostUpdate, |s| {
             s.add_system(submit_frame_color_rects)
                 .add_system(submit_frame_text_rects)
-                .add_system(update_drag_history);
+                .add_system(update_ids);
         });
     }
 }
@@ -101,16 +103,20 @@ pub struct ShapingResult {
     pub texture: TextDrawResponse,
 }
 
-fn update_drag_history(mut h: ResMut<UiState>) {
-    h.dragged = h.next_dragged;
+fn update_ids(mut lhs: ResMut<UiIds>, rhs: Res<NextUiIds>) {
+    *lhs = rhs.0;
 }
+
+#[derive(Default, Debug, Clone, Copy)]
+pub struct UiIds {
+    hovered: UiId,
+    active: UiId,
+    dragged: UiId,
+}
+pub struct NextUiIds(pub UiIds);
 
 /// UI context object. Use this to builder your user interface
 pub struct UiState {
-    hovered: UiId,
-    active: UiId,
-    next_dragged: UiId,
-    dragged: UiId,
     /// stack of parents in the ui tree
     id_stack: Vec<IdxType>,
 
@@ -173,10 +179,6 @@ impl Default for Theme {
 impl UiState {
     pub fn new() -> Self {
         Self {
-            hovered: Default::default(),
-            active: Default::default(),
-            next_dragged: Default::default(),
-            dragged: Default::default(),
             id_stack: Default::default(),
             color_rects: Default::default(),
             text_rects: Default::default(),
@@ -272,21 +274,21 @@ impl<'a> Ui<'a> {
 
     #[inline]
     fn set_hovered(&mut self, id: UiId) {
-        self.ui.hovered = id;
+        self.next_ids.0.hovered = id;
     }
 
     #[inline]
     fn set_active(&mut self, id: UiId) {
-        self.ui.active = id;
+        self.next_ids.0.active = id;
     }
 
     #[inline]
     pub fn is_anything_dragged(&self) -> bool {
-        self.ui.dragged != UiId::SENTINEL
+        self.ids.dragged != UiId::SENTINEL
     }
 
     pub fn clear_active(&mut self) {
-        self.ui.active = UiId::SENTINEL;
+        self.next_ids.0.active = UiId::SENTINEL;
     }
 
     #[inline]
@@ -323,17 +325,17 @@ impl<'a> Ui<'a> {
 
     #[inline]
     fn is_active(&self, id: UiId) -> bool {
-        self.ui.active == id
+        self.ids.active == id
     }
 
     #[inline]
     pub fn is_anything_active(&self) -> bool {
-        self.ui.active != UiId::SENTINEL
+        self.ids.active != UiId::SENTINEL
     }
 
     #[inline]
     fn is_hovered(&self, id: UiId) -> bool {
-        self.ui.hovered == id
+        self.ids.hovered == id
     }
 
     #[inline]
@@ -364,15 +366,15 @@ impl<'a> Ui<'a> {
 
     #[inline]
     fn set_not_active(&mut self, id: UiId) {
-        if self.ui.active == id {
-            self.ui.active = UiId::SENTINEL;
+        if self.ids.active == id {
+            self.next_ids.0.active = UiId::SENTINEL;
         }
     }
 
     #[inline]
     fn set_not_hovered(&mut self, id: UiId) {
-        if self.ui.hovered == id {
-            self.ui.hovered = UiId::SENTINEL;
+        if self.ids.hovered == id {
+            self.next_ids.0.hovered = UiId::SENTINEL;
         }
     }
 
@@ -611,8 +613,8 @@ impl<'a> Ui<'a> {
         };
         self.submit_rect(id, rect);
         Response {
-            hovered: self.ui.hovered == id,
-            active: self.ui.active == id,
+            hovered: self.ids.hovered == id,
+            active: self.ids.active == id,
             inner: (),
             rect,
         }
@@ -727,8 +729,8 @@ impl<'a> Ui<'a> {
         };
         self.submit_rect(id, rect);
         ButtonResponse {
-            hovered: self.ui.hovered == id,
-            active: self.ui.active == id,
+            hovered: self.ids.hovered == id,
+            active: self.ids.active == id,
             inner: ButtonState { pressed },
             rect,
         }
@@ -1043,7 +1045,7 @@ impl<'a> Ui<'a> {
             is_being_dragged = true;
             if self.mouse_up() {
                 self.set_not_active(id);
-                self.ui.next_dragged = UiId::SENTINEL;
+                self.next_ids.0.dragged = UiId::SENTINEL;
             } else {
                 let drag_anchor = state.drag_anchor;
                 let drag_start = state.drag_start;
@@ -1061,7 +1063,7 @@ impl<'a> Ui<'a> {
                 is_being_dragged = true;
                 state.drag_start = self.mouse.cursor_position;
                 self.set_active(id);
-                self.ui.next_dragged = id;
+                self.next_ids.0.dragged = id;
             }
         }
 
@@ -1139,7 +1141,7 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.push(0);
         let mut state = DropState::default();
         state.id = id;
-        state.dragged = self.ui.dragged;
+        state.dragged = self.ids.dragged;
         if self.is_anything_dragged() {
             if self.contains_mouse(id) {
                 state.hovered = true;
@@ -1389,6 +1391,8 @@ fn submit_frame_text_rects(
 }
 
 pub struct Ui<'a> {
+    ids: Res<'a, UiIds>,
+    next_ids: ResMut<'a, NextUiIds>,
     ui: ResMut<'a, UiState>,
     texture_cache: ResMut<'a, TextTextureCache>,
     shaping_results: ResMut<'a, assets::Assets<ShapingResult>>,
@@ -1639,7 +1643,11 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         let mouse = Res::new(db);
         let keyboard = Res::new(db);
         let fonts = Res::new(db);
+        let ids = Res::new(db);
+        let next_ids = ResMut::new(db);
         Self(Ui {
+            ids,
+            next_ids,
             ui,
             texture_cache,
             shaping_results: text_assets,
@@ -1652,6 +1660,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
     }
 
     fn resources_mut(set: &mut std::collections::HashSet<TypeId>) {
+        set.insert(TypeId::of::<NextUiIds>());
         set.insert(TypeId::of::<UiState>());
         set.insert(TypeId::of::<TextTextureCache>());
         set.insert(TypeId::of::<Assets<ShapingResult>>());
@@ -1661,6 +1670,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
 
     fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
         set.insert(TypeId::of::<MouseInputs>());
+        set.insert(TypeId::of::<UiIds>());
         set.insert(TypeId::of::<KeyBoardInputs>());
         set.insert(TypeId::of::<Assets<OwnedTypeFace>>());
     }
