@@ -54,50 +54,63 @@ fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
     );
 }
 
-fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>) {
+struct Dnd {
+    pub lists: Vec<Vec<usize>>,
+}
+
+fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>, mut dnd: ResMut<Dnd>) {
     let MenuState::DragNDrop = *state else { return };
-    ctx.window(
-        brengin::ui::WindowDescriptor {
-            name: "poggers window",
-            ..Default::default()
-        },
-        |ui| {
-            ui.with_theme(
-                brengin::ui::Theme {
-                    font_size: 24,
-                    ..ui.theme().clone()
-                },
-                |ui| {
-                    ui.label("epic widget dude");
-                },
-            );
-            ui.label("some label");
-            ui.grid(4, |cols| {
-                for col in 0..4 {
-                    cols.column(col, |ui| {
-                        for row in 0..4 {
-                            let resp = ui.drop_target(|ui, _| {
-                                ui.drag_source(|ui| {
-                                    ui.label(format!("drag me {col} {row}"));
-                                });
-                            });
-                            if resp.dropped {
-                                println!("dropped on {col} {row}");
-                            }
+
+    let mut dropped_on = None;
+    let mut dragged = None;
+    for (i, list) in dnd.lists.iter_mut().enumerate() {
+        ctx.window(
+            brengin::ui::WindowDescriptor {
+                name: format!("window {i}").as_str(),
+                ..Default::default()
+            },
+            |ui| {
+                ui.with_theme(
+                    brengin::ui::Theme {
+                        font_size: 24,
+                        ..ui.theme().clone()
+                    },
+                    |ui| {
+                        ui.label(format!("List {i}"));
+                    },
+                );
+
+                for (j, n) in list.iter().enumerate() {
+                    ui.drop_target(|ui, d| {
+                        if d.dropped {
+                            dropped_on = Some((i, j));
                         }
                         if ui
-                            .drop_target(|ui, _| {
-                                ui.empty(128, 32);
+                            .drag_source(|ui| {
+                                ui.label(format!("item {n}"));
                             })
-                            .dropped
+                            .is_being_dragged
                         {
-                            println!("dropped on {col} end");
+                            dragged = Some((i, j));
                         }
                     });
                 }
-            });
-        },
-    );
+                if ui
+                    .drop_target(|ui, _| {
+                        ui.empty(128, 32);
+                    })
+                    .dropped
+                {
+                    dropped_on = Some((i, list.len()));
+                }
+            },
+        );
+    }
+    if let (Some(dragged), Some(mut dropped_on)) = (dragged, dropped_on) {
+        let n = dnd.lists[dragged.0].remove(dragged.1);
+        dropped_on.1 = dropped_on.1.min(dnd.lists[dropped_on.0].len());
+        dnd.lists[dropped_on.0].insert(dropped_on.1, n);
+    }
 }
 
 fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, state: Res<MenuState>) {
@@ -251,6 +264,15 @@ async fn game() {
     app.insert_resource(Label(Default::default()));
     app.insert_resource(MenuState::Main);
     app.insert_resource(UiState::default());
+    app.insert_resource(Dnd {
+        lists: vec![
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        ],
+    });
     app.add_plugin(DefaultPlugins);
     app.add_startup_system(setup);
     app.with_stage(brengin::Stage::Update, |s| {
