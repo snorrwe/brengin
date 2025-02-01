@@ -1150,6 +1150,7 @@ impl<'a> Ui<'a> {
         }
     }
 
+    /// return the previous layer
     fn push_layer(&mut self) -> u16 {
         let l = self.ui.layer;
         self.ui.layer += 1;
@@ -1198,6 +1199,57 @@ impl<'a> Ui<'a> {
                 rect: content_bounds,
                 inner: (),
             },
+        }
+    }
+
+    pub fn text_input(&mut self, content: &mut String) -> Response<()> {
+        self.begin_widget();
+        let id = self.current_id();
+        let last_layer = self.push_layer();
+        let layer = self.ui.layer;
+
+        // shape the text
+        let mut w = 0;
+        let mut h = 0;
+        let x = self.ui.bounds.min_x;
+        let y = self.ui.bounds.min_y;
+        let padding = self.theme.padding as i32;
+        let [x, y] = [x + padding, y + padding];
+        if !content.is_empty() {
+            let (handle, e) =
+                self.shape_and_draw_line(content.clone(), self.theme.font_size as u32);
+            let pic = &e.texture;
+            let line_width = pic.width() as i32;
+            let line_height = pic.height() as i32;
+            w = w.max(line_width);
+            h += line_height;
+
+            self.text_rect(
+                x,
+                y,
+                line_width,
+                line_height,
+                self.theme.secondary_color,
+                layer + 1,
+                handle,
+            );
+        }
+        let w = w.max(self.theme.font_size as i32 * 30);
+        let h = h.max(self.theme.font_size as i32);
+        let rect = UiRect {
+            min_x: x,
+            min_y: y,
+            max_x: x + w,
+            max_y: y + h,
+        };
+        self.color_rect_from_rect(rect, self.theme.secondary_color, layer);
+        self.submit_rect(id, rect);
+        self.ui.layer = last_layer;
+        Response {
+            hovered: self.ids.hovered == id,
+            active: self.ids.active == id,
+            inner: (),
+            rect,
         }
     }
 }
