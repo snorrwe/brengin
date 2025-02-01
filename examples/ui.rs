@@ -76,7 +76,7 @@ fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>) {
                 for col in 0..4 {
                     cols.column(col, |ui| {
                         for row in 0..4 {
-                            let resp = ui.drop_target(|ui| {
+                            let resp = ui.drop_target(|ui, _| {
                                 ui.drag_source(|ui| {
                                     ui.label(format!("drag me {col} {row}"));
                                 });

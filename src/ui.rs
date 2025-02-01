@@ -1119,7 +1119,7 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self)) -> DropResponse {
+    pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self, DropState)) -> DropResponse {
         self.begin_widget();
         let id = self.current_id();
         let old_bounds = self.ui.bounds;
@@ -1127,8 +1127,19 @@ impl<'a> Ui<'a> {
         self.ui.layer += 1;
         self.ui.id_stack.push(0);
         let history_start = self.ui.rect_history.len();
+        let mut state = DropState::default();
+        state.id = id;
+        state.dragged = self.ui.dragged;
+        if self.is_anything_dragged() {
+            if self.contains_mouse(id) {
+                state.hovered = true;
+                if self.mouse_up() {
+                    state.dropped = true;
+                }
+            }
+        }
         ///////////////////////
-        contents(self);
+        contents(self, state);
         ///////////////////////
         self.ui.layer = layer;
         self.ui.id_stack.pop();
@@ -1136,18 +1147,12 @@ impl<'a> Ui<'a> {
 
         let bounding_rect = self.history_bounding_rect(history_start);
         self.submit_rect(id, bounding_rect);
-        let mut dropped = false;
-        if self.is_anything_dragged() {
-            if self.contains_mouse(id) && self.mouse_up() {
-                dropped = true;
-            }
-        }
 
         DropResponse {
-            dropped,
+            dropped: state.dropped,
             inner: Response {
                 hovered: self.is_hovered(id),
-                active: dropped,
+                active: state.dropped,
                 rect: bounding_rect,
                 inner: (),
             },
@@ -1173,6 +1178,14 @@ pub struct DragResponse {
 pub struct DropResponse {
     pub dropped: bool,
     pub inner: Response<()>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DropState {
+    pub id: UiId,
+    pub dragged: UiId,
+    pub dropped: bool,
+    pub hovered: bool,
 }
 
 /// If a field is None, then the area does not scroll on that axis
