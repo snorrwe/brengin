@@ -526,6 +526,14 @@ impl<'a> Ui<'a> {
         })
     }
 
+    pub fn get_current_font(&self) -> &OwnedTypeFace {
+        if self.fonts.contains(self.theme.font.id()) {
+            self.fonts.get(&self.theme.font)
+        } else {
+            &self.ui.fallback_font
+        }
+    }
+
     fn shape_and_draw_line(
         &mut self,
         line: String,
