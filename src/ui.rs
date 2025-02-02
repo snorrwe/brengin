@@ -355,18 +355,19 @@ impl<'a> Ui<'a> {
 
     #[inline]
     fn contains_mouse(&self, id: UiId) -> bool {
-        let mouse = self.mouse.cursor_position;
-
-        if let Some(scissor) = self.ui.scissors.get(self.ui.scissor_idx as usize) {
-            if !scissor.contains_point(mouse.x as i32, mouse.y as i32) {
-                return false;
-            }
-        }
-
-        let Some(bbox) = self.ui.bounding_boxes.get(&id) else {
+        let Some(bbox) = self.widget_bounds(id) else {
             return false;
         };
+        let mouse = self.mouse.cursor_position;
         bbox.contains_point(mouse.x as i32, mouse.y as i32)
+    }
+
+    fn widget_bounds(&self, id: UiId) -> Option<UiRect> {
+        let mut bbox = *self.ui.bounding_boxes.get(&id)?;
+        if let Some(scissor) = self.ui.scissors.get(self.ui.scissor_idx as usize) {
+            bbox = bbox.intersection(*scissor)?;
+        }
+        Some(bbox)
     }
 
     #[inline]
@@ -1216,10 +1217,14 @@ impl<'a> Ui<'a> {
         // handle input
         'input: {
             if self.is_active(id) {
-                if self.contains_mouse(id) {
-                } else if self.mouse_up() {
-                    self.set_not_active(id);
-                    break 'input;
+                if self.mouse_up() {
+                    if self.contains_mouse(id) {
+                        let pos = self.mouse.cursor_position;
+                        self.contains_mouse(id)
+                    } else {
+                        self.set_not_active(id);
+                        break 'input;
+                    }
                 }
                 for k in self.keyboard.just_pressed.iter() {
                     match k {

@@ -121,4 +121,23 @@ impl UiRect {
         let delta = new_height - self.height();
         self.grow_y(delta);
     }
+
+    /// get the intersection of two rects
+    ///
+    /// if other contains self, then self is returned
+    pub fn intersection(mut self, other: UiRect) -> Option<UiRect> {
+        if other.max_x < self.min_x
+            || other.max_y < self.min_y
+            || self.max_x < other.min_x
+            || self.max_y < other.min_y
+        {
+            return None;
+        }
+
+        self.min_x = self.min_x.max(other.min_x);
+        self.min_y = self.min_y.max(other.min_y);
+        self.max_x = self.max_x.min(other.max_x);
+        self.max_y = self.max_y.min(other.max_y);
+        Some(self)
+    }
 }
