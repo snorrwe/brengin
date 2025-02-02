@@ -53,11 +53,13 @@ pub fn parse_font(data: Box<[u8]>, face_index: u32) -> anyhow::Result<OwnedTypeF
     })
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GlyphBufferBounds {
     pub bounds: UiRect,
     pub padding_x: u32,
     pub padding_y: u32,
+    /// grapheme cluster, bounds
+    pub glyph_bounds: Vec<(u32, UiRect)>,
 }
 
 pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBounds {
@@ -68,10 +70,20 @@ pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBo
     let mut maxy = 0;
     let mut padding_x = 0;
     let mut padding_y = 0;
+    let mut glyph_bounds = Vec::with_capacity(pos.len());
     for (pos, info) in pos.into_iter().zip(info.into_iter()) {
         let glyph_id = info.glyph_id;
         let bounds = face.glyph_bounding_box(rustybuzz::ttf_parser::GlyphId(glyph_id as u16));
         if let Some(bounds) = bounds {
+            glyph_bounds.push((
+                info.cluster,
+                UiRect {
+                    min_x: bounds.x_min as i32,
+                    min_y: bounds.y_min as i32,
+                    max_x: bounds.x_max as i32,
+                    max_y: bounds.y_max as i32,
+                },
+            ));
             if bounds.x_min < 0 {
                 padding_x = padding_x.max(-bounds.x_min as u32);
             }
@@ -86,7 +98,6 @@ pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBo
             }
         }
         maxx += pos.x_advance as i32;
-        maxy += pos.y_advance as i32;
     }
 
     GlyphBufferBounds {
@@ -98,6 +109,7 @@ pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBo
         },
         padding_x,
         padding_y,
+        glyph_bounds,
     }
 }
 
@@ -106,6 +118,7 @@ pub struct TextDrawResponse {
     pub pixmap: tiny_skia::Pixmap,
     pub xoffset: i32,
     pub yoffset: i32,
+    pub bounds: GlyphBufferBounds,
 }
 
 impl TextDrawResponse {
@@ -155,6 +168,7 @@ pub fn draw_glyph_buffer(
         pixmap,
         xoffset: -(bounds.padding_x as i32),
         yoffset: -(bounds.padding_y as i32),
+        bounds,
     })
 }
 

@@ -1222,10 +1222,13 @@ impl<'a> Ui<'a> {
             cursor: content.len(),
         });
         state.cursor = state.cursor.min(content.len());
+        let mouse_pos = self.mouse.cursor_position;
 
         // handle input
-        if self.is_active(id) {
-            for k in self.keyboard.just_pressed.iter() {
+        let is_active = self.is_active(id);
+        if is_active {
+            // TODO: debounce, Backspace/delete can get out of hand
+            for k in self.keyboard.pressed.iter() {
                 match k {
                     KeyCode::ArrowLeft => {
                         state.cursor = state.cursor.saturating_sub(1);
@@ -1283,6 +1286,7 @@ impl<'a> Ui<'a> {
         let padding = self.theme.padding as i32;
         let [x, y] = [x + padding, y + padding];
         if !content.is_empty() {
+            let mouse_up = self.mouse_up();
             let (handle, e) =
                 self.shape_and_draw_line(content.clone(), self.theme.font_size as u32);
             let pic = &e.texture;
@@ -1290,6 +1294,29 @@ impl<'a> Ui<'a> {
             let line_height = pic.height() as i32;
             w = w.max(line_width);
             h += line_height;
+
+            if is_active && mouse_up {
+                // remap mouse position into 'shape space'
+                let mx = mouse_pos.x - x as f64;
+                let my = mouse_pos.y - y as f64;
+                let width = e.texture.bounds.bounds.width() as f64;
+                let height = e.texture.bounds.bounds.width() as f64;
+
+                let sx = width / line_width as f64;
+                let sy = height / line_height as f64;
+
+                let mx = mx * sx;
+                let my = my * sy;
+
+                for (cluster, glyph_bounds) in e.texture.bounds.glyph_bounds.iter() {
+                    // find the cluster where the pointer points to
+                    if glyph_bounds.contains_point(mx as i32, my as i32) {
+                        state.cursor = *cluster as usize;
+                        debug!("Setting cursor to {}", state.cursor);
+                        break;
+                    }
+                }
+            }
 
             self.text_rect(
                 x,
@@ -1302,17 +1329,8 @@ impl<'a> Ui<'a> {
             );
         }
 
-        if self.is_active(id) {
-            if self.mouse_up() {
-                if self.contains_mouse(id) {
-                    let pos = self.mouse.cursor_position;
-                    let idx = remap_cursor_pos_to_text_pos(pos.x, x, x + w, content.len());
-                    state.cursor = idx;
-                    debug!(?pos, ?x, ?w, "Setting cursor to {idx}");
-                } else {
-                    self.set_not_active(id);
-                }
-            }
+        if is_active && self.mouse_up() && !self.contains_mouse(id) {
+            self.set_not_active(id);
         }
 
         let w = w.max(self.theme.font_size as i32 * 10);
@@ -1959,11 +1977,4 @@ fn div_half_ceil(n: i32) -> i32 {
 #[derive(Default, Debug, Clone, Copy)]
 struct TextInputState {
     cursor: usize,
-}
-
-fn remap_cursor_pos_to_text_pos(x: f64, min_x: i32, max_x: i32, text_len: usize) -> usize {
-    let t = (x - min_x as f64) / (max_x - min_x) as f64;
-
-    let i = text_len as f64 * t;
-    i as usize
 }
