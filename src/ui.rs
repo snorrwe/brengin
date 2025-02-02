@@ -13,6 +13,7 @@ use std::{any::TypeId, collections::HashMap, ptr::NonNull};
 use cecs::{prelude::*, query};
 use glam::IVec2;
 use text_rect_pipeline::{DrawTextRect, TextRectRequests};
+use tracing::debug;
 use winit::{
     dpi::PhysicalPosition,
     event::{MouseButton, MouseScrollDelta},
@@ -1215,68 +1216,56 @@ impl<'a> Ui<'a> {
         state.cursor = state.cursor.min(content.len());
 
         // handle input
-        'input: {
-            if self.is_active(id) {
-                if self.mouse_up() {
-                    if self.contains_mouse(id) {
-                        let pos = self.mouse.cursor_position;
-                        self.contains_mouse(id)
-                    } else {
-                        self.set_not_active(id);
-                        break 'input;
+        if self.is_active(id) {
+            for k in self.keyboard.just_pressed.iter() {
+                match k {
+                    KeyCode::ArrowLeft => {
+                        state.cursor = state.cursor.saturating_sub(1);
                     }
-                }
-                for k in self.keyboard.just_pressed.iter() {
-                    match k {
-                        KeyCode::ArrowLeft => {
-                            state.cursor = state.cursor.saturating_sub(1);
-                        }
-                        KeyCode::ArrowRight => {
-                            state.cursor = content.len().min(state.cursor + 1);
-                        }
-                        KeyCode::Home => {
-                            state.cursor = 0;
-                        }
-                        KeyCode::End => {
-                            state.cursor = content.len();
-                        }
-                        KeyCode::Backspace => {
-                            if state.cursor > 0 {
-                                state.cursor -= 1;
-                                content.remove(state.cursor);
-                            }
-                        }
-                        KeyCode::Delete => {
-                            if state.cursor < content.len() {
-                                content.remove(state.cursor);
-                            }
-                        }
-                        _ => {
-                            if let Some(text) = self
-                                .keyboard
-                                .events
-                                .get(k)
-                                .and_then(|ev| ev.logical_key.to_text())
-                            {
-                                content.insert_str(state.cursor, text);
-                                state.cursor += text.len();
-                            }
+                    KeyCode::ArrowRight => {
+                        state.cursor = content.len().min(state.cursor + 1);
+                    }
+                    KeyCode::Home => {
+                        state.cursor = 0;
+                    }
+                    KeyCode::End => {
+                        state.cursor = content.len();
+                    }
+                    KeyCode::Backspace => {
+                        if state.cursor > 0 {
+                            state.cursor -= 1;
+                            content.remove(state.cursor);
                         }
                     }
-                }
-            } else if self.is_hovered(id) {
-                if !self.contains_mouse(id) {
-                    self.set_not_hovered(id);
-                } else if self.mouse_down() {
-                    self.set_not_hovered(id);
-                    self.set_active(id);
+                    KeyCode::Delete => {
+                        if state.cursor < content.len() {
+                            content.remove(state.cursor);
+                        }
+                    }
+                    _ => {
+                        if let Some(text) = self
+                            .keyboard
+                            .events
+                            .get(k)
+                            .and_then(|ev| ev.logical_key.to_text())
+                        {
+                            content.insert_str(state.cursor, text);
+                            state.cursor += text.len();
+                        }
+                    }
                 }
             }
-            if !self.is_anything_active() && self.contains_mouse(id) {
-                self.set_hovered(id);
+        } else if self.is_hovered(id) {
+            if !self.contains_mouse(id) {
+                self.set_not_hovered(id);
+            } else if self.mouse_down() {
+                self.set_not_hovered(id);
+                self.set_active(id);
             }
         }
-        self.insert_memory(id, state);
+        if self.contains_mouse(id) {
+            self.set_hovered(id);
+        }
 
         // shape the text
         let mut w = 0;
@@ -1304,7 +1293,21 @@ impl<'a> Ui<'a> {
                 handle,
             );
         }
-        let w = w.max(self.theme.font_size as i32 * 30);
+
+        if self.is_active(id) {
+            if self.mouse_up() {
+                if self.contains_mouse(id) {
+                    let pos = self.mouse.cursor_position;
+                    let idx = remap_cursor_pos_to_text_pos(pos.x, x, x + w, content.len());
+                    state.cursor = idx;
+                    debug!(?pos, ?x, ?w, "Setting cursor to {idx}");
+                } else {
+                    self.set_not_active(id);
+                }
+            }
+        }
+
+        let w = w.max(self.theme.font_size as i32 * 10);
         let h = h.max(self.theme.font_size as i32);
         let rect = UiRect {
             min_x: x,
@@ -1315,6 +1318,7 @@ impl<'a> Ui<'a> {
         self.color_rect_from_rect(rect, self.theme.secondary_color, layer);
         self.submit_rect(id, rect);
         self.ui.layer = last_layer;
+        self.insert_memory(id, state);
         Response {
             hovered: self.ids.hovered == id,
             active: self.ids.active == id,
@@ -1947,4 +1951,11 @@ fn div_half_ceil(n: i32) -> i32 {
 #[derive(Default, Debug, Clone, Copy)]
 struct TextInputState {
     cursor: usize,
+}
+
+fn remap_cursor_pos_to_text_pos(x: f64, min_x: i32, max_x: i32, text_len: usize) -> usize {
+    let t = (x - min_x as f64) / (max_x - min_x) as f64;
+
+    let i = text_len as f64 * t;
+    i as usize
 }
