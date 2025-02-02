@@ -10,12 +10,14 @@ use tracing::debug;
 use crate::Plugin;
 
 pub type AssetId = u64;
+pub const ASSET_ID_SENTINEL: u64 = AssetId::MAX;
 
 struct RefCount {
     data_references: AtomicUsize,
     weak_references: AtomicUsize,
 }
 
+#[derive(Debug)]
 pub struct Handle<T> {
     id: AssetId,
     weak: WeakHandle<T>,
@@ -23,7 +25,7 @@ pub struct Handle<T> {
 
 impl<T> Default for Handle<T> {
     fn default() -> Self {
-        Self::new(AssetId::MAX)
+        Self::new(ASSET_ID_SENTINEL)
     }
 }
 
@@ -31,6 +33,23 @@ pub struct WeakHandle<T> {
     id: AssetId,
     references: NonNull<RefCount>,
     _m: PhantomData<T>,
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for WeakHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let references = unsafe { self.references.as_ref() };
+        f.debug_struct("WeakHandle")
+            .field("id", &self.id)
+            .field(
+                "data_references",
+                &references.data_references.load(Ordering::Relaxed),
+            )
+            .field(
+                "weak_references",
+                &references.weak_references.load(Ordering::Relaxed),
+            )
+            .finish()
+    }
 }
 
 impl<T> WeakHandle<T> {
@@ -62,6 +81,10 @@ impl<T> WeakHandle<T> {
 
     pub fn id(&self) -> AssetId {
         self.id
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.id != ASSET_ID_SENTINEL
     }
 }
 
@@ -140,6 +163,10 @@ impl<T> Handle<T> {
     pub fn downgrade(&self) -> WeakHandle<T> {
         let weak = self.weak.clone();
         weak
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.id != ASSET_ID_SENTINEL
     }
 }
 

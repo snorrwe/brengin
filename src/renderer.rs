@@ -174,7 +174,7 @@ impl GraphicsState {
             width: size.width.max(1),
             height: size.height.max(1),
             // TODO: configure
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             // TODO: configure
             desired_maximum_frame_latency: 2,
@@ -295,6 +295,16 @@ fn extract_passes(mut cmd: Commands, game_world: Res<GameWorld>) {
     )
 }
 
+fn extract_window_size(mut cmd: Commands, game_world: Res<GameWorld>) {
+    cmd.insert_resource(
+        game_world
+            .world()
+            .get_resource::<WindowSize>()
+            .cloned()
+            .unwrap(),
+    );
+}
+
 impl Plugin for RendererPlugin {
     fn build(self, app: &mut crate::App) {
         app.render_app_mut().with_stage(crate::Stage::Render, |s| {
@@ -305,6 +315,7 @@ impl Plugin for RendererPlugin {
             height: 0,
         });
         app.add_extract_system(extract_passes);
+        app.add_extract_system(extract_window_size);
         app.add_plugin(CameraPlugin);
         app.add_plugin(SpriteRendererPlugin);
         app.add_plugin(ExtractionPlugin::<RenderCommandInternal>::default());
@@ -342,11 +353,18 @@ impl RenderPass {
                 view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(state.clear_color),
+                    load: wgpu::LoadOp::Load,
                     store: StoreOp::Store,
                 },
             })],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &state.depth_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
             timestamp_writes: None,
             occlusion_query_set: None,
         })
@@ -364,7 +382,7 @@ impl RenderPass {
                 view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(state.clear_color),
+                    load: wgpu::LoadOp::Load,
                     store: StoreOp::Store,
                 },
             })],
@@ -393,7 +411,6 @@ fn render_system(mut world: WorldAccess) {
                 tracing::trace!("No render pass has been registered");
                 return Ok(());
             };
-            let cameras = cameras.iter();
             let output = state.surface.get_current_texture()?;
             let view = output
                 .texture
@@ -405,7 +422,24 @@ fn render_system(mut world: WorldAccess) {
                         label: Some("Render Encoder"),
                     });
 
-            for camera_buffer in cameras {
+            // clear
+            {
+                let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Clear Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(state.clear_color),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    occlusion_query_set: None,
+                    timestamp_writes: None,
+                });
+            }
+            for camera_buffer in cameras.iter() {
                 // FIXME: retain the camera bind ground
                 let camera_bind_group =
                     state.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -428,7 +462,6 @@ fn render_system(mut world: WorldAccess) {
                 }
             }
 
-            // submit will accept anything that implements IntoIter
             state.queue.submit(std::iter::once(encoder.finish()));
             output.present();
 
@@ -450,7 +483,7 @@ pub trait Extract: Component {
     type Filter: Filter + 'static;
     type Out: Bundle;
 
-    fn extract<'a>(it: <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out>;
+    fn extract(it: <Self::QueryItem as QueryFragment>::Item<'_>) -> Option<Self::Out>;
 }
 
 fn extractor_system<T: Extract>(
@@ -463,9 +496,10 @@ fn extractor_system<T: Extract>(
     game_world
         .world()
         .run_view_system(|q: Query<(EntityId, T::QueryItem), T::Filter>| {
+            let tick: ExtractionTick = *tick;
             for (id, q) in q.iter() {
                 if let Some(out) = <T as Extract>::extract(q) {
-                    cmd.insert_id(id).insert(*tick).insert_bundle(out);
+                    cmd.insert_id(id).insert(tick).insert_bundle(out);
                 }
             }
         });
@@ -499,7 +533,9 @@ where
 {
     fn build(self, app: &mut crate::App) {
         app.add_extract_system(extractor_system::<T>);
-        app.render_app_mut().with_stage(crate::Stage::Update, |s| {
+        let render_app = app.render_app_mut();
+        render_app.insert_resource(ExtractionTick(0));
+        render_app.with_stage(crate::Stage::Update, |s| {
             s.add_system(gc_system::<T>);
         });
     }
@@ -523,7 +559,7 @@ mod tests {
 
         type Out = (Self,);
 
-        fn extract<'a>((i, j): <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out> {
+        fn extract((i, j): <Self::QueryItem as QueryFragment>::Item<'_>) -> Option<Self::Out> {
             Some((Self { i: *i, j: *j },))
         }
     }

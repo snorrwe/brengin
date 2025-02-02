@@ -25,11 +25,19 @@ impl Texture {
         label: Option<&str>,
     ) -> anyhow::Result<Self> {
         let rgba = img.to_rgba8();
-        let dimensions = img.dimensions();
+        Self::from_rgba8(device, queue, &rgba, img.dimensions(), label)
+    }
 
+    pub fn from_rgba8(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        rgba: &[u8],
+        (width, height): (u32, u32),
+        label: Option<&str>,
+    ) -> anyhow::Result<Self> {
         let size = wgpu::Extent3d {
-            width: dimensions.0,
-            height: dimensions.1,
+            width,
+            height,
             depth_or_array_layers: 1,
         };
         let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -53,8 +61,8 @@ impl Texture {
             &rgba,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * dimensions.0),
-                rows_per_image: Some(dimensions.1),
+                bytes_per_row: Some(4 * width),
+                rows_per_image: Some(height),
             },
             size,
         );
@@ -74,7 +82,7 @@ impl Texture {
             texture,
             view,
             sampler,
-            size: dimensions,
+            size: (width, height),
         })
     }
 

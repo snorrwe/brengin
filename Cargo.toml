@@ -9,8 +9,6 @@ edition = "2021"
 default = ["audio", "parallel", "tracing"]
 audio = ["dep:kira"]
 parallel = ["cecs/parallel"]
-# FIXME: wasm feature currently broken
-wasm = ["wgpu/webgl", "dep:web-sys", "instant/stdweb", "instant/wasm-bindgen"]
 tracing = ["dep:tracing", "cecs/tracing"]
 
 [dependencies]
@@ -26,13 +24,10 @@ wgpu = { version = "22.1.0" }
 winit = "0.30"
 kira = { version = "0.9", optional = true }
 instant = { version = "0.1.13", features = [] }
-web-sys = { version = "0.3", features = [
-    "Document",
-    "Window",
-    "Element",
-], optional = true }
 pollster = "0.3.0"
 parking_lot = "0.12.3"
+rustybuzz = "0.20.0"
+tiny-skia = "0.11.4"
 
 [dev-dependencies]
 tracing-subscriber = "0.3.18"

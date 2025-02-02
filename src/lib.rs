@@ -7,13 +7,16 @@ pub mod transform;
 
 #[cfg(feature = "audio")]
 pub mod audio;
+pub mod ui;
 
 use anyhow::Context;
+use instant::Instant;
+use ui::UiPlugin;
+
 // reexport
 pub use cecs;
 pub use glam;
 pub use image;
-use instant::Instant;
 pub use wgpu;
 pub use winit;
 
@@ -27,7 +30,7 @@ use winit::{
 use parking_lot::Mutex;
 use std::{
     any::TypeId,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     ptr::NonNull,
     sync::{atomic::AtomicBool, Arc},
     thread::JoinHandle,
@@ -68,6 +71,10 @@ unsafe impl Sync for GameWorld {}
 impl GameWorld {
     pub fn world(&self) -> &World {
         unsafe { self.world.as_ref() }
+    }
+
+    pub fn world_mut(&mut self) -> &mut World {
+        unsafe { self.world.as_mut() }
     }
 }
 
@@ -121,20 +128,30 @@ fn extract_render_data(
     render_world: &mut World,
     render_extract: &SystemStage,
 ) {
-    render_world
-        .run_system(
-            |mut cmd: Commands, tick: Option<ResMut<ExtractionTick>>| match tick {
-                Some(mut t) => t.0 += 1,
-                None => cmd.insert_resource(ExtractionTick(0)),
-            },
-        )
-        .unwrap();
-    let Some(mut gw) = game_world.try_lock_for(Duration::from_millis(1)) else {
+    let Some(mut gw) = game_world.try_lock_for(Duration::from_millis(6)) else {
+        tracing::debug!("game_world lock failed. rendering the previous frame");
         return;
     };
+    render_world
+        .run_system(|mut tick: ResMut<ExtractionTick>| {
+            tick.0 += 1;
+        })
+        .unwrap();
     render_world.insert_resource(GameWorld {
         world: NonNull::from(&mut *gw),
     });
+    render_world
+        .run_system(
+            |world: Res<GameWorld>, mut cmd: Commands, q: Query<EntityId>| {
+                // clear invalid ids
+                for id in q.iter() {
+                    if !world.world().is_id_valid(id) {
+                        cmd.delete(id);
+                    }
+                }
+            },
+        )
+        .unwrap();
     render_world.run_stage(render_extract.clone()).unwrap();
     render_world.remove_resource::<GameWorld>();
 }
@@ -337,6 +354,29 @@ impl ApplicationHandler for RunningApp {
                     .next
                     .push(event.clone());
             }
+            WindowEvent::MouseInput { state, button, .. } => {
+                game_world
+                    .lock()
+                    .get_resource_mut::<MouseInputs>()
+                    .unwrap()
+                    .next
+                    .push((button, state));
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                game_world
+                    .lock()
+                    .get_resource_mut::<MouseInputs>()
+                    .unwrap()
+                    .next_scroll
+                    .push(delta);
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                game_world
+                    .lock()
+                    .get_resource_mut::<MouseInputs>()
+                    .unwrap()
+                    .cursor_position = position;
+            }
             WindowEvent::RedrawRequested => {
                 extract_render_data(&game_world, render_world, render_extract);
 
@@ -440,6 +480,7 @@ impl App {
         self
     }
 
+    /// extraction systems run on the RenderWorld with readonly access to the GameWorld
     pub fn add_extract_system<P>(
         &mut self,
         sys: impl cecs::systems::IntoSystem<'static, P, ()>,
@@ -522,33 +563,34 @@ pub enum Stage {
 
 #[derive(Default)]
 pub struct KeyBoardInputs {
-    pub inputs: Vec<KeyEvent>,
     pub(crate) next: Vec<KeyEvent>,
     pub pressed: HashSet<KeyCode>,
     pub just_released: HashSet<KeyCode>,
     pub just_pressed: HashSet<KeyCode>,
+    pub events: HashMap<KeyCode, KeyEvent>,
 }
 
 impl KeyBoardInputs {
     pub fn update(&mut self) {
-        std::mem::swap(&mut self.inputs, &mut self.next);
-        self.next.clear();
         self.just_released.clear();
         self.just_pressed.clear();
-        for k in self.inputs.iter() {
-            match k.state {
+        self.events.clear();
+        for ke in self.next.drain(..) {
+            match ke.state {
                 ElementState::Pressed => {
-                    if let PhysicalKey::Code(k) = k.physical_key {
+                    if let PhysicalKey::Code(k) = ke.physical_key {
                         if !self.pressed.contains(&k) {
                             self.just_pressed.insert(k);
                         }
                         self.pressed.insert(k);
+                        self.events.insert(k, ke);
                     }
                 }
                 ElementState::Released => {
-                    if let PhysicalKey::Code(k) = k.physical_key {
+                    if let PhysicalKey::Code(k) = ke.physical_key {
                         self.pressed.remove(&k);
                         self.just_released.insert(k);
+                        self.events.insert(k, ke);
                     }
                 }
             }
@@ -556,7 +598,46 @@ impl KeyBoardInputs {
     }
 }
 
+#[derive(Default)]
+pub struct MouseInputs {
+    pub(crate) next: Vec<(MouseButton, ElementState)>,
+    pub(crate) next_scroll: Vec<winit::event::MouseScrollDelta>,
+    pub scroll: Vec<winit::event::MouseScrollDelta>,
+    pub cursor_position: winit::dpi::PhysicalPosition<f64>,
+    pub pressed: HashSet<MouseButton>,
+    pub just_released: HashSet<MouseButton>,
+    pub just_pressed: HashSet<MouseButton>,
+}
+
+impl MouseInputs {
+    pub fn update(&mut self) {
+        self.just_released.clear();
+        self.just_pressed.clear();
+        self.scroll.clear();
+        std::mem::swap(&mut self.scroll, &mut self.next_scroll);
+        for (k, state) in self.next.iter() {
+            match state {
+                ElementState::Pressed => {
+                    if !self.pressed.contains(k) {
+                        self.just_pressed.insert(*k);
+                    }
+                    self.pressed.insert(*k);
+                }
+                ElementState::Released => {
+                    self.pressed.remove(k);
+                    self.just_released.insert(*k);
+                }
+            }
+        }
+        self.next.clear();
+    }
+}
+
 fn update_inputs(mut k: ResMut<KeyBoardInputs>) {
+    k.update();
+}
+
+fn update_mouse_inputs(mut k: ResMut<MouseInputs>) {
     k.update();
 }
 
@@ -564,9 +645,12 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(self, app: &mut App) {
         app.insert_resource(KeyBoardInputs::default());
+        app.insert_resource(MouseInputs::default());
 
         app.with_stage(Stage::PreUpdate, |s| {
-            s.add_system(update_time).add_system(update_inputs);
+            s.add_system(update_time)
+                .add_system(update_inputs)
+                .add_system(update_mouse_inputs);
         });
     }
 }
@@ -588,6 +672,8 @@ impl Plugin for DefaultPlugins {
 
         app.add_plugin(TransformPlugin);
         app.add_plugin(RendererPlugin);
+
+        app.add_plugin(UiPlugin);
 
         #[cfg(feature = "audio")]
         app.add_plugin(audio::AudioPlugin);

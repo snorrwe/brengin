@@ -186,7 +186,7 @@ fn compute_sprite_instances(
 }
 
 #[derive(Default)]
-struct SpritePipelineInstances(BTreeMap<u64, Vec<SpriteInstanceRaw>>);
+struct SpritePipelineInstances(BTreeMap<AssetId, Vec<SpriteInstanceRaw>>);
 
 fn clear_pipeline_instances(mut instances: ResMut<SpritePipelineInstances>) {
     for i in instances.0.values_mut() {
@@ -613,7 +613,7 @@ fn texture_to_bindings(
                 resource: wgpu::BindingResource::Sampler(&texture.sampler),
             },
         ],
-        label: Some("diffuse_bind_group"),
+        label: Some("sprite_texture_bind_group"),
     });
     (texture_bind_group_layout, diffuse_bind_group)
 }
