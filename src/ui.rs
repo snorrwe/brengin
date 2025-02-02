@@ -1232,34 +1232,59 @@ impl<'a> Ui<'a> {
         let is_active = self.is_active(id);
         if is_active {
             state.caret_timer.update(self.delta_time.0);
+            state.cursor_debounce.update(self.delta_time.0);
+            if state.cursor_debounce.just_finished() {
+                state.can_move = true;
+            }
             if state.caret_timer.just_finished() {
                 state.show_caret = !state.show_caret;
             }
-            // TODO: debounce, Backspace/delete can get out of hand
+            macro_rules! cursor_update {
+                ($inner: tt) => {
+                    if state.can_move {
+                        $inner
+                        state.can_move = false;
+                        state.cursor_debounce.reset();
+                    }
+                };
+            }
+
             for k in self.keyboard.pressed.iter() {
                 match k {
                     KeyCode::ArrowLeft => {
-                        state.cursor = state.cursor.saturating_sub(1);
+                        cursor_update!({
+                            state.cursor = state.cursor.saturating_sub(1);
+                        });
                     }
                     KeyCode::ArrowRight => {
-                        state.cursor = content.len().min(state.cursor + 1);
+                        cursor_update!({
+                            state.cursor = content.len().min(state.cursor + 1);
+                        });
                     }
                     KeyCode::Home => {
-                        state.cursor = 0;
+                        cursor_update!({
+                            state.cursor = 0;
+                        });
                     }
                     KeyCode::End => {
-                        state.cursor = content.len();
+                        cursor_update!({
+                            state.cursor = content.len();
+                        });
                     }
                     KeyCode::Backspace => {
-                        if state.cursor > 0 {
-                            state.cursor -= 1;
-                            content.remove(state.cursor);
-                        }
+                        cursor_update!({
+                            if state.cursor > 0 {
+                                state.cursor -= 1;
+                                content.remove(state.cursor);
+                            }
+                        });
                     }
                     KeyCode::Delete => {
-                        if state.cursor < content.len() {
-                            content.remove(state.cursor);
-                        }
+                        cursor_update!({
+                            if state.cursor < content.len() {
+                                content.remove(state.cursor);
+                            }
+                        });
                     }
                     _ => {
                         if let Some(text) = self
@@ -2007,6 +2032,8 @@ struct TextInputState {
     cursor: usize,
     caret_timer: Timer,
     show_caret: bool,
+    cursor_debounce: Timer,
+    can_move: bool,
 }
 
 impl Default for TextInputState {
@@ -2015,6 +2042,8 @@ impl Default for TextInputState {
             cursor: Default::default(),
             caret_timer: Timer::new(Duration::from_millis(500), true),
             show_caret: false,
+            cursor_debounce: Timer::new(Duration::from_millis(100), true),
+            can_move: true,
         }
     }
 }
