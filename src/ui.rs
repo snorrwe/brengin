@@ -1,6 +1,6 @@
 use crate::{
     assets::{self, Assets, AssetsPlugin, Handle, WeakHandle},
-    KeyBoardInputs, MouseInputs, Plugin,
+    DeltaTime, KeyBoardInputs, MouseInputs, Plugin, Timer,
 };
 
 pub mod color_rect_pipeline;
@@ -8,7 +8,7 @@ pub mod rect;
 pub mod text;
 pub mod text_rect_pipeline;
 
-use std::{any::TypeId, collections::HashMap, ptr::NonNull};
+use std::{any::TypeId, collections::HashMap, ptr::NonNull, time::Duration};
 
 use cecs::{prelude::*, query};
 use glam::IVec2;
@@ -1218,15 +1218,20 @@ impl<'a> Ui<'a> {
         let last_layer = self.push_layer();
         let layer = self.ui.layer;
 
-        let mut state = *self.get_memory_or_insert::<TextInputState>(id, || TextInputState {
-            cursor: content.len(),
-        });
+        let mut state = self
+            .get_memory_or_insert::<TextInputState>(id, || TextInputState {
+                cursor: content.len(),
+                ..Default::default()
+            })
+            .clone();
+
         state.cursor = state.cursor.min(content.len());
         let mouse_pos = self.mouse.cursor_position;
 
         // handle input
         let is_active = self.is_active(id);
         if is_active {
+            state.caret_timer.update(self.delta_time.0);
             // TODO: debounce, Backspace/delete can get out of hand
             for k in self.keyboard.pressed.iter() {
                 match k {
@@ -1576,6 +1581,7 @@ pub struct Ui<'a> {
     keyboard: Res<'a, KeyBoardInputs>,
     memory: ResMut<'a, UiMemory>,
     fonts: Res<'a, Assets<OwnedTypeFace>>,
+    delta_time: Res<'a, DeltaTime>,
 }
 
 /// Root of the UI used to instantiate UI containers
@@ -1845,6 +1851,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         let fonts = Res::new(db);
         let ids = Res::new(db);
         let next_ids = ResMut::new(db);
+        let delta_time = Res::new(db);
         Self(Ui {
             ids,
             next_ids,
@@ -1856,6 +1863,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
             keyboard,
             memory,
             fonts,
+            delta_time,
         })
     }
 
@@ -1869,6 +1877,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
     }
 
     fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
+        set.insert(TypeId::of::<DeltaTime>());
         set.insert(TypeId::of::<MouseInputs>());
         set.insert(TypeId::of::<UiIds>());
         set.insert(TypeId::of::<KeyBoardInputs>());
@@ -1974,7 +1983,17 @@ fn div_half_ceil(n: i32) -> i32 {
     d + r
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct TextInputState {
     cursor: usize,
+    caret_timer: Timer,
+}
+
+impl Default for TextInputState {
+    fn default() -> Self {
+        Self {
+            cursor: Default::default(),
+            caret_timer: Timer::new(Duration::from_secs(1), true),
+        }
+    }
 }
