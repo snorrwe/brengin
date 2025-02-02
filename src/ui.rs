@@ -1208,6 +1208,56 @@ impl<'a> Ui<'a> {
         let last_layer = self.push_layer();
         let layer = self.ui.layer;
 
+        let mut state = *self.get_memory_or_insert::<TextInputState>(id, || TextInputState {
+            cursor: content.len(),
+        });
+        state.cursor = state.cursor.min(content.len());
+
+        // handle input
+        {
+            // TODO: if active
+            for k in self.keyboard.just_pressed.iter() {
+                match k {
+                    // TODO:
+                    KeyCode::ArrowLeft => {
+                        state.cursor = state.cursor.saturating_sub(1);
+                    }
+                    KeyCode::ArrowRight => {
+                        state.cursor = content.len().min(state.cursor + 1);
+                    }
+                    KeyCode::Home => {
+                        state.cursor = 0;
+                    }
+                    KeyCode::End => {
+                        state.cursor = content.len();
+                    }
+                    KeyCode::Backspace => {
+                        if state.cursor > 0 {
+                            state.cursor -= 1;
+                            content.remove(state.cursor);
+                        }
+                    }
+                    KeyCode::Delete => {
+                        if state.cursor < content.len() {
+                            content.remove(state.cursor);
+                        }
+                    }
+                    _ => {
+                        if let Some(text) = self
+                            .keyboard
+                            .events
+                            .get(k)
+                            .and_then(|ev| ev.logical_key.to_text())
+                        {
+                            content.insert_str(state.cursor, text);
+                            state.cursor += text.len();
+                        }
+                    }
+                }
+            }
+        }
+        self.insert_memory(id, state);
+
         // shape the text
         let mut w = 0;
         let mut h = 0;
@@ -1229,7 +1279,7 @@ impl<'a> Ui<'a> {
                 y,
                 line_width,
                 line_height,
-                self.theme.secondary_color,
+                self.theme.primary_color,
                 layer + 1,
                 handle,
             );
@@ -1872,4 +1922,9 @@ fn div_half_ceil(n: i32) -> i32 {
     let d = n / 2;
     let r = n % 2;
     d + r
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+struct TextInputState {
+    cursor: usize,
 }

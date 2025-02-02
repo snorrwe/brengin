@@ -113,7 +113,17 @@ fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>, mut dnd: ResMut<Dnd>) {
     }
 }
 
-fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, state: Res<MenuState>) {
+#[derive(Debug, Default)]
+struct FormState {
+    pub data: String,
+}
+
+fn buttons_ui(
+    mut ctx: UiRoot,
+    mut label: ResMut<Label>,
+    state: Res<MenuState>,
+    mut form: ResMut<FormState>,
+) {
     let MenuState::Buttons = *state else { return };
     ctx.panel(
         brengin::ui::PanelDescriptor {
@@ -171,6 +181,8 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, state: Res<MenuState>) 
                     ui.label("|");
                     ui.label("v");
                     ui.label(&label.0);
+
+                    ui.text_input(&mut form.data);
                 });
             });
         },
@@ -273,6 +285,7 @@ async fn game() {
             vec![],
         ],
     });
+    app.insert_resource(FormState::default());
     app.add_plugin(DefaultPlugins);
     app.add_startup_system(setup);
     app.with_stage(brengin::Stage::Update, |s| {
