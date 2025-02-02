@@ -30,7 +30,7 @@ use winit::{
 use parking_lot::Mutex;
 use std::{
     any::TypeId,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     ptr::NonNull,
     sync::{atomic::AtomicBool, Arc},
     thread::JoinHandle,
@@ -567,31 +567,34 @@ pub struct KeyBoardInputs {
     pub pressed: HashSet<KeyCode>,
     pub just_released: HashSet<KeyCode>,
     pub just_pressed: HashSet<KeyCode>,
+    pub events: HashMap<KeyCode, KeyEvent>,
 }
 
 impl KeyBoardInputs {
     pub fn update(&mut self) {
         self.just_released.clear();
         self.just_pressed.clear();
-        for k in self.next.iter() {
-            match k.state {
+        self.events.clear();
+        for ke in self.next.drain(..) {
+            match ke.state {
                 ElementState::Pressed => {
-                    if let PhysicalKey::Code(k) = k.physical_key {
+                    if let PhysicalKey::Code(k) = ke.physical_key {
                         if !self.pressed.contains(&k) {
                             self.just_pressed.insert(k);
                         }
                         self.pressed.insert(k);
+                        self.events.insert(k, ke);
                     }
                 }
                 ElementState::Released => {
-                    if let PhysicalKey::Code(k) = k.physical_key {
+                    if let PhysicalKey::Code(k) = ke.physical_key {
                         self.pressed.remove(&k);
                         self.just_released.insert(k);
+                        self.events.insert(k, ke);
                     }
                 }
             }
         }
-        self.next.clear();
     }
 }
 
