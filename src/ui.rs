@@ -1214,46 +1214,61 @@ impl<'a> Ui<'a> {
         state.cursor = state.cursor.min(content.len());
 
         // handle input
-        {
-            // TODO: if active
-            for k in self.keyboard.just_pressed.iter() {
-                match k {
-                    // TODO:
-                    KeyCode::ArrowLeft => {
-                        state.cursor = state.cursor.saturating_sub(1);
-                    }
-                    KeyCode::ArrowRight => {
-                        state.cursor = content.len().min(state.cursor + 1);
-                    }
-                    KeyCode::Home => {
-                        state.cursor = 0;
-                    }
-                    KeyCode::End => {
-                        state.cursor = content.len();
-                    }
-                    KeyCode::Backspace => {
-                        if state.cursor > 0 {
-                            state.cursor -= 1;
-                            content.remove(state.cursor);
+        'input: {
+            if self.is_active(id) {
+                if self.contains_mouse(id) {
+                } else if self.mouse_up() {
+                    self.set_not_active(id);
+                    break 'input;
+                }
+                for k in self.keyboard.just_pressed.iter() {
+                    match k {
+                        KeyCode::ArrowLeft => {
+                            state.cursor = state.cursor.saturating_sub(1);
                         }
-                    }
-                    KeyCode::Delete => {
-                        if state.cursor < content.len() {
-                            content.remove(state.cursor);
+                        KeyCode::ArrowRight => {
+                            state.cursor = content.len().min(state.cursor + 1);
                         }
-                    }
-                    _ => {
-                        if let Some(text) = self
-                            .keyboard
-                            .events
-                            .get(k)
-                            .and_then(|ev| ev.logical_key.to_text())
-                        {
-                            content.insert_str(state.cursor, text);
-                            state.cursor += text.len();
+                        KeyCode::Home => {
+                            state.cursor = 0;
+                        }
+                        KeyCode::End => {
+                            state.cursor = content.len();
+                        }
+                        KeyCode::Backspace => {
+                            if state.cursor > 0 {
+                                state.cursor -= 1;
+                                content.remove(state.cursor);
+                            }
+                        }
+                        KeyCode::Delete => {
+                            if state.cursor < content.len() {
+                                content.remove(state.cursor);
+                            }
+                        }
+                        _ => {
+                            if let Some(text) = self
+                                .keyboard
+                                .events
+                                .get(k)
+                                .and_then(|ev| ev.logical_key.to_text())
+                            {
+                                content.insert_str(state.cursor, text);
+                                state.cursor += text.len();
+                            }
                         }
                     }
                 }
+            } else if self.is_hovered(id) {
+                if !self.contains_mouse(id) {
+                    self.set_not_hovered(id);
+                } else if self.mouse_down() {
+                    self.set_not_hovered(id);
+                    self.set_active(id);
+                }
+            }
+            if !self.is_anything_active() && self.contains_mouse(id) {
+                self.set_hovered(id);
             }
         }
         self.insert_memory(id, state);
