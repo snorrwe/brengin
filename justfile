@@ -1,4 +1,5 @@
 export CARGO_PROFILE_RELEASE_DEBUG := "true"
+export RUST_LOG := "warn,brengin=debug"
 
 _default:
     @just --list
