@@ -1232,6 +1232,9 @@ impl<'a> Ui<'a> {
         let is_active = self.is_active(id);
         if is_active {
             state.caret_timer.update(self.delta_time.0);
+            if state.caret_timer.just_finished() {
+                state.show_caret = !state.show_caret;
+            }
             // TODO: debounce, Backspace/delete can get out of hand
             for k in self.keyboard.pressed.iter() {
                 match k {
@@ -1332,6 +1335,22 @@ impl<'a> Ui<'a> {
                 layer + 1,
                 handle,
             );
+
+            if is_active && state.show_caret {
+                // caret
+
+                // TODO: better position
+                let t = state.cursor as f64 / content.len() as f64;
+                let cx = line_width as f64 * t;
+                self.color_rect(
+                    x + cx as i32,
+                    y,
+                    2,
+                    line_height,
+                    self.theme.primary_color,
+                    layer + 2,
+                );
+            }
         }
 
         if is_active && self.mouse_up() && !self.contains_mouse(id) {
@@ -1987,13 +2006,15 @@ fn div_half_ceil(n: i32) -> i32 {
 struct TextInputState {
     cursor: usize,
     caret_timer: Timer,
+    show_caret: bool,
 }
 
 impl Default for TextInputState {
     fn default() -> Self {
         Self {
             cursor: Default::default(),
-            caret_timer: Timer::new(Duration::from_secs(1), true),
+            caret_timer: Timer::new(Duration::from_millis(500), true),
+            show_caret: false,
         }
     }
 }
