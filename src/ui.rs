@@ -329,7 +329,7 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
-    fn is_active(&self, id: UiId) -> bool {
+    pub fn is_active(&self, id: UiId) -> bool {
         self.ids.active == id
     }
 
@@ -339,22 +339,22 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
-    fn is_hovered(&self, id: UiId) -> bool {
+    pub fn is_hovered(&self, id: UiId) -> bool {
         self.ids.hovered == id
     }
 
     #[inline]
-    fn mouse_up(&self) -> bool {
+    pub fn mouse_up(&self) -> bool {
         self.mouse.just_released.contains(&MouseButton::Left)
     }
 
     #[inline]
-    fn mouse_down(&self) -> bool {
+    pub fn mouse_down(&self) -> bool {
         self.mouse.pressed.contains(&MouseButton::Left)
     }
 
     #[inline]
-    fn contains_mouse(&self, id: UiId) -> bool {
+    pub fn contains_mouse(&self, id: UiId) -> bool {
         let Some(bbox) = self.widget_bounds(id) else {
             return false;
         };
@@ -362,7 +362,7 @@ impl<'a> Ui<'a> {
         bbox.contains_point(mouse.x as i32, mouse.y as i32)
     }
 
-    fn widget_bounds(&self, id: UiId) -> Option<UiRect> {
+    pub fn widget_bounds(&self, id: UiId) -> Option<UiRect> {
         let mut bbox = *self.ui.bounding_boxes.get(&id)?;
         if let Some(scissor) = self.ui.scissors.get(self.ui.scissor_idx as usize) {
             bbox = bbox.intersection(*scissor)?;
