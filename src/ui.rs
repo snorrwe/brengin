@@ -1370,7 +1370,7 @@ impl<'a> Ui<'a> {
                 self.color_rect(
                     x + cx as i32,
                     y,
-                    2,
+                    1,
                     line_height,
                     self.theme.primary_color,
                     layer + 2,
