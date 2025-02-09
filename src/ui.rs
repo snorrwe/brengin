@@ -1843,8 +1843,7 @@ impl<'a> UiRoot<'a> {
         self.0.ui.bounds = bounds;
         let scissor = self.0.push_scissor(bounds);
 
-        let layer = self.0.ui.layer;
-        self.0.ui.layer += 1;
+        let layer = self.0.push_layer();
         self.0.color_rect(
             bounds.min_x,
             bounds.min_y,
