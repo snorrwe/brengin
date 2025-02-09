@@ -123,7 +123,7 @@ fn update_time(mut time: ResMut<Time>, mut dt: ResMut<DeltaTime>) {
 }
 
 /// extraction
-fn extract_render_data(
+pub fn extract_render_data(
     game_world: &Mutex<World>,
     render_world: &mut World,
     render_extract: &SystemStage,
@@ -521,7 +521,7 @@ impl App {
         world
     }
 
-    fn build(mut self) -> InitializedWorlds {
+    pub fn build(mut self) -> InitializedWorlds {
         #[cfg(feature = "tracing")]
         if self
             .stages
@@ -546,7 +546,7 @@ impl App {
     }
 }
 
-struct InitializedWorlds {
+pub struct InitializedWorlds {
     pub game_world: World,
     pub render_world: World,
     pub render_extract: SystemStage<'static>,
