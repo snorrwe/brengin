@@ -43,7 +43,7 @@ use renderer::{GraphicsState, RenderResult, RendererPlugin, WindowSize};
 
 use winit::event_loop::EventLoop;
 
-use cecs::prelude::*;
+use cecs::{prelude::*, systems::SystemStageBuilder};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Time(pub instant::Instant);
@@ -159,11 +159,11 @@ pub fn extract_render_data(
 
 pub struct App {
     world: World,
-    stages: std::collections::BTreeMap<Stage, SystemStage<'static>>,
-    startup_systems: SystemStage<'static>,
+    stages: std::collections::BTreeMap<Stage, SystemStageBuilder<'static>>,
+    startup_systems: SystemStageBuilder<'static>,
     plugins: HashSet<TypeId>,
 
-    extact_stage: SystemStage<'static>,
+    extact_stage: SystemStageBuilder<'static>,
     pub render_app: Option<Box<App>>,
 }
 
@@ -469,16 +469,18 @@ impl App {
     pub fn with_stage(
         &mut self,
         stage: Stage,
-        f: impl FnOnce(&mut SystemStage<'static>),
+        f: impl FnOnce(&mut SystemStageBuilder<'static>),
     ) -> &mut Self {
         let stage = self
             .stages
             .entry(stage)
-            .or_insert_with(move || SystemStage::new(format!("Stage-{:?}", stage)));
+            .or_insert_with(move || SystemStageBuilder::new(format!("Stage-{:?}", stage)));
         f(
             // # SAFETY
             // No fucking idea, but I can't decypher the bloody compiler error so here we are
-            unsafe { std::mem::transmute::<&mut SystemStage, &mut SystemStage>(stage) },
+            unsafe {
+                std::mem::transmute::<&mut SystemStageBuilder, &mut SystemStageBuilder>(stage)
+            },
         );
         self
     }
@@ -525,9 +527,9 @@ impl App {
             .into_iter()
             .filter(|(_, stage)| !stage.is_empty())
         {
-            world.add_stage(stage);
+            world.add_stage(stage.build());
         }
-        world.run_stage(self.startup_systems).unwrap();
+        world.run_stage(self.startup_systems.build()).unwrap();
         world.vacuum();
         world
     }
@@ -547,7 +549,8 @@ impl App {
             .take()
             .map(|a| a._build())
             .unwrap_or_else(|| World::new(4));
-        let render_extract = std::mem::replace(&mut self.extact_stage, SystemStage::new("nil"));
+        let render_extract =
+            std::mem::replace(&mut self.extact_stage, SystemStage::new("nil")).build();
         let w = self._build();
         InitializedWorlds {
             game_world: w,
