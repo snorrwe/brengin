@@ -17,6 +17,7 @@ use ui::UiPlugin;
 pub use cecs;
 pub use glam;
 pub use image;
+pub use parking_lot;
 pub use wgpu;
 pub use winit;
 
