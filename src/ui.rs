@@ -1302,7 +1302,7 @@ impl<'a> Ui<'a> {
         } else if self.is_hovered(id) {
             if !self.contains_mouse(id) {
                 self.set_not_hovered(id);
-            } else if self.mouse_down() {
+            } else if !self.is_anything_active() && self.mouse_down() {
                 self.set_not_hovered(id);
                 self.set_active(id);
             }
