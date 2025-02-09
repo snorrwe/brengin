@@ -274,8 +274,8 @@ fn update_instances(
     mut pipeline: ResMut<TextPipeline>,
 ) {
     // TODO: retain buffer
-    let w = renderer.size().width as f32;
-    let h = renderer.size().height as f32;
+    let w = renderer.size().x as f32;
+    let h = renderer.size().y as f32;
     let mut instances = HashMap::<(AssetId, UiScissor), Vec<DrawRectInstance>>::default();
     for (rects, scissor) in q.iter() {
         for rect in rects.0.iter() {

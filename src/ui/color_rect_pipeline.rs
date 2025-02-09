@@ -202,8 +202,8 @@ fn update_instances(
 ) {
     // TODO: retain buffer
     let mut buff = Vec::new();
-    let w = renderer.size().width as f32;
-    let h = renderer.size().height as f32;
+    let w = renderer.size().x as f32;
+    let h = renderer.size().y as f32;
     for (id, rects, buffer) in q.iter_mut() {
         buff.clear();
         buff.reserve(rects.0.len());

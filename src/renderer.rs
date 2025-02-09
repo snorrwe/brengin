@@ -8,9 +8,9 @@ use cecs::{
     query::{filters::Filter, QueryFragment, WorldQuery},
     Component,
 };
+use glam::UVec2;
 use tracing::debug;
-use wgpu::{Backends, InstanceFlags, StoreOp};
-use winit::{dpi::PhysicalSize, window::Window};
+use wgpu::{Backends, InstanceFlags, StoreOp, SurfaceTarget};
 
 pub use crate::camera::camera_bundle;
 use crate::{
@@ -23,12 +23,11 @@ use self::sprite_renderer::SpriteRendererPlugin;
 pub struct GraphicsState {
     pub clear_color: wgpu::Color,
 
-    window: Arc<Window>,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    size: PhysicalSize<u32>,
+    size: UVec2,
 
     camera_bind_group_layout: wgpu::BindGroupLayout,
 
@@ -118,13 +117,11 @@ where
 }
 
 impl GraphicsState {
-    pub async fn new(window: Arc<Window>) -> Self {
+    pub async fn new(window: impl Into<SurfaceTarget<'static>>, size: UVec2) -> Self {
         #[cfg(not(debug_assertions))]
         let flags = InstanceFlags::default();
         #[cfg(debug_assertions)]
         let flags = InstanceFlags::debugging();
-
-        let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: Backends::all(),
@@ -133,7 +130,7 @@ impl GraphicsState {
             gles_minor_version: Default::default(),
         });
         let surface = instance
-            .create_surface(Arc::clone(&window))
+            .create_surface(window)
             .expect("Failed to create surface");
 
         let adapter = instance
@@ -171,8 +168,8 @@ impl GraphicsState {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface.get_capabilities(&adapter).formats[0],
             view_formats: vec![surface.get_capabilities(&adapter).formats[0]],
-            width: size.width.max(1),
-            height: size.height.max(1),
+            width: size.x.max(1),
+            height: size.y.max(1),
             // TODO: configure
             present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
@@ -200,22 +197,21 @@ impl GraphicsState {
                 b: 0.451,
                 a: 1.0,
             },
-            window,
         }
     }
 
-    pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
-        if new_size.width > 0 && new_size.height > 0 {
+    pub fn resize(&mut self, new_size: UVec2) {
+        if new_size.x > 0 && new_size.y > 0 {
             self.size = new_size;
-            self.config.width = new_size.width;
-            self.config.height = new_size.height;
+            self.config.width = new_size.x;
+            self.config.height = new_size.y;
             self.surface.configure(&self.device, &self.config);
             self.depth_texture =
                 texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
         }
     }
 
-    pub fn size(&self) -> PhysicalSize<u32> {
+    pub fn size(&self) -> UVec2 {
         self.size
     }
 
@@ -235,12 +231,8 @@ impl GraphicsState {
         &self.config
     }
 
-    pub fn size_mut(&mut self) -> &mut PhysicalSize<u32> {
+    pub fn size_mut(&mut self) -> &mut UVec2 {
         &mut self.size
-    }
-
-    pub fn window(&self) -> &Window {
-        &self.window
     }
 
     pub fn camera_bind_group_layout(&self) -> &wgpu::BindGroupLayout {

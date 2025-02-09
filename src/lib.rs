@@ -275,9 +275,17 @@ impl ApplicationHandler for RunningApp {
         let window = Arc::new(window);
         // FIXME:
         // do not block here
-        let graphics_state = pollster::block_on(GraphicsState::new(Arc::clone(&window)));
+        let size = window.inner_size();
+        let graphics_state = pollster::block_on(GraphicsState::new(
+            Arc::clone(&window),
+            glam::UVec2 {
+                x: size.width,
+                y: size.height,
+            },
+        ));
 
         app.render_app_mut().insert_resource(graphics_state);
+        app.render_app_mut().insert_resource(window);
 
         let InitializedWorlds {
             game_world,
@@ -341,7 +349,10 @@ impl ApplicationHandler for RunningApp {
                             height: size.height,
                         });
 
-                        state.resize(size);
+                        state.resize(glam::UVec2 {
+                            x: size.width,
+                            y: size.height,
+                        });
                     })
                     .unwrap();
             }
@@ -413,9 +424,8 @@ impl ApplicationHandler for RunningApp {
             return;
         }
         self.world_mut()
-            .run_system(|gs: Res<GraphicsState>| {
-                let window = gs.window();
-                tracing::trace!("redraw {window:?}");
+            .run_system(|window: Res<Arc<winit::window::Window>>| {
+                tracing::trace!("redraw {:?}", &*window);
                 window.request_redraw();
             })
             .unwrap();
