@@ -6,140 +6,49 @@ use glam::Vec2;
 use wgpu::{include_wgsl, util::DeviceExt};
 
 use crate::{
-    assets::{AssetId, Assets, AssetsPlugin, Handle, WeakHandle},
-    camera::ViewFrustum,
+    assets::{AssetId, AssetsPlugin, Handle, WeakHandle},
     renderer::texture::{self, Texture},
-    transform::GlobalTransform,
     GameWorld, Plugin, Stage,
 };
 
 use crate::renderer::{
     Extract, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput,
-    RenderCommandPlugin, RenderPass, Vertex,
+    RenderCommandPlugin, RenderPass,
 };
 
-pub fn sprite_sheet_bundle(
-    handle: Handle<SpriteSheet>,
-    instance: impl Into<Option<SpriteInstance>>,
-) -> impl Bundle {
-    (
-        instance.into().unwrap_or(SpriteInstance {
-            index: 0,
-            flip: false,
-        }),
-        Visible,
-        handle,
-        SpriteInstanceRaw::default(),
-    )
-}
+use super::UiScissor;
 
-struct CullSize(pub f32);
-struct Visible;
-
-fn signed_dist_plane_point(plane: &glam::Vec4, pos: glam::Vec3) -> f32 {
-    plane.dot(pos.extend(1.0))
-}
-
-fn is_visible(pos: glam::Vec3, planes: &[glam::Vec4], radius: f32) -> bool {
-    for plane in planes {
-        let d = signed_dist_plane_point(plane, pos);
-        if d < -radius {
-            return false;
-        }
-    }
-    true
-}
-
-fn update_visible(
-    mut cmd: Commands,
-    cameras: Query<&ViewFrustum>,
-    visible: Query<(EntityId, &CullSize, &GlobalTransform), With<Visible>>,
-) {
-    for fr in cameras.iter() {
-        for (id, size, tr) in visible.iter() {
-            if !is_visible(tr.0.pos, &fr.planes, size.0) {
-                cmd.entity(id).remove::<Visible>();
-            }
-        }
-    }
-}
-
-fn update_invisible(
-    mut cmd: Commands,
-    cameras: Query<&ViewFrustum>,
-    invisible: Query<(EntityId, &CullSize, &GlobalTransform), WithOut<Visible>>,
-) {
-    for fr in cameras.iter() {
-        for (id, size, tr) in invisible.iter() {
-            if is_visible(tr.0.pos, &fr.planes, size.0) {
-                cmd.entity(id).insert(Visible);
-            }
-        }
-    }
-}
-
-fn insert_missing_cull(
-    q: Query<(EntityId, &Handle<SpriteSheet>), WithOut<CullSize>>,
-    assets: Res<Assets<SpriteSheet>>,
-    mut cmd: Commands,
-) {
-    for (id, handle) in q.iter() {
-        let sheet = assets.get(handle);
-        cmd.entity(id)
-            .insert(CullSize(sheet.box_size.x.max(sheet.box_size.y)));
-    }
-}
-
-pub struct SpriteSheet {
-    /// Padding applied to the box
-    pub padding: Vec2,
-    /// Size of the entire box
-    pub box_size: Vec2,
-    /// Number of boxes in a row
-    pub num_cols: u32,
+pub struct UiTexture {
     pub image: DynamicImage,
-    /// Size of the entire sheet
+    /// Size of the entire image
     pub size: Vec2,
 }
 
-impl SpriteSheet {
-    pub fn from_image(padding: Vec2, box_size: Vec2, num_cols: u32, image: DynamicImage) -> Self {
+impl UiTexture {
+    pub fn from_image(image: DynamicImage) -> Self {
         Self {
-            padding,
-            box_size,
-            num_cols,
             size: Vec2::new(image.width() as f32, image.height() as f32),
             image,
-        }
-    }
-
-    fn extract(&self) -> SpriteSheetGpu {
-        SpriteSheetGpu {
-            padding: self.padding.to_array(),
-            box_size: self.box_size.to_array(),
-            num_cols: self.num_cols,
-            size: self.size.to_array(),
-            _pad: 0xDEADBEEF,
         }
     }
 }
 
 #[derive(Default, Debug, Clone, Copy)]
-pub struct SpriteInstance {
+pub struct TextureInstance {
     pub index: u32,
     pub flip: bool,
 }
 
-pub fn add_missing_sheets(
-    mut pipeline: ResMut<SpritePipeline>,
+pub fn add_missing_textures(
+    mut pipeline: ResMut<TexturePipeline>,
     renderer: Res<GraphicsState>,
     game_world: Res<GameWorld>,
 ) {
     game_world
         .world()
-        .run_view_system(|sheets: Res<crate::assets::Assets<SpriteSheet>>| {
+        .run_view_system(|sheets: Res<crate::assets::Assets<UiTexture>>| {
             for (id, sheet) in sheets.iter() {
-                if !pipeline.sheets.contains_key(&id) {
+                if !pipeline.textures.contains_key(&id) {
                     pipeline.add_sheet(id, sheet, &renderer);
                 }
             }
@@ -147,9 +56,9 @@ pub fn add_missing_sheets(
 }
 
 fn unload_sheets(
-    mut handles: ResMut<RenderSpritesheetHandles>,
-    mut pipeline: ResMut<SpritePipeline>,
-    mut instances: ResMut<SpritePipelineInstances>,
+    mut handles: ResMut<RenderTexturesheetHandles>,
+    mut pipeline: ResMut<TexturePipeline>,
+    mut instances: ResMut<TexturePipelineInstances>,
 ) {
     let unloaded = handles
         .0
@@ -164,62 +73,91 @@ fn unload_sheets(
     }
 }
 
-fn compute_sprite_instances(
-    mut q: Query<
-        (
-            &crate::transform::GlobalTransform,
-            &SpriteInstance,
-            &mut SpriteInstanceRaw,
-        ),
-        With<Visible>,
-    >,
+fn compute_text_rect_instances(
+    mut q: Query<(
+        &crate::transform::GlobalTransform,
+        &TextureInstance,
+        &mut TextureInstanceRaw,
+    )>,
 ) {
-    q.par_for_each_mut(|(tr, i, instance)| {
+    for (tr, i, instance) in q.iter_mut() {
         let pos = tr.0.pos;
         let scale = tr.0.scale;
-        *instance = SpriteInstanceRaw {
+        *instance = TextureInstanceRaw {
             index: i.index,
             pos_scale: [pos.x, pos.y, pos.z, scale.x],
             flip: i.flip as u32,
         };
-    });
+    }
+}
+
+/// XY is the center, WH are half-extents
+#[derive(Debug, Default, Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
+#[repr(C)]
+pub struct DrawRectInstance {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub layer: f32,
+}
+
+impl DrawRectInstance {
+    pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        wgpu::VertexBufferLayout {
+            array_stride: size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: size_of::<[u32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32,
+                },
+            ],
+        }
+    }
 }
 
 #[derive(Default)]
-struct SpritePipelineInstances(BTreeMap<AssetId, Vec<SpriteInstanceRaw>>);
+struct TexturePipelineInstances(BTreeMap<AssetId, Vec<TextureInstanceRaw>>);
 
-fn clear_pipeline_instances(mut instances: ResMut<SpritePipelineInstances>) {
+fn clear_pipeline_instances(mut instances: ResMut<TexturePipelineInstances>) {
     for i in instances.0.values_mut() {
         i.clear();
     }
 }
 
-impl Extract for SpriteInstanceRaw {
-    type QueryItem = (&'static Handle<SpriteSheet>, &'static SpriteInstanceRaw);
+impl Extract for TextureInstanceRaw {
+    type QueryItem = (&'static Handle<UiTexture>, &'static TextureInstanceRaw);
 
-    type Filter = With<Visible>;
+    type Filter = ();
 
-    type Out = (WeakHandle<SpriteSheet>, SpriteInstanceRaw, Visible);
+    type Out = (WeakHandle<UiTexture>, TextureInstanceRaw);
 
     fn extract<'a>(
         (handle, instance): <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
     ) -> Option<Self::Out> {
-        Some((handle.downgrade(), *instance, Visible))
+        Some((handle.downgrade(), *instance))
     }
 }
 
 fn update_sprite_pipelines(
     renderer: Res<GraphicsState>,
-    q: Query<(&WeakHandle<SpriteSheet>, &SpriteInstanceRaw)>,
-    mut pipeline: ResMut<SpritePipeline>,
-    mut instances: ResMut<SpritePipelineInstances>,
+    q: Query<(&WeakHandle<UiTexture>, &TextureInstanceRaw)>,
+    mut pipeline: ResMut<TexturePipeline>,
+    mut instances: ResMut<TexturePipelineInstances>,
 ) {
     for (handle, raw) in q.iter() {
         instances.0.entry(handle.id()).or_default().push(*raw);
     }
 
     for (id, cpu) in instances.0.iter() {
-        let Some(sprite_rendering_data) = pipeline.sheets.get_mut(&id) else {
+        let Some(sprite_rendering_data) = pipeline.textures.get_mut(&id) else {
             continue;
         };
 
@@ -229,7 +167,7 @@ fn update_sprite_pipelines(
             // resize the buffer
             sprite_rendering_data.instance_gpu =
                 renderer.device().create_buffer(&wgpu::BufferDescriptor {
-                    label: Some(&format!("Sprite Instance Buffer - {}", id)),
+                    label: Some(&format!("Texture Instance Buffer - {}", id)),
                     size: size * 2,
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
@@ -245,92 +183,55 @@ fn update_sprite_pipelines(
 }
 
 #[derive(Default)]
-struct RenderSpritesheetHandles(pub HashMap<AssetId, WeakHandle<SpriteSheet>>);
+struct RenderTexturesheetHandles(pub HashMap<AssetId, WeakHandle<UiTexture>>);
 
-// per spritesheet
-pub struct SpriteRenderingData {
-    pub count: usize,
-    pub instance_gpu: wgpu::Buffer,
-    pub spritesheet_gpu: wgpu::BindGroup,
-    pub spritesheet_bind_group: wgpu::BindGroup,
+// per texture
+pub struct TextureRenderingData {
+    pub texture_bind_group: wgpu::BindGroup,
     pub texture: Texture,
 }
 
-pub struct SpritePipeline {
-    sheets: HashMap<AssetId, SpriteRenderingData>,
+pub struct TexturePipeline {
+    textures: HashMap<AssetId, TextureRenderingData>,
     // shared
     render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    num_indices: u32,
-    sprite_sheet_layout: wgpu::BindGroupLayout,
+
+    instances: HashMap<UiScissor, Vec<TexturePipelineInstances>>,
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct SpriteSheetGpu {
-    pub padding: [f32; 2],
-    pub box_size: [f32; 2],
-    pub size: [f32; 2],
-    pub num_cols: u32,
-    pub _pad: u32,
-}
-
-impl SpritePipeline {
+impl TexturePipeline {
     pub fn unload_sheet(&mut self, id: AssetId) {
-        self.sheets.remove(&id);
+        self.textures.remove(&id);
     }
 
-    pub fn add_sheet(&mut self, id: AssetId, sheet: &SpriteSheet, renderer: &GraphicsState) {
+    pub fn add_sheet(&mut self, id: AssetId, sheet: &UiTexture, renderer: &GraphicsState) {
         let texture = Texture::from_image(renderer.device(), renderer.queue(), &sheet.image, None)
             .expect("Failed to create texture");
 
-        let (_, spritesheet_bind_group) = texture_to_bindings(renderer.device(), &texture);
-        let sheet_gpu = sheet.extract();
+        let (_, texture_bind_group) = texture_to_bindings(renderer.device(), &texture);
 
-        let spritesheet_buffer =
-            renderer
-                .device()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("SpriteSheet Instance Buffer {}", id)),
-                    usage: wgpu::BufferUsages::UNIFORM,
-                    contents: bytemuck::cast_slice(&[sheet_gpu]),
-                });
-
-        let spritesheet_gpu = renderer
-            .device()
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &self.sprite_sheet_layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: spritesheet_buffer.as_entire_binding(),
-                }],
-                label: Some(&format!("spritesheet_bind_group {}", id)),
-            });
-
-        self.sheets.insert(
+        self.textures.insert(
             id,
-            SpriteRenderingData {
+            TextureRenderingData {
                 count: 0,
                 instance_gpu: renderer.device().create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Sprite Instance Buffer"),
+                    label: Some("Texture Instance Buffer"),
                     mapped_at_creation: false,
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                     size: 0,
                 }),
-                spritesheet_gpu,
-                spritesheet_bind_group,
+                texture_bind_group,
                 texture,
             },
         );
     }
 
     pub fn new(renderer: &GraphicsState) -> Self {
-        let sprite_sheet_layout: wgpu::BindGroupLayout =
+        let texture_layout: wgpu::BindGroupLayout =
             renderer
                 .device()
                 .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("Sprite Sheet Uniform Layout"),
+                    label: Some("Texture Sheet Uniform Layout"),
                     entries: &[wgpu::BindGroupLayoutEntry {
                         binding: 0,
                         visibility: wgpu::ShaderStages::all(),
@@ -353,11 +254,11 @@ impl SpritePipeline {
             renderer
                 .device()
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Sprite Render Pipeline Layout"),
+                    label: Some("Texture Render Pipeline Layout"),
                     bind_group_layouts: &[
                         renderer.camera_bind_group_layout(),
                         &texture_bind_group_layout,
-                        &sprite_sheet_layout,
+                        &texture_layout,
                     ],
                     push_constant_ranges: &[],
                 });
@@ -365,12 +266,12 @@ impl SpritePipeline {
             renderer
                 .device()
                 .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("Sprite Render Pipeline"),
+                    label: Some("Texture Render Pipeline"),
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
                         module: &shader,
                         entry_point: "vs_main",
-                        buffers: &[Vertex::desc(), SpriteInstanceRaw::desc()],
+                        buffers: &[DrawRectInstance::desc(), TextureInstanceRaw::desc()],
                         compilation_options: Default::default(),
                     },
                     fragment: Some(wgpu::FragmentState {
@@ -411,79 +312,72 @@ impl SpritePipeline {
                     cache: None,
                 });
 
-        let vertex_buffer = renderer
-            .device()
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Sprite Vertex Buffer"),
-                contents: bytemuck::cast_slice(VERTICES),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-
-        let index_buffer = renderer
-            .device()
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Sprite Index Buffer"),
-                contents: bytemuck::cast_slice(INDICES),
-                usage: wgpu::BufferUsages::INDEX,
-            });
-        let num_indices = INDICES.len() as u32;
-
-        SpritePipeline {
-            sheets: Default::default(),
-            sprite_sheet_layout,
+        TexturePipeline {
+            textures: Default::default(),
             render_pipeline,
-            vertex_buffer,
-            index_buffer,
-            num_indices,
-        }
-    }
-
-    pub fn render(
-        &self,
-        RenderCommandInput {
-            render_pass,
-            camera,
-        }: &mut RenderCommandInput,
-    ) {
-        render_pass.set_pipeline(&self.render_pipeline);
-        for (_, sheet) in self.sheets.iter() {
-            render_pass.set_bind_group(0, camera, &[]);
-            render_pass.set_bind_group(1, &sheet.spritesheet_bind_group, &[]);
-            render_pass.set_bind_group(2, &sheet.spritesheet_gpu, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, sheet.instance_gpu.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..sheet.count as u32);
         }
     }
 }
 
-struct SpriteRenderCommand;
+struct TextureRenderCommand;
 
-impl<'a> RenderCommand<'a> for SpriteRenderCommand {
-    type Parameters = Res<'a, SpritePipeline>;
+impl<'a> RenderCommand<'a> for TextureRenderCommand {
+    type Parameters = (
+        Res<'a, crate::renderer::WindowSize>,
+        Res<'a, TexturePipeline>,
+    );
 
-    fn render<'r>(input: &'r mut RenderCommandInput<'a>, pipeline: &'r Self::Parameters) {
-        pipeline.render(input)
+    fn render<'r>(
+        RenderCommandInput {
+            render_pass,
+            camera,
+        }: &'r mut RenderCommandInput<'a>,
+        (size, pipeline): &'r Self::Parameters,
+    ) {
+        render_pass.set_pipeline(&pipeline.render_pipeline);
+        for (scissor, instances) in pipeline.instances.iter() {
+            let x = scissor.0.min_x.max(0) as u32;
+            let y = scissor.0.min_y.max(0) as u32;
+            let w = (scissor.0.width() as u32).min(size.width.saturating_sub(x));
+            let h = (scissor.0.height() as u32).min(size.height.saturating_sub(y));
+
+            if w == 0 || h == 0 {
+                tracing::warn!(?scissor, "Scissor is outside of render target {:?}", **size);
+                continue;
+            }
+
+            render_pass.set_scissor_rect(x, y, w, h);
+
+            for instances in instances {
+                for (id, instances) in instances.0.iter() {
+                    let Some(texture) = pipeline.textures.get(id) else {
+                        continue;
+                    };
+                    render_pass.set_bind_group(0, &texture.texture_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, instances.as_slice());
+
+                    render_pass.draw_indexed(0..6, 0, 0..texture.count as u32);
+                }
+            }
+        }
     }
 }
 
 #[repr(C)]
 #[derive(Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct SpriteInstanceRaw {
+struct TextureInstanceRaw {
     pos_scale: [f32; 4],
     index: u32,
     /// bool
     flip: u32,
 }
 
-impl SpriteInstanceRaw {
+impl TextureInstanceRaw {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         use std::mem;
         const ROW_SIZE: wgpu::BufferAddress = mem::size_of::<[f32; 4]>() as wgpu::BufferAddress;
         wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<SpriteInstanceRaw>() as wgpu::BufferAddress,
+            array_stride: mem::size_of::<TextureInstanceRaw>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &[
                 wgpu::VertexAttribute {
@@ -506,33 +400,8 @@ impl SpriteInstanceRaw {
     }
 }
 
-const VERTICES: &[Vertex] = &[
-    // A
-    Vertex {
-        pos: [-0.5, 0.5, 0.0],
-        uv: [0.0, 0.0],
-    },
-    // B
-    Vertex {
-        pos: [-0.5, -0.5, 0.0],
-        uv: [0.0, 1.0],
-    },
-    // C
-    Vertex {
-        pos: [0.5, -0.5, 0.0],
-        uv: [1.0, 1.0],
-    },
-    // D
-    Vertex {
-        pos: [0.5, 0.5, 0.0],
-        uv: [1.0, 0.0],
-    },
-];
-
-const INDICES: &[u16] = &[3, 2, 1, 3, 1, 0];
-
 fn setup(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
-    let sprite_pipeline = SpritePipeline::new(&graphics_state);
+    let sprite_pipeline = TexturePipeline::new(&graphics_state);
     cmd.insert_resource(sprite_pipeline);
 }
 
@@ -540,25 +409,22 @@ pub struct TexturedRectRendererPlugin;
 
 impl Plugin for TexturedRectRendererPlugin {
     fn build(self, app: &mut crate::App) {
-        app.add_plugin(AssetsPlugin::<SpriteSheet>::default());
-        app.add_plugin(ExtractionPlugin::<SpriteInstanceRaw>::default());
+        app.add_plugin(AssetsPlugin::<UiTexture>::default());
+        app.add_plugin(ExtractionPlugin::<TextureInstanceRaw>::default());
         app.with_stage(Stage::Update, |s| {
             // putting this system in update means that the last frame's data will be presented
-            s.add_system(compute_sprite_instances)
-                .add_system(insert_missing_cull)
-                .add_system(update_visible)
-                .add_system(update_invisible);
+            s.add_system(compute_text_rect_instances);
         });
 
-        app.add_plugin(RenderCommandPlugin::<SpriteRenderCommand>::new(
-            RenderPass::Transparent,
+        app.add_plugin(RenderCommandPlugin::<TextureRenderCommand>::new(
+            RenderPass::Ui,
         ));
-        app.extact_stage.add_system(add_missing_sheets);
+        app.extact_stage.add_system(add_missing_textures);
 
         if let Some(ref mut app) = app.render_app {
             app.add_startup_system(setup);
-            app.insert_resource(SpritePipelineInstances::default());
-            app.insert_resource(RenderSpritesheetHandles::default());
+            app.insert_resource(TexturePipelineInstances::default());
+            app.insert_resource(RenderTexturesheetHandles::default());
             app.with_stage(Stage::PreUpdate, |s| {
                 s.add_system(clear_pipeline_instances);
             });
