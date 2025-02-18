@@ -7,6 +7,7 @@ pub mod color_rect_pipeline;
 pub mod rect;
 pub mod text;
 pub mod text_rect_pipeline;
+pub mod textured_rect_pipeline;
 
 use std::{any::TypeId, collections::HashMap, ptr::NonNull, time::Duration};
 
@@ -34,6 +35,7 @@ impl Plugin for UiPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(color_rect_pipeline::UiColorRectPlugin);
         app.add_plugin(text_rect_pipeline::UiTextRectPlugin);
+        app.add_plugin(textured_rect_pipeline::TexturedRectRendererPlugin);
         app.add_plugin(AssetsPlugin::<OwnedTypeFace>::default());
         app.add_plugin(AssetsPlugin::<ShapingResult>::default());
 
