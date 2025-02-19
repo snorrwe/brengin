@@ -115,7 +115,7 @@ impl DrawRectInstance {
                 },
                 wgpu::VertexAttribute {
                     offset: size_of::<[u32; 4]>() as wgpu::BufferAddress,
-                    shader_location: 2,
+                    shader_location: 1,
                     format: wgpu::VertexFormat::Float32,
                 },
             ],
