@@ -98,6 +98,7 @@ pub struct UiTextureRenderingData {
     pub texture: Texture,
 }
 
+// TODO: use texture/image assets
 #[derive(Default)]
 struct UiTextureReferences(pub HashMap<AssetId, WeakHandle<super::ShapingResult>>);
 
@@ -115,6 +116,7 @@ fn gc_text_textures(
     });
 }
 
+// TODO: extract textures from ui
 fn extract_textures(
     renderer: Res<GraphicsState>,
     mut pipeline: ResMut<UiTexturePipeline>,
