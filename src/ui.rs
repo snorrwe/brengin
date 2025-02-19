@@ -35,7 +35,7 @@ impl Plugin for UiPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(color_rect_pipeline::UiColorRectPlugin);
         app.add_plugin(text_rect_pipeline::UiTextRectPlugin);
-        app.add_plugin(textured_rect_pipeline::TexturedRectRendererPlugin);
+        app.add_plugin(textured_rect_pipeline::UiTextureRectPlugin);
         app.add_plugin(AssetsPlugin::<OwnedTypeFace>::default());
         app.add_plugin(AssetsPlugin::<ShapingResult>::default());
 
