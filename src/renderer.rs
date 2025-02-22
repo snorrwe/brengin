@@ -44,15 +44,15 @@ pub struct WindowSize {
 }
 
 #[derive(Debug)]
-pub struct RenderCommandInput<'a> {
-    pub render_pass: &'a mut wgpu::RenderPass<'a>,
+pub struct RenderCommandInput<'a, 'b> {
+    pub render_pass: &'a mut wgpu::RenderPass<'b>,
     pub camera: &'a wgpu::BindGroup,
 }
 
 pub trait RenderCommand<'a> {
     type Parameters: WorldQuery<'a>;
 
-    fn render<'r>(input: &'r mut RenderCommandInput<'a>, params: &'r Self::Parameters);
+    fn render<'r>(input: &'r mut RenderCommandInput<'a, 'r>, params: &'r Self::Parameters);
 }
 
 #[derive(Clone)]
@@ -67,7 +67,7 @@ impl RenderCommandInternal {
             render_cmd: Arc::new(move |world, input| {
                 world.run_view_system(move |q: T::Parameters| unsafe {
                     let q: &T::Parameters = std::mem::transmute(&q);
-                    let input: &mut RenderCommandInput<'_> = std::mem::transmute(input);
+                    let input: &mut RenderCommandInput<'_, '_> = std::mem::transmute(input);
                     T::render(input, q);
                 });
             }),
@@ -123,11 +123,10 @@ impl GraphicsState {
         #[cfg(debug_assertions)]
         let flags = InstanceFlags::debugging();
 
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: Backends::all(),
-            dx12_shader_compiler: Default::default(),
             flags,
-            gles_minor_version: Default::default(),
+            backend_options: wgpu::BackendOptions::default(),
         });
         let surface = instance
             .create_surface(window)

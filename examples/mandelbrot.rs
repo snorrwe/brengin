@@ -50,13 +50,13 @@ impl MandelbrotPipeline {
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
                         module: &shader,
-                        entry_point: "vs_main",
+                        entry_point: Some("vs_main"),
                         buffers: &[],
                         compilation_options: Default::default(),
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &shader,
-                        entry_point: "fs_main",
+                        entry_point: Some("fs_main"),
                         compilation_options: Default::default(),
                         targets: &[Some(wgpu::ColorTargetState {
                             format: renderer.config().format,
@@ -102,7 +102,7 @@ impl<'a> RenderCommand<'a> for MandelbrotPipeline {
         brengin::renderer::RenderCommandInput {
             render_pass,
             ..
-        }: &'r mut brengin::renderer::RenderCommandInput<'a>,
+        }: &'r mut brengin::renderer::RenderCommandInput<'a, 'r>,
 
         pipeline: &'r Self::Parameters,
     ) {

@@ -369,13 +369,13 @@ impl SpritePipeline {
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
                         module: &shader,
-                        entry_point: "vs_main",
+                        entry_point: Some("vs_main"),
                         buffers: &[Vertex::desc(), SpriteInstanceRaw::desc()],
                         compilation_options: Default::default(),
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &shader,
-                        entry_point: "fs_main",
+                        entry_point: Some("fs_main"),
                         compilation_options: Default::default(),
                         targets: &[Some(wgpu::ColorTargetState {
                             format: renderer.config.format,
@@ -447,7 +447,7 @@ impl SpritePipeline {
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
         for (_, sheet) in self.sheets.iter() {
-            render_pass.set_bind_group(0, camera, &[]);
+            render_pass.set_bind_group(0, *camera, &[]);
             render_pass.set_bind_group(1, &sheet.spritesheet_bind_group, &[]);
             render_pass.set_bind_group(2, &sheet.spritesheet_gpu, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
@@ -464,7 +464,7 @@ struct SpriteRenderCommand;
 impl<'a> RenderCommand<'a> for SpriteRenderCommand {
     type Parameters = Res<'a, SpritePipeline>;
 
-    fn render<'r>(input: &'r mut RenderCommandInput<'a>, pipeline: &'r Self::Parameters) {
+    fn render<'r>(input: &'r mut RenderCommandInput<'a, 'r>, pipeline: &'r Self::Parameters) {
         pipeline.render(input)
     }
 }

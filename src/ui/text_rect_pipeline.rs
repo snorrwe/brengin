@@ -178,13 +178,13 @@ impl TextPipeline {
                     )),
                     vertex: wgpu::VertexState {
                         module: &shader,
-                        entry_point: "vs_main",
+                        entry_point: Some("vs_main"),
                         buffers: &[DrawRectInstance::desc()],
                         compilation_options: Default::default(),
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &shader,
-                        entry_point: "fs_main",
+                        entry_point: Some("fs_main"),
                         compilation_options: Default::default(),
                         targets: &[Some(wgpu::ColorTargetState {
                             format: renderer.config().format,
@@ -230,7 +230,10 @@ struct RectRenderCommand;
 impl<'a> RenderCommand<'a> for RectRenderCommand {
     type Parameters = (Res<'a, crate::renderer::WindowSize>, Res<'a, TextPipeline>);
 
-    fn render<'r>(input: &'r mut RenderCommandInput<'a>, (size, pipeline): &'r Self::Parameters) {
+    fn render<'r>(
+        input: &'r mut RenderCommandInput<'a, 'r>,
+        (size, pipeline): &'r Self::Parameters,
+    ) {
         input
             .render_pass
             .set_pipeline(&pipeline.color_rect_pipeline);
