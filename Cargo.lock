@@ -316,7 +316,7 @@ dependencies = [
 [[package]]
 name = "cecs"
 version = "0.1.6"
-source = "git+https://github.com/caolo-game/cecs#35e90ef6be98ddabac6a1a9cc81f55e0a82b676b"
+source = "git+https://github.com/caolo-game/cecs#f14306877815887f757219264b54556c9ecad0ef"
 dependencies = [
  "cache-padded",
  "cfg-if",
