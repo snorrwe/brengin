@@ -9,8 +9,7 @@ struct Vertex {
 
 struct Instance {
     @location(0) xywh: vec4<f32>,
-    @location(1) color: u32,
-    @location(2) layer: f32,
+    @location(1) layer: f32,
 }
 
 struct VertexOutput {
@@ -24,7 +23,6 @@ fn vs_main(
     instance: Instance,
 ) -> VertexOutput {
     var out: VertexOutput;
-    let c = instance.color;
     let xywh = instance.xywh;
 
     let u = f32(model.vertex_index & 1);

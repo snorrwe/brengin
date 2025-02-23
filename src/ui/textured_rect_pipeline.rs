@@ -70,11 +70,6 @@ impl DrawRectInstance {
                 wgpu::VertexAttribute {
                     offset: size_of::<[u32; 4]>() as wgpu::BufferAddress,
                     shader_location: 1,
-                    format: wgpu::VertexFormat::Uint32,
-                },
-                wgpu::VertexAttribute {
-                    offset: (size_of::<[u32; 4]>() + size_of::<u32>()) as wgpu::BufferAddress,
-                    shader_location: 2,
                     format: wgpu::VertexFormat::Float32,
                 },
             ],
@@ -177,13 +172,13 @@ impl UiTexturePipeline {
                     )),
                     vertex: wgpu::VertexState {
                         module: &shader,
-                        entry_point: "vs_main",
+                        entry_point: Some("vs_main"),
                         buffers: &[DrawRectInstance::desc()],
                         compilation_options: Default::default(),
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: &shader,
-                        entry_point: "fs_main",
+                        entry_point: Some("fs_main"),
                         compilation_options: Default::default(),
                         targets: &[Some(wgpu::ColorTargetState {
                             format: renderer.config().format,
@@ -232,7 +227,10 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
         Res<'a, UiTexturePipeline>,
     );
 
-    fn render<'r>(input: &'r mut RenderCommandInput<'a>, (size, pipeline): &'r Self::Parameters) {
+    fn render<'r>(
+        input: &'r mut RenderCommandInput<'a, 'r>,
+        (size, pipeline): &'r Self::Parameters,
+    ) {
         input.render_pass.set_pipeline(&pipeline.pipeline);
 
         for ((scissor, texture_id), requests) in pipeline.instances.iter() {
