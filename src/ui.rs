@@ -15,6 +15,7 @@ use cecs::{prelude::*, query};
 use glam::IVec2;
 use image::DynamicImage;
 use text_rect_pipeline::{DrawTextRect, TextRectRequests};
+use textured_rect_pipeline::DrawTextureRect;
 use tracing::debug;
 use winit::{
     dpi::PhysicalPosition,
@@ -126,6 +127,7 @@ pub struct UiState {
     id_stack: Vec<IdxType>,
 
     color_rects: Vec<DrawColorRect>,
+    texture_rects: Vec<DrawTextureRect>,
     text_rects: Vec<DrawTextRect>,
     scissors: Vec<UiRect>,
     scissor_idx: u32,
@@ -148,6 +150,18 @@ pub struct UiState {
     fallback_font: OwnedTypeFace,
 
     window_allocator: WindowAllocator,
+}
+
+#[derive(Clone)]
+pub enum ThemeEntry {
+    Color(Color),
+    Image(Handle<DynamicImage>),
+}
+
+impl From<Color> for ThemeEntry {
+    fn from(value: Color) -> Self {
+        Self::Color(value)
+    }
 }
 
 #[derive(Clone)]
@@ -189,6 +203,7 @@ impl UiState {
             id_stack: Default::default(),
             color_rects: Default::default(),
             text_rects: Default::default(),
+            texture_rects: Default::default(),
             scissors: Default::default(),
             scissor_idx: 0,
             bounds: Default::default(),
@@ -495,6 +510,31 @@ impl<'a> Ui<'a> {
             w: width,
             h: height,
             color,
+            layer,
+            scissor,
+        })
+    }
+
+    pub fn image_rect(
+        &mut self,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        image: Handle<DynamicImage>,
+        layer: u16,
+    ) {
+        self.ui
+            .rect_history
+            .push(UiRect::from_pos_size(x, y, width, height));
+        assert!(!self.ui.scissors.is_empty());
+        let scissor = self.ui.scissor_idx;
+        self.ui.texture_rects.push(DrawTextureRect {
+            x,
+            y,
+            w: width,
+            h: height,
+            image,
             layer,
             scissor,
         })

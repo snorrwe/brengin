@@ -42,7 +42,7 @@ pub struct DrawTextureRect {
     pub w: i32,
     pub h: i32,
     pub layer: u16,
-    pub texture: Handle<Texture>,
+    pub image: Handle<DynamicImage>,
     pub scissor: u32,
 }
 
@@ -94,9 +94,8 @@ pub struct UiTextureRenderingData {
     pub texture: Texture,
 }
 
-// TODO: use texture/image assets
 #[derive(Default)]
-struct UiTextureReferences(pub HashMap<AssetId, WeakHandle<super::ShapingResult>>);
+struct UiTextureReferences(pub HashMap<AssetId, WeakHandle<DynamicImage>>);
 
 fn gc_text_textures(
     mut texturerefs: ResMut<UiTextureReferences>,
@@ -120,30 +119,27 @@ fn extract_textures(
     game_world: Res<GameWorld>,
 ) {
     game_world.world().run_view_system(
-        |cache: Res<super::TextTextureCache>, images: Res<Assets<DynamicImage>>| {
-            for handle in cache.0.values() {
-                let res = shaping_results.get(handle);
-                let id = handle.id();
-                if refs.0.contains_key(&id) {
-                    continue;
+        |requests: Query<&TextureRectRequests>, images: Res<Assets<DynamicImage>>| {
+            for r in requests.iter() {
+                for handle in r.0.iter().map(|r| &r.image) {
+                    let res = images.get(handle);
+                    let id = handle.id();
+                    if refs.0.contains_key(&id) {
+                        continue;
+                    }
+                    let texture =
+                        Texture::from_image(renderer.device(), renderer.queue(), res, None)
+                            .expect("Failed to create text texture");
+                    let texture_bind_group = texture_to_bindings(renderer.device(), &texture);
+
+                    refs.0.insert(id, handle.downgrade());
+                    let rendering_data = UiTextureRenderingData {
+                        texture_bind_group,
+                        texture,
+                    };
+
+                    pipeline.textures.insert(id, rendering_data);
                 }
-                let texture = Texture::from_rgba8(
-                    renderer.device(),
-                    renderer.queue(),
-                    res.texture.pixmap.data(),
-                    (res.texture.width(), res.texture.height()),
-                    None,
-                )
-                .expect("Failed to create text texture");
-                let texture_bind_group = texture_to_bindings(renderer.device(), &texture);
-
-                refs.0.insert(id, handle.downgrade());
-                let rendering_data = UiTextureRenderingData {
-                    texture_bind_group,
-                    texture,
-                };
-
-                pipeline.textures.insert(id, rendering_data);
             }
         },
     );
@@ -291,7 +287,7 @@ fn update_instances(
                 layer,
             };
             instances
-                .entry((rect.texture.id(), *scissor))
+                .entry((rect.image.id(), *scissor))
                 .or_default()
                 .push(instance);
         }
