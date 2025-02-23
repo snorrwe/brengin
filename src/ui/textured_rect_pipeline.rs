@@ -10,6 +10,7 @@ use crate::renderer::{
 use crate::wgpu::include_wgsl;
 use crate::GameWorld;
 use cecs::prelude::*;
+use image::DynamicImage;
 use tracing::debug;
 
 use crate::{renderer::Extract, Plugin};
@@ -119,8 +120,7 @@ fn extract_textures(
     game_world: Res<GameWorld>,
 ) {
     game_world.world().run_view_system(
-        |cache: Res<super::TextTextureCache>,
-         shaping_results: Res<Assets<super::ShapingResult>>| {
+        |cache: Res<super::TextTextureCache>, images: Res<Assets<DynamicImage>>| {
             for handle in cache.0.values() {
                 let res = shaping_results.get(handle);
                 let id = handle.id();
