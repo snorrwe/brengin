@@ -13,6 +13,7 @@ use std::{any::TypeId, collections::HashMap, ptr::NonNull, time::Duration};
 
 use cecs::{prelude::*, query};
 use glam::IVec2;
+use image::DynamicImage;
 use text_rect_pipeline::{DrawTextRect, TextRectRequests};
 use tracing::debug;
 use winit::{
@@ -36,8 +37,9 @@ impl Plugin for UiPlugin {
         app.add_plugin(color_rect_pipeline::UiColorRectPlugin);
         app.add_plugin(text_rect_pipeline::UiTextRectPlugin);
         app.add_plugin(textured_rect_pipeline::UiTextureRectPlugin);
-        app.add_plugin(AssetsPlugin::<OwnedTypeFace>::default());
-        app.add_plugin(AssetsPlugin::<ShapingResult>::default());
+        app.require_plugin(AssetsPlugin::<OwnedTypeFace>::default());
+        app.require_plugin(AssetsPlugin::<ShapingResult>::default());
+        app.require_plugin(AssetsPlugin::<DynamicImage>::default());
 
         app.insert_resource(UiState::new());
         app.insert_resource(UiIds::default());
