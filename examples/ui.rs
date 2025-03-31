@@ -3,6 +3,7 @@ use brengin::ui::{HorizontalAlignment, ScrollDescriptor, UiCoord, UiRoot, Vertic
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
 use image::DynamicImage;
+use tracing_subscriber::fmt::format;
 
 struct Label(String);
 
@@ -30,8 +31,8 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
 
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoord::Percent(100),
-            height: UiCoord::Percent(100),
+            width: UiCoord::Percent(50),
+            height: UiCoord::Percent(50),
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
         },
@@ -39,9 +40,13 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
             ui.grid(4, |ui| {
                 for col in 0..4 {
                     ui.column(col, |ui| {
-                        for _row in 0..4 {
-                            ui.label("pog");
-                            ui.image(ui_state.boid.clone(), 128, 128);
+                        for row in 0..4 {
+                            ui.label(format!("col - {col} row - {row}"));
+                            ui.image(
+                                ui_state.boid.clone(),
+                                UiCoord::Percent(50),
+                                UiCoord::Absolute(56),
+                            );
                         }
                     });
                 }

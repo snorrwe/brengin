@@ -627,11 +627,20 @@ impl<'a> Ui<'a> {
         *self.theme = t;
     }
 
-    pub fn image(&mut self, image: Handle<DynamicImage>, width: i32, height: i32) -> Response<()> {
+    pub fn image(
+        &mut self,
+        image: Handle<DynamicImage>,
+        width: UiCoord,
+        height: UiCoord,
+    ) -> Response<()> {
         self.begin_widget();
         let id = self.current_id();
         let layer = self.ui.layer;
         let padding = self.theme.padding as i32;
+
+        let width = width.as_abolute(self.ui.bounds.width());
+        let height = height.as_abolute(self.ui.bounds.height());
+
         let x = self.ui.bounds.min_x;
         let y = self.ui.bounds.min_y;
         self.image_rect(x + padding, y + padding, width, height, image, layer);
