@@ -2,16 +2,52 @@ use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
 use brengin::ui::{HorizontalAlignment, ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment};
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
+use image::DynamicImage;
 
 struct Label(String);
 
 #[derive(Default)]
-struct UiState {}
+struct UiState {
+    boid: Handle<DynamicImage>,
+}
 
 enum MenuState {
     Main,
     DragNDrop,
     Buttons,
+    ImageGrid,
+}
+
+fn load_image(mut state: ResMut<UiState>, mut images: ResMut<Assets<DynamicImage>>) {
+    let data = include_bytes!("./assets/boid.png");
+    let image = image::load_from_memory(data).expect("Failed to load image");
+
+    state.boid = images.insert(image);
+}
+
+fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
+    let MenuState::ImageGrid = *state else { return };
+
+    ctx.panel(
+        brengin::ui::PanelDescriptor {
+            width: UiCoord::Percent(100),
+            height: UiCoord::Percent(100),
+            horizonal: HorizontalAlignment::Center,
+            vertical: VerticalAlignment::Center,
+        },
+        |ui| {
+            ui.grid(4, |ui| {
+                for col in 0..4 {
+                    ui.column(col, |ui| {
+                        for _row in 0..4 {
+                            ui.label("pog");
+                            ui.image(ui_state.boid.clone(), 128, 128);
+                        }
+                    });
+                }
+            });
+        },
+    );
 }
 
 fn back(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
@@ -49,6 +85,9 @@ fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
             }
             if ui.button("Buttons").inner.pressed {
                 *state = MenuState::Buttons;
+            }
+            if ui.button("ImageGrid").inner.pressed {
+                *state = MenuState::ImageGrid;
             }
         },
     );
@@ -288,11 +327,13 @@ async fn game() {
     app.insert_resource(FormState::default());
     app.add_plugin(DefaultPlugins);
     app.add_startup_system(setup);
+    app.add_startup_system(load_image);
     app.with_stage(brengin::Stage::Update, |s| {
         s.add_system(buttons_ui);
         s.add_system(menu);
         s.add_system(dnd_ui);
         s.add_system(back);
+        s.add_system(image_grid);
     });
     app.run().await.unwrap();
 }

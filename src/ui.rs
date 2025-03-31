@@ -515,6 +515,7 @@ impl<'a> Ui<'a> {
         })
     }
 
+    /// low level rendering method
     pub fn image_rect(
         &mut self,
         x: i32,
@@ -623,6 +624,30 @@ impl<'a> Ui<'a> {
         ///////////////////////
 
         *self.theme = t;
+    }
+
+    pub fn image(&mut self, image: Handle<DynamicImage>, width: i32, height: i32) -> Response<()> {
+        self.begin_widget();
+        let id = self.current_id();
+        let layer = self.ui.layer;
+        // TODO: padding
+        let x = self.ui.bounds.min_x;
+        let y = self.ui.bounds.min_y;
+        self.image_rect(x, y, width, height, image, layer);
+        let rect = UiRect {
+            min_x: x,
+            min_y: y,
+            max_x: x + width,
+            max_y: y + height,
+        };
+        self.submit_rect(id, rect);
+
+        Response {
+            hovered: self.ids.hovered == id,
+            active: self.ids.active == id,
+            inner: (),
+            rect,
+        }
     }
 
     pub fn label(&mut self, label: impl Into<String>) -> Response<()> {
