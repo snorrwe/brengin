@@ -165,6 +165,12 @@ impl From<Color> for ThemeEntry {
     }
 }
 
+impl From<Handle<DynamicImage>> for ThemeEntry {
+    fn from(value: Handle<DynamicImage>) -> Self {
+        Self::Image(value)
+    }
+}
+
 #[derive(Clone)]
 pub struct Theme {
     pub primary_color: Color,
