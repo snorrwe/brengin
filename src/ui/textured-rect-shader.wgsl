@@ -28,12 +28,12 @@ fn vs_main(
     let u = f32(model.vertex_index & 1);
     var v = f32((model.vertex_index >> 1) & 1);
 
-    out.uv = vec2<f32>(u, v);
-
     let flip = model.vertex_index > 2;
     if flip {
         v = 1.0 - v;
     }
+
+    out.uv = vec2<f32>(u, v);
 
     var vertex = vec2<f32>(u, v) * vec2(2, -2) + vec2(-1, 1);
     vertex *= xywh.zw;
