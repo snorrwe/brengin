@@ -179,6 +179,10 @@ pub struct Theme {
     pub button_default: ThemeEntry,
     pub button_hovered: ThemeEntry,
     pub button_pressed: ThemeEntry,
+
+    pub drop_target_default: ThemeEntry,
+    pub drop_target_hovered: ThemeEntry,
+
     pub text_padding: u16,
     pub font_size: u16,
     pub padding: u16,
@@ -197,6 +201,10 @@ impl Default for Theme {
             button_default: 0x212224ff.into(),
             button_hovered: 0x45475aff.into(),
             button_pressed: 0x585b70ff.into(),
+
+            drop_target_default: 0x0.into(),
+            drop_target_hovered: 0xcdd6f4ff.into(),
+
             text_padding: 5,
             font_size: 12,
             padding: 5,
@@ -1260,11 +1268,13 @@ impl<'a> Ui<'a> {
         self.begin_widget();
         let id = self.current_id();
         let old_bounds = self.ui.bounds;
-        let layer = self.push_layer();
+        let og_layer = self.push_layer();
+        let bg_layer = self.push_layer();
         self.ui.id_stack.push(0);
         let mut state = DropState::default();
         state.id = id;
         state.dragged = self.ids.dragged;
+
         if self.is_anything_dragged() {
             if self.contains_mouse(id) {
                 state.hovered = true;
@@ -1273,22 +1283,33 @@ impl<'a> Ui<'a> {
                 }
             }
         }
+
         let history_start = self.ui.rect_history.len();
         ///////////////////////
         contents(self, state);
         ///////////////////////
-        self.ui.layer = layer;
+        self.ui.layer = og_layer;
         self.ui.id_stack.pop();
         self.ui.bounds = old_bounds;
 
         let content_bounds = self.history_bounding_rect(history_start);
         self.submit_rect(id, content_bounds);
 
+        let background;
         if state.hovered {
-            let color = self.theme.primary_color;
-            self.color_rect_from_rect(content_bounds, color, layer);
-            self.ui.rect_history.pop();
+            background = &self.theme.drop_target_hovered;
+        } else {
+            background = &self.theme.drop_target_default;
         }
+        self.theme_rect(
+            content_bounds.min_x,
+            content_bounds.min_y,
+            content_bounds.width(),
+            content_bounds.height(),
+            bg_layer,
+            background.clone(),
+        );
+        self.ui.rect_history.pop();
 
         DropResponse {
             dropped: state.dropped,
