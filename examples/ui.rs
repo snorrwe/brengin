@@ -101,7 +101,7 @@ struct Dnd {
     pub lists: Vec<Vec<usize>>,
 }
 
-fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>, mut dnd: ResMut<Dnd>) {
+fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>, mut dnd: ResMut<Dnd>, ui_state: Res<UiState>) {
     let MenuState::DragNDrop = *state else { return };
 
     let mut dropped_on = None;
@@ -131,6 +131,7 @@ fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>, mut dnd: ResMut<Dnd>) {
                         if ui
                             .drag_source(|ui| {
                                 ui.label(format!("item {n}"));
+                                ui.image(ui_state.boid.clone(), 32.into(), 32.into());
                             })
                             .is_being_dragged
                         {
