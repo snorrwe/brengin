@@ -176,8 +176,9 @@ pub struct Theme {
     pub background: ThemeEntry,
     pub primary_color: Color,
     pub secondary_color: Color,
-    pub button_hovered: Color,
-    pub button_pressed: Color,
+    pub button_default: ThemeEntry,
+    pub button_hovered: ThemeEntry,
+    pub button_pressed: ThemeEntry,
     pub text_padding: u16,
     pub font_size: u16,
     pub padding: u16,
@@ -193,8 +194,9 @@ impl Default for Theme {
             background: 0x04a5e5ff.into(),
             primary_color: 0xcdd6f4ff,
             secondary_color: 0x212224ff,
-            button_hovered: 0x45475aff,
-            button_pressed: 0x585b70ff,
+            button_default: 0x212224ff.into(),
+            button_hovered: 0x45475aff.into(),
+            button_pressed: 0x585b70ff.into(),
             text_padding: 5,
             font_size: 12,
             padding: 5,
@@ -750,10 +752,10 @@ impl<'a> Ui<'a> {
         let id = self.current_id();
         let mut pressed = false;
         let contains_mouse = self.contains_mouse(id);
-        let mut color = self.theme.secondary_color;
+        let mut color = self.theme.button_default.clone();
         let active = self.is_active(id);
         if active {
-            color = self.theme.button_pressed;
+            color = self.theme.button_pressed.clone();
             if self.mouse_up() {
                 if self.is_hovered(id) {
                     pressed = true;
@@ -761,7 +763,7 @@ impl<'a> Ui<'a> {
                 self.set_not_active(id);
             }
         } else if self.is_hovered(id) {
-            color = self.theme.button_hovered;
+            color = self.theme.button_hovered.clone();
             if !contains_mouse {
                 self.set_not_hovered(id);
             } else if self.mouse_down() {
@@ -821,7 +823,7 @@ impl<'a> Ui<'a> {
         // background
         let w = w + 2 * text_padding;
         let h = h + 2 * text_padding;
-        self.color_rect(x, y, w, h, color, layer);
+        self.theme_rect(x, y, w, h, layer, color);
 
         let rect = UiRect {
             min_x: x,
@@ -1488,6 +1490,25 @@ impl<'a> Ui<'a> {
             rect,
         }
     }
+
+    fn theme_rect(
+        &mut self,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        layer: u16,
+        entry: ThemeEntry,
+    ) {
+        match entry {
+            ThemeEntry::Color(c) => {
+                self.color_rect(x, y, width, height, c, layer);
+            }
+            ThemeEntry::Image(handle) => {
+                self.image_rect(x, y, width, height, handle, layer);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -1926,25 +1947,6 @@ impl<'a> UiRoot<'a> {
         self.0.ui.window_allocator = allocator;
     }
 
-    fn theme_rect(
-        &mut self,
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-        layer: u16,
-        entry: ThemeEntry,
-    ) {
-        match entry {
-            ThemeEntry::Color(c) => {
-                self.0.color_rect(x, y, width, height, c, layer);
-            }
-            ThemeEntry::Image(handle) => {
-                self.0.image_rect(x, y, width, height, handle, layer);
-            }
-        }
-    }
-
     pub fn panel(&mut self, desc: PanelDescriptor, mut contents: impl FnMut(&mut Ui)) {
         let width = desc.width.as_abolute(self.0.ui.bounds.width());
         let height = desc.height.as_abolute(self.0.ui.bounds.height());
@@ -1986,7 +1988,7 @@ impl<'a> UiRoot<'a> {
         let scissor = self.0.push_scissor(bounds);
 
         let layer = self.0.push_layer();
-        self.theme_rect(
+        self.0.theme_rect(
             bounds.min_x,
             bounds.min_y,
             width,
