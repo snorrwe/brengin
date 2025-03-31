@@ -557,7 +557,7 @@ impl<'a> Ui<'a> {
             image,
             layer,
             scissor,
-        })
+        });
     }
 
     pub fn text_rect(
