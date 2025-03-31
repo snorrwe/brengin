@@ -630,15 +630,15 @@ impl<'a> Ui<'a> {
         self.begin_widget();
         let id = self.current_id();
         let layer = self.ui.layer;
-        // TODO: padding
+        let padding = self.theme.padding as i32;
         let x = self.ui.bounds.min_x;
         let y = self.ui.bounds.min_y;
-        self.image_rect(x, y, width, height, image, layer);
+        self.image_rect(x + padding, y + padding, width, height, image, layer);
         let rect = UiRect {
             min_x: x,
             min_y: y,
-            max_x: x + width,
-            max_y: y + height,
+            max_x: x + width + padding * 2,
+            max_y: y + height + padding * 2,
         };
         self.submit_rect(id, rect);
 
