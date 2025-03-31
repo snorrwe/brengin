@@ -3,7 +3,6 @@ use brengin::ui::{HorizontalAlignment, ScrollDescriptor, UiCoord, UiRoot, Vertic
 use brengin::{prelude::*, transform};
 use brengin::{App, DefaultPlugins};
 use image::DynamicImage;
-use tracing_subscriber::fmt::format;
 
 struct Label(String);
 
