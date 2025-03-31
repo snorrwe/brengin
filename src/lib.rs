@@ -455,6 +455,7 @@ impl App {
         }
     }
 
+    /// Panics if repeatedly called with the same type.
     pub fn add_plugin<T: Plugin + 'static>(&mut self, plugin: T) -> &mut Self {
         let id = TypeId::of::<T>();
         assert!(
@@ -463,6 +464,15 @@ impl App {
         );
         self.plugins.insert(id);
         plugin.build(self);
+        self
+    }
+
+    /// Adds the plugin the first time it's called. If called repeatedly with the same type
+    /// repeated calls are a noop.
+    pub fn require_plugin<T: Plugin + 'static>(&mut self, plugin: T) -> &mut Self {
+        if self.plugins.insert(TypeId::of::<T>()) {
+            plugin.build(self);
+        }
         self
     }
 

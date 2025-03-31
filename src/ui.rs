@@ -7,12 +7,15 @@ pub mod color_rect_pipeline;
 pub mod rect;
 pub mod text;
 pub mod text_rect_pipeline;
+pub mod textured_rect_pipeline;
 
 use std::{any::TypeId, collections::HashMap, ptr::NonNull, time::Duration};
 
 use cecs::{prelude::*, query};
 use glam::IVec2;
+use image::DynamicImage;
 use text_rect_pipeline::{DrawTextRect, TextRectRequests};
+use textured_rect_pipeline::{DrawTextureRect, TextureRectRequests};
 use tracing::debug;
 use winit::{
     dpi::PhysicalPosition,
@@ -34,8 +37,10 @@ impl Plugin for UiPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(color_rect_pipeline::UiColorRectPlugin);
         app.add_plugin(text_rect_pipeline::UiTextRectPlugin);
-        app.add_plugin(AssetsPlugin::<OwnedTypeFace>::default());
-        app.add_plugin(AssetsPlugin::<ShapingResult>::default());
+        app.add_plugin(textured_rect_pipeline::UiTextureRectPlugin);
+        app.require_plugin(AssetsPlugin::<OwnedTypeFace>::default());
+        app.require_plugin(AssetsPlugin::<ShapingResult>::default());
+        app.require_plugin(AssetsPlugin::<DynamicImage>::default());
 
         app.insert_resource(UiState::new());
         app.insert_resource(UiIds::default());
@@ -53,6 +58,7 @@ impl Plugin for UiPlugin {
         app.with_stage(crate::Stage::PostUpdate, |s| {
             s.add_system(submit_frame_color_rects)
                 .add_system(submit_frame_text_rects)
+                .add_system(submit_frame_texture_rects)
                 .add_system(update_ids);
         });
     }
@@ -122,6 +128,7 @@ pub struct UiState {
     id_stack: Vec<IdxType>,
 
     color_rects: Vec<DrawColorRect>,
+    texture_rects: Vec<DrawTextureRect>,
     text_rects: Vec<DrawTextRect>,
     scissors: Vec<UiRect>,
     scissor_idx: u32,
@@ -144,6 +151,18 @@ pub struct UiState {
     fallback_font: OwnedTypeFace,
 
     window_allocator: WindowAllocator,
+}
+
+#[derive(Clone)]
+pub enum ThemeEntry {
+    Color(Color),
+    Image(Handle<DynamicImage>),
+}
+
+impl From<Color> for ThemeEntry {
+    fn from(value: Color) -> Self {
+        Self::Color(value)
+    }
 }
 
 #[derive(Clone)]
@@ -185,6 +204,7 @@ impl UiState {
             id_stack: Default::default(),
             color_rects: Default::default(),
             text_rects: Default::default(),
+            texture_rects: Default::default(),
             scissors: Default::default(),
             scissor_idx: 0,
             bounds: Default::default(),
@@ -496,6 +516,32 @@ impl<'a> Ui<'a> {
         })
     }
 
+    /// low level rendering method
+    pub fn image_rect(
+        &mut self,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        image: Handle<DynamicImage>,
+        layer: u16,
+    ) {
+        self.ui
+            .rect_history
+            .push(UiRect::from_pos_size(x, y, width, height));
+        assert!(!self.ui.scissors.is_empty());
+        let scissor = self.ui.scissor_idx;
+        self.ui.texture_rects.push(DrawTextureRect {
+            x,
+            y,
+            w: width,
+            h: height,
+            image,
+            layer,
+            scissor,
+        })
+    }
+
     pub fn text_rect(
         &mut self,
         x: i32,
@@ -579,6 +625,39 @@ impl<'a> Ui<'a> {
         ///////////////////////
 
         *self.theme = t;
+    }
+
+    pub fn image(
+        &mut self,
+        image: Handle<DynamicImage>,
+        width: UiCoord,
+        height: UiCoord,
+    ) -> Response<()> {
+        self.begin_widget();
+        let id = self.current_id();
+        let layer = self.ui.layer;
+        let padding = self.theme.padding as i32;
+
+        let width = width.as_abolute(self.ui.bounds.width());
+        let height = height.as_abolute(self.ui.bounds.height());
+
+        let x = self.ui.bounds.min_x;
+        let y = self.ui.bounds.min_y;
+        self.image_rect(x + padding, y + padding, width, height, image, layer);
+        let rect = UiRect {
+            min_x: x,
+            min_y: y,
+            max_x: x + width + padding * 2,
+            max_y: y + height + padding * 2,
+        };
+        self.submit_rect(id, rect);
+
+        Response {
+            hovered: self.ids.hovered == id,
+            active: self.ids.active == id,
+            inner: (),
+            rect,
+        }
     }
 
     pub fn label(&mut self, label: impl Into<String>) -> Response<()> {
@@ -1531,6 +1610,7 @@ fn begin_frame(mut ui: ResMut<UiState>, window_size: Res<crate::renderer::Window
     ui.rect_history.clear();
     ui.color_rects.clear();
     ui.text_rects.clear();
+    ui.texture_rects.clear();
     ui.bounds = UiRect {
         min_x: 0,
         min_y: 0,
@@ -1611,6 +1691,41 @@ fn submit_frame_text_rects(
         ));
     }
     ui.text_rects = text_rects;
+    ui.text_rects.clear();
+}
+
+// preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
+// GC if too many
+// most frames should have the same items
+fn submit_frame_texture_rects(
+    mut ui: ResMut<UiState>,
+    mut cmd: Commands,
+    mut texture_rect_q: Query<(&mut TextureRectRequests, &mut UiScissor, EntityId)>,
+) {
+    let mut textured_rects = std::mem::take(&mut ui.texture_rects);
+    textured_rects.sort_unstable_by_key(|r| r.scissor);
+
+    let mut buffers_reused = 0;
+    let mut rects_consumed = 0;
+    for (g, (rects, sc, _id)) in
+        (textured_rects.chunk_by_mut(|a, b| a.scissor == b.scissor)).zip(texture_rect_q.iter_mut())
+    {
+        buffers_reused += 1;
+        rects_consumed += g.len();
+        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
+        rects.0.clear();
+        rects.0.extend(g.iter_mut().map(|x| std::mem::take(x)));
+    }
+    for (_, _, id) in texture_rect_q.iter().skip(buffers_reused) {
+        cmd.delete(id);
+    }
+    for g in textured_rects[rects_consumed..].chunk_by_mut(|a, b| a.scissor == b.scissor) {
+        cmd.spawn().insert_bundle((
+            UiScissor(ui.scissors[g[0].scissor as usize]),
+            TextureRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
+        ));
+    }
+    ui.texture_rects = textured_rects;
     ui.text_rects.clear();
 }
 
