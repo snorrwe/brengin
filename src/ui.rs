@@ -173,6 +173,7 @@ impl From<Handle<DynamicImage>> for ThemeEntry {
 
 #[derive(Clone)]
 pub struct Theme {
+    pub background: ThemeEntry,
     pub primary_color: Color,
     pub secondary_color: Color,
     pub button_hovered: Color,
@@ -189,6 +190,7 @@ pub struct Theme {
 impl Default for Theme {
     fn default() -> Self {
         Theme {
+            background: 0x04a5e5ff.into(),
             primary_color: 0xcdd6f4ff,
             secondary_color: 0x212224ff,
             button_hovered: 0x45475aff,
@@ -1924,6 +1926,25 @@ impl<'a> UiRoot<'a> {
         self.0.ui.window_allocator = allocator;
     }
 
+    fn theme_rect(
+        &mut self,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        layer: u16,
+        entry: ThemeEntry,
+    ) {
+        match entry {
+            ThemeEntry::Color(c) => {
+                self.0.color_rect(x, y, width, height, c, layer);
+            }
+            ThemeEntry::Image(handle) => {
+                self.0.image_rect(x, y, width, height, handle, layer);
+            }
+        }
+    }
+
     pub fn panel(&mut self, desc: PanelDescriptor, mut contents: impl FnMut(&mut Ui)) {
         let width = desc.width.as_abolute(self.0.ui.bounds.width());
         let height = desc.height.as_abolute(self.0.ui.bounds.height());
@@ -1965,14 +1986,15 @@ impl<'a> UiRoot<'a> {
         let scissor = self.0.push_scissor(bounds);
 
         let layer = self.0.push_layer();
-        self.0.color_rect(
+        self.theme_rect(
             bounds.min_x,
             bounds.min_y,
             width,
             height,
-            0x04a5e5ff,
             self.0.ui.layer,
+            self.0.theme.background.clone(),
         );
+
         self.0.ui.layer += 1;
         self.0.ui.id_stack.push(0);
         ///////////////////////
