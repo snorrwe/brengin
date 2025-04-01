@@ -48,7 +48,7 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                                         UiCoord::Absolute(56),
                                     );
                                 },
-                                |ui| {
+                                |ui, _| {
                                     ui.label(format!("col - {col} row - {row}"));
                                 },
                             );

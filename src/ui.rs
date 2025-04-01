@@ -1556,7 +1556,7 @@ impl<'a> Ui<'a> {
     pub fn context_menu(
         &mut self,
         mut contents: impl FnMut(&mut Self),
-        mut context_menu: impl FnMut(&mut Self),
+        mut context_menu: impl FnMut(&mut Self, &mut ContextMenuState),
     ) -> ContextMenuResponse<'_, 'a> {
         self.begin_widget();
         let id = self.current_id();
@@ -1601,7 +1601,7 @@ impl<'a> Ui<'a> {
             });
 
             ///////////////////////
-            context_menu(self);
+            context_menu(self, &mut state);
             ///////////////////////
             self.ui.id_stack.pop();
             self.ui.bounds = new_bounds;
