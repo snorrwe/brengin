@@ -40,11 +40,17 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                 for col in 0..4 {
                     ui.column(col, |ui| {
                         for row in 0..4 {
-                            ui.label(format!("col - {col} row - {row}"));
-                            ui.image(
-                                ui_state.boid.clone(),
-                                UiCoord::Percent(50),
-                                UiCoord::Absolute(56),
+                            ui.context_menu(
+                                |ui| {
+                                    ui.image(
+                                        ui_state.boid.clone(),
+                                        UiCoord::Percent(50),
+                                        UiCoord::Absolute(56),
+                                    );
+                                },
+                                |ui| {
+                                    ui.label(format!("col - {col} row - {row}"));
+                                },
                             );
                         }
                     });

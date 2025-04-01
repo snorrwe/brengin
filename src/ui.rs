@@ -180,6 +180,8 @@ pub struct Theme {
     pub button_hovered: Option<ThemeEntry>,
     pub button_pressed: Option<ThemeEntry>,
 
+    pub context_background: ThemeEntry,
+
     pub drop_target_default: ThemeEntry,
     pub drop_target_hovered: Option<ThemeEntry>,
 
@@ -196,6 +198,7 @@ impl Default for Theme {
     fn default() -> Self {
         Theme {
             background: 0x04a5e5ff.into(),
+            context_background: 0x02a3e3ff.into(),
             primary_color: 0xcdd6f4ff,
             secondary_color: 0x212224ff,
             button_default: 0x212224ff.into(),
@@ -436,7 +439,7 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.pop();
         self.ui.layout_dir = layout;
         self.ui.bounds = bounds;
-        self.submit_rect_group(history_start);
+        self.submit_rect_group(self.current_id(), history_start);
     }
 
     pub fn vertical(&mut self, mut contents: impl FnMut(&mut Self)) {
@@ -452,21 +455,22 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.pop();
         self.ui.layout_dir = layout;
         self.ui.bounds = bounds;
-        self.submit_rect_group(history_start);
+        self.submit_rect_group(self.current_id(), history_start);
     }
 
     /// submit a new rect that contains all rects submitted beginning at history_start index
-    fn submit_rect_group(&mut self, history_start: usize) {
+    fn submit_rect_group(&mut self, id: UiId, history_start: usize) -> UiRect {
         if self.ui.rect_history.len() <= history_start {
             // no rects have been submitted
-            return;
+            return UiRect::default();
         }
 
         let mut rect = self.ui.rect_history[history_start];
         self.ui.rect_history[history_start + 1..]
             .iter()
             .for_each(|r| rect = rect.grow_over(*r));
-        self.submit_rect(self.current_id(), rect);
+        self.submit_rect(id, rect);
+        rect
     }
 
     pub fn grid<'b>(&mut self, columns: u32, mut contents: impl FnMut(&mut Columns) + 'b)
@@ -495,7 +499,7 @@ impl<'a> Ui<'a> {
 
         self.ui.id_stack.pop();
         self.ui.bounds = bounds;
-        self.submit_rect_group(history_start);
+        self.submit_rect_group(self.current_id(), history_start);
     }
 
     pub fn color_rect_from_rect(&mut self, rect: UiRect, color: Color, layer: u16) {
@@ -1542,6 +1546,113 @@ impl<'a> Ui<'a> {
             }
         }
     }
+
+    pub fn context_menu(
+        &mut self,
+        mut contents: impl FnMut(&mut Self),
+        mut context_menu: impl FnMut(&mut Self),
+    ) -> ContextMenuResponse {
+        self.begin_widget();
+        let id = self.current_id();
+        let old_bounds = self.ui.bounds;
+        let old_layer = self.push_layer();
+
+        self.begin_widget();
+        let history_start = self.ui.rect_history.len();
+        self.ui.id_stack.push(0);
+        ///////////////////////
+        contents(self);
+        ///////////////////////
+        self.ui.id_stack.pop();
+        let content_bounds = self.submit_rect_group(id, history_start);
+
+        let mut state = self
+            .remove_memory::<ContextMenuState>(id)
+            .map(|x| *x)
+            .unwrap_or_default();
+
+        if state.open {
+            self.begin_widget();
+            let history_start = self.ui.rect_history.len();
+            self.ui.id_stack.push(0);
+            self.ui.layer = CONTEXT_LAYER + 1;
+            // TODO: scissor
+
+            let mut bounds = old_bounds;
+            bounds.move_to_x(state.offset.x + bounds.width() / 2);
+            bounds.move_to_y(state.offset.y + bounds.height() / 2);
+            let new_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
+
+            ///////////////////////
+            context_menu(self);
+            ///////////////////////
+            self.ui.id_stack.pop();
+            self.ui.bounds = new_bounds;
+
+            let context_bounds = self.history_bounding_rect(history_start);
+
+            let padding = self.theme.padding as i32;
+
+            self.theme_rect(
+                context_bounds.min_x - padding,
+                context_bounds.min_y - padding,
+                context_bounds.width() + padding * 2,
+                context_bounds.height() + padding * 2,
+                CONTEXT_LAYER,
+                self.theme.context_background.clone(),
+            );
+
+            self.ui
+                .rect_history
+                .resize_with(history_start, || unreachable!());
+
+            if !self.mouse.pressed.is_empty()
+                && !context_bounds.contains_point(
+                    self.mouse.cursor_position.x as i32,
+                    self.mouse.cursor_position.y as i32,
+                )
+            {
+                debug!("Closing context menu over {id:?}");
+                state.open = false;
+            }
+        } else {
+            if self.contains_mouse(id) && self.mouse.just_released.contains(&MouseButton::Right) {
+                debug!("Opening context menu over {id:?}");
+                state.open = true;
+                state.offset = IVec2::new(
+                    self.mouse.cursor_position.x as i32,
+                    self.mouse.cursor_position.y as i32,
+                );
+            }
+        }
+        self.ui.layer = old_layer;
+
+        let resp = ContextMenuResponse {
+            open: state.open,
+            inner: Response {
+                hovered: self.is_hovered(id),
+                active: self.is_active(id),
+                rect: content_bounds,
+                inner: (),
+            },
+        };
+
+        self.insert_memory(id, state);
+
+        resp
+    }
+}
+
+#[derive(Debug)]
+pub struct ContextMenuResponse {
+    pub open: bool,
+    pub inner: Response<()>,
+}
+
+#[derive(Debug, Default)]
+pub struct ContextMenuState {
+    pub open: bool,
+    pub offset: IVec2,
 }
 
 #[derive(Debug, Default)]
@@ -1838,6 +1949,7 @@ impl<'a> Default for WindowDescriptor<'a> {
 }
 
 const WINDOW_LAYER: u16 = 100;
+const CONTEXT_LAYER: u16 = 10000;
 
 #[derive(Default, Debug)]
 struct WindowAllocator {
