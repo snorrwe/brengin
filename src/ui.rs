@@ -522,9 +522,12 @@ impl<'a> Ui<'a> {
         color: Color,
         layer: u16,
     ) {
-        self.ui
-            .rect_history
-            .push(UiRect::from_pos_size(x, y, width, height));
+        self.ui.rect_history.push(UiRect {
+            min_x: x,
+            min_y: y,
+            max_x: x + width,
+            max_y: y + height,
+        });
         assert!(!self.ui.scissors.is_empty());
         let scissor = self.ui.scissor_idx;
         self.ui.color_rects.push(DrawColorRect {
@@ -548,9 +551,12 @@ impl<'a> Ui<'a> {
         image: Handle<DynamicImage>,
         layer: u16,
     ) {
-        self.ui
-            .rect_history
-            .push(UiRect::from_pos_size(x, y, width, height));
+        self.ui.rect_history.push(UiRect {
+            min_x: x,
+            min_y: y,
+            max_x: x + width,
+            max_y: y + height,
+        });
         assert!(!self.ui.scissors.is_empty());
         let scissor = self.ui.scissor_idx;
         self.ui.texture_rects.push(DrawTextureRect {
@@ -1560,6 +1566,7 @@ impl<'a> Ui<'a> {
         self.begin_widget();
         let history_start = self.ui.rect_history.len();
         self.ui.id_stack.push(0);
+        let contains_mouse = self.contains_mouse(id);
         ///////////////////////
         contents(self);
         ///////////////////////
@@ -1616,7 +1623,7 @@ impl<'a> Ui<'a> {
                 state.open = false;
             }
         } else {
-            if self.contains_mouse(id) && self.mouse.just_released.contains(&MouseButton::Right) {
+            if contains_mouse && self.mouse.just_released.contains(&MouseButton::Right) {
                 debug!("Opening context menu over {id:?}");
                 state.open = true;
                 state.offset = IVec2::new(
