@@ -1557,7 +1557,7 @@ impl<'a> Ui<'a> {
         &mut self,
         mut contents: impl FnMut(&mut Self),
         mut context_menu: impl FnMut(&mut Self),
-    ) -> ContextMenuResponse {
+    ) -> ContextMenuResponse<'_, 'a> {
         self.begin_widget();
         let id = self.current_id();
         let old_bounds = self.ui.bounds;
@@ -1652,26 +1652,38 @@ impl<'a> Ui<'a> {
         }
         self.ui.layer = old_layer;
 
+        let open = state.open;
+        self.insert_memory(id, state);
         let resp = ContextMenuResponse {
-            open: state.open,
+            open,
             inner: Response {
                 hovered: self.is_hovered(id),
                 active: self.is_active(id),
                 rect: content_bounds,
                 inner: (),
             },
+            ui: self,
+            id,
         };
-
-        self.insert_memory(id, state);
 
         resp
     }
 }
 
-#[derive(Debug)]
-pub struct ContextMenuResponse {
+pub struct ContextMenuResponse<'a, 'b> {
     pub open: bool,
     pub inner: Response<()>,
+    ui: &'a mut Ui<'b>,
+    id: UiId,
+}
+
+impl<'a, 'b> ContextMenuResponse<'a, 'b> {
+    pub fn close(&mut self) {
+        if self.open {
+            let mem: &mut ContextMenuState = self.ui.get_memory_or_default(self.id);
+            mem.open = false;
+        }
+    }
 }
 
 #[derive(Debug, Default)]
