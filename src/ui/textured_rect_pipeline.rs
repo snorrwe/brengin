@@ -271,16 +271,16 @@ fn update_instances(
     let mut instances = HashMap::<(AssetId, UiScissor), Vec<DrawRectInstance>>::default();
     for (rects, scissor) in q.iter() {
         for rect in rects.0.iter() {
-            let ww = rect.w as f32 * 0.5;
-            let hh = rect.h as f32 * 0.5;
+            let half_w = rect.w as f32 * 0.5;
+            let half_h = rect.h as f32 * 0.5;
             // flip y
             let y = h - rect.y as f32;
             // switch order of layers, lower layers are in the front
             // remap to 0..1
             let layer = (0xFFFF - rect.layer) as f32 / (0xFFFF as f32);
             let instance = DrawRectInstance {
-                x: (rect.x as f32 + ww) / w,
-                y: (y - hh) / h,
+                x: (rect.x as f32 + half_w) / w,
+                y: (y - half_h) / h,
                 // w: ww / w,
                 w: rect.w as f32 / w,
                 h: rect.h as f32 / h,
