@@ -1588,7 +1588,17 @@ impl<'a> Ui<'a> {
             let mut bounds = old_bounds;
             bounds.move_to_x(state.offset.x + bounds.width() / 2);
             bounds.move_to_y(state.offset.y + bounds.height() / 2);
+
             let new_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
+            let padding = self.theme.padding as i32;
+            let outline_size = 2;
+
+            let scissor = self.push_scissor(UiRect {
+                min_x: bounds.min_x - 2 * padding - outline_size,
+                min_y: bounds.min_y - 2 * padding - outline_size,
+                max_x: bounds.max_x + 2 * padding + outline_size,
+                max_y: bounds.max_y + 2 * padding + outline_size,
+            });
 
             ///////////////////////
             context_menu(self);
@@ -1597,9 +1607,6 @@ impl<'a> Ui<'a> {
             self.ui.bounds = new_bounds;
 
             let context_bounds = self.history_bounding_rect(history_start);
-
-            let padding = self.theme.padding as i32;
-            let outline_size = 2;
 
             self.color_rect(
                 context_bounds.min_x - padding - outline_size,
@@ -1631,6 +1638,8 @@ impl<'a> Ui<'a> {
                 debug!("Closing context menu over {id:?}");
                 state.open = false;
             }
+
+            self.ui.scissor_idx = scissor;
         } else {
             if contains_mouse && self.mouse.just_released.contains(&MouseButton::Right) {
                 debug!("Opening context menu over {id:?}");
