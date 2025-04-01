@@ -1985,8 +1985,8 @@ impl<'a> Default for WindowDescriptor<'a> {
     }
 }
 
-const WINDOW_LAYER: u16 = 100;
-const CONTEXT_LAYER: u16 = 10000;
+pub const WINDOW_LAYER: u16 = 100;
+pub const CONTEXT_LAYER: u16 = 10000;
 
 #[derive(Default, Debug)]
 struct WindowAllocator {
