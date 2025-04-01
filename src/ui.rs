@@ -177,11 +177,11 @@ pub struct Theme {
     pub primary_color: Color,
     pub secondary_color: Color,
     pub button_default: ThemeEntry,
-    pub button_hovered: ThemeEntry,
-    pub button_pressed: ThemeEntry,
+    pub button_hovered: Option<ThemeEntry>,
+    pub button_pressed: Option<ThemeEntry>,
 
     pub drop_target_default: ThemeEntry,
-    pub drop_target_hovered: ThemeEntry,
+    pub drop_target_hovered: Option<ThemeEntry>,
 
     pub text_padding: u16,
     pub font_size: u16,
@@ -199,11 +199,11 @@ impl Default for Theme {
             primary_color: 0xcdd6f4ff,
             secondary_color: 0x212224ff,
             button_default: 0x212224ff.into(),
-            button_hovered: 0x45475aff.into(),
-            button_pressed: 0x585b70ff.into(),
+            button_hovered: Some(0x45475aff.into()),
+            button_pressed: Some(0x585b70ff.into()),
 
             drop_target_default: 0x0.into(),
-            drop_target_hovered: 0xcdd6f4ff.into(),
+            drop_target_hovered: Some(0xcdd6f4ff.into()),
 
             text_padding: 5,
             font_size: 12,
@@ -763,7 +763,12 @@ impl<'a> Ui<'a> {
         let mut color = self.theme.button_default.clone();
         let active = self.is_active(id);
         if active {
-            color = self.theme.button_pressed.clone();
+            color = self
+                .theme
+                .button_pressed
+                .as_ref()
+                .unwrap_or(&self.theme.button_default)
+                .clone();
             if self.mouse_up() {
                 if self.is_hovered(id) {
                     pressed = true;
@@ -771,7 +776,12 @@ impl<'a> Ui<'a> {
                 self.set_not_active(id);
             }
         } else if self.is_hovered(id) {
-            color = self.theme.button_hovered.clone();
+            color = self
+                .theme
+                .button_hovered
+                .as_ref()
+                .unwrap_or(&self.theme.button_default)
+                .clone();
             if !contains_mouse {
                 self.set_not_hovered(id);
             } else if self.mouse_down() {
@@ -1297,9 +1307,9 @@ impl<'a> Ui<'a> {
 
         let background;
         if state.hovered {
-            background = &self.theme.drop_target_hovered;
+            background = self.theme.drop_target_hovered.as_ref();
         } else {
-            background = &self.theme.drop_target_default;
+            background = Some(&self.theme.drop_target_default);
         }
         self.theme_rect(
             content_bounds.min_x,
@@ -1307,7 +1317,9 @@ impl<'a> Ui<'a> {
             content_bounds.width(),
             content_bounds.height(),
             bg_layer,
-            background.clone(),
+            background
+                .unwrap_or(&self.theme.drop_target_default)
+                .clone(),
         );
         self.ui.rect_history.pop();
 
