@@ -1582,7 +1582,7 @@ impl<'a> Ui<'a> {
             self.begin_widget();
             let history_start = self.ui.rect_history.len();
             self.ui.id_stack.push(0);
-            self.ui.layer = CONTEXT_LAYER + 1;
+            self.ui.layer = CONTEXT_LAYER + 2;
             // TODO: scissor
 
             let mut bounds = old_bounds;
@@ -1599,13 +1599,22 @@ impl<'a> Ui<'a> {
             let context_bounds = self.history_bounding_rect(history_start);
 
             let padding = self.theme.padding as i32;
+            let outline_size = 2;
 
+            self.color_rect(
+                context_bounds.min_x - padding - outline_size,
+                context_bounds.min_y - padding - outline_size,
+                context_bounds.width() + padding * 2 + outline_size * 2,
+                context_bounds.height() + padding * 2 + outline_size * 2,
+                0xFF,
+                CONTEXT_LAYER,
+            );
             self.theme_rect(
                 context_bounds.min_x - padding,
                 context_bounds.min_y - padding,
                 context_bounds.width() + padding * 2,
                 context_bounds.height() + padding * 2,
-                CONTEXT_LAYER,
+                CONTEXT_LAYER + 1,
                 self.theme.context_background.clone(),
             );
 
