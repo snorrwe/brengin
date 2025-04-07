@@ -1671,11 +1671,15 @@ impl<'a> Ui<'a> {
 
     pub fn allocate_area(
         &mut self,
-        width: i32,
-        height: i32,
+        width: UiCoord,
+        height: UiCoord,
         mut contents: impl FnMut(&mut Self),
     ) {
         let bounds = self.ui.bounds;
+
+        let width = width.as_abolute(bounds.width());
+        let height = height.as_abolute(bounds.height());
+
         self.ui.bounds.resize_w(width);
         self.ui.bounds.resize_h(height);
 
