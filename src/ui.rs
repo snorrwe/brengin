@@ -1553,11 +1553,11 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub fn context_menu(
-        &mut self,
-        mut contents: impl FnMut(&mut Self),
-        mut context_menu: impl FnMut(&mut Self, &mut ContextMenuState),
-    ) -> ContextMenuResponse<'_, 'a> {
+    pub fn context_menu<'b>(
+        &'b mut self,
+        mut contents: impl FnMut(&mut Self) + 'b,
+        mut context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
+    ) -> ContextMenuResponse<'b, 'a> {
         self.begin_widget();
         let id = self.current_id();
         let old_bounds = self.ui.bounds;
