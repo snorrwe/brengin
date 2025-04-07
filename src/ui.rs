@@ -1668,6 +1668,21 @@ impl<'a> Ui<'a> {
 
         resp
     }
+
+    pub fn allocate_area(
+        &mut self,
+        width: i32,
+        height: i32,
+        mut contents: impl FnMut(&mut Self),
+    ) {
+        let bounds = self.ui.bounds;
+        self.ui.bounds.resize_w(width);
+        self.ui.bounds.resize_h(height);
+
+        contents(self);
+
+        self.ui.bounds = bounds;
+    }
 }
 
 pub struct ContextMenuResponse<'a, 'b> {
