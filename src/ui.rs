@@ -1583,9 +1583,10 @@ impl<'a> Ui<'a> {
             let history_start = self.ui.rect_history.len();
             self.ui.id_stack.push(0);
             self.ui.layer = CONTEXT_LAYER + 2;
-            // TODO: scissor
 
             let mut bounds = old_bounds;
+            // TODO:
+            // take viewport into account
             bounds.move_to_x(state.offset.x + bounds.width() / 2);
             bounds.move_to_y(state.offset.y + bounds.height() / 2);
 
