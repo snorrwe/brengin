@@ -1676,6 +1676,8 @@ impl<'a> Ui<'a> {
         height: UiCoord,
         mut contents: impl FnMut(&mut Self),
     ) {
+        self.begin_widget();
+        let id = self.current_id();
         let bounds = self.ui.bounds;
 
         let width = width.as_abolute(bounds.width());
@@ -1683,10 +1685,17 @@ impl<'a> Ui<'a> {
 
         self.ui.bounds.resize_w(width);
         self.ui.bounds.resize_h(height);
+        self.ui.bounds.min_x = bounds.min_x;
+        self.ui.bounds.min_y = bounds.min_y;
+
+        let history_start = self.ui.rect_history.len();
 
         contents(self);
 
         self.ui.bounds = bounds;
+
+        let bounds = self.history_bounding_rect(history_start);
+        self.submit_rect(id, bounds);
     }
 }
 

@@ -49,7 +49,9 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                                     );
                                 },
                                 |ui, _| {
-                                    ui.label(format!("col - {col} row - {row}"));
+                                    ui.allocate_area(128.into(), 128.into(), |ui| {
+                                        ui.label(format!("col - {col} row - {row}"));
+                                    });
                                 },
                             );
                         }
