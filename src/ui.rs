@@ -1685,8 +1685,10 @@ impl<'a> Ui<'a> {
 
         self.ui.bounds.resize_w(width);
         self.ui.bounds.resize_h(height);
-        self.ui.bounds.min_x = bounds.min_x;
-        self.ui.bounds.min_y = bounds.min_y;
+        let min_x = self.ui.bounds.min_x;
+        let min_y = self.ui.bounds.min_y;
+        self.ui.bounds.offset_x(bounds.min_x - min_x);
+        self.ui.bounds.offset_y(bounds.min_y - min_y);
 
         let history_start = self.ui.rect_history.len();
 
