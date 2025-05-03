@@ -6,8 +6,16 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
-  outputs = inputs@{ self, nixpkgs, rust-overlay, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      rust-overlay,
+      flake-utils,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
@@ -39,10 +47,14 @@
             llvmPackages_latest.lldb
             stdenv
             (rust-bin.nightly.latest.default.override {
-              extensions = [ "rust-src" "rust-analyzer" "rustfmt" ];
-              targets = [ ];
+              extensions = [
+                "rust-src"
+                "rust-analyzer"
+                "rustfmt"
+              ];
+              targets = [ "wasm32-unknown-unknown" ];
             })
-            # winit deps          
+            # winit deps
             #
             # To use wayland
             wayland
@@ -58,12 +70,14 @@
             just
             renderdoc
           ];
-          LD_LIBRARY_PATH = lib.makeLibraryPath ([
-            alsa-lib
-            wayland
-          ] ++ x11libs);
+          LD_LIBRARY_PATH = lib.makeLibraryPath (
+            [
+              alsa-lib
+              wayland
+            ]
+            ++ x11libs
+          );
         };
       }
     );
 }
-
