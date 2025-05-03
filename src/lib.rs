@@ -130,6 +130,7 @@ pub fn extract_render_data(
     render_extract: &SystemStage,
 ) {
     let Some(mut gw) = game_world.try_lock_for(Duration::from_millis(6)) else {
+        #[cfg(feature = "tracing")]
         tracing::debug!("game_world lock failed. rendering the previous frame");
         return;
     };
@@ -314,6 +315,7 @@ impl ApplicationHandler for RunningApp {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
+        #[cfg(feature = "tracing")]
         tracing::trace!(?event, "Event received");
         let RunningApp::Initialized {
             render_world,
@@ -400,16 +402,21 @@ impl ApplicationHandler for RunningApp {
                         Ok(_) => {}
                         // handled by the renderer system
                         Err(wgpu::SurfaceError::Lost) => {
+                            #[cfg(feature = "tracing")]
                             tracing::info!("Surface lost")
                         }
                         // The system is out of memory, we should probably quit
                         Err(wgpu::SurfaceError::OutOfMemory) => {
+                            #[cfg(feature = "tracing")]
                             tracing::error!("gpu out of memory");
                             self.stop();
                             event_loop.exit();
                         }
                         // All other errors (Outdated, Timeout) should be resolved by the next frame
-                        Err(e) => tracing::info!("rendering failed: {:?}", e),
+                        Err(_e) => {
+                            #[cfg(feature = "tracing")]
+                            tracing::info!(error=?_e,"rendering failed")
+                        }
                     }
                 }
             }
@@ -418,17 +425,21 @@ impl ApplicationHandler for RunningApp {
     }
 
     fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        #[cfg(feature = "tracing")]
         tracing::trace!("• about_to_wait");
         if let RunningApp::Terminated = self {
+            #[cfg(feature = "tracing")]
             tracing::trace!("x about_to_wait");
             return;
         }
         self.world_mut()
             .run_system(|window: Res<Arc<winit::window::Window>>| {
+                #[cfg(feature = "tracing")]
                 tracing::trace!("redraw {:?}", &*window);
                 window.request_redraw();
             })
             .unwrap();
+        #[cfg(feature = "tracing")]
         tracing::trace!("✓ about_to_wait");
     }
 }
@@ -545,13 +556,13 @@ impl App {
     }
 
     pub fn build(mut self) -> InitializedWorlds {
-        #[cfg(feature = "tracing")]
         if self
             .stages
             .get(&Stage::Render)
             .map(|s| s.is_empty())
             .unwrap_or(false)
         {
+            #[cfg(feature = "tracing")]
             tracing::warn!("Rendering is performed in a sub-app not the main app. But the main app's Render stage is non-empty.");
         }
         let rw = self

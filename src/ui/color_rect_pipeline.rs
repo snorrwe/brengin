@@ -177,6 +177,7 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
             let h = (scissor.0.height() as u32).min(size.height.saturating_sub(y));
 
             if w == 0 || h == 0 {
+                #[cfg(feature="tracing")]
                 tracing::warn!(?scissor, "Scissor is outside of render target {:?}", **size);
                 continue;
             }

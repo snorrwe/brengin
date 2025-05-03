@@ -12,7 +12,6 @@ use brengin::{
     transform::{self, transform_bundle, Transform},
     App, DefaultPlugins, DeltaTime, Plugin, Stage,
 };
-use tracing::info;
 
 struct Boid;
 
@@ -107,7 +106,7 @@ fn setup_boids(mut cmd: Commands, mut assets: ResMut<assets::Assets<SpriteSheet>
         &mut assets,
     );
 
-    info!(N, "Spawning boids");
+    println!("Spawning {N} boids");
     for _ in 0..N {
         // TODO: scale by map size
         let x = fastrand::f32();

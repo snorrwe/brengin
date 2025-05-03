@@ -5,7 +5,6 @@ use brengin::prelude::*;
 use brengin::renderer::sprite_renderer::{self, SpriteInstance, SpriteSheet};
 use brengin::{App, DefaultPlugins, Plugin};
 use glam::{Quat, Vec2, Vec3};
-use tracing::info;
 
 struct GamePlugin;
 
@@ -58,7 +57,7 @@ fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
     );
 
     const CUBE_SIDE: f32 = 100.0;
-    info!("Spawning {N} explosions");
+    println!("Spawning {N} explosions");
     for _ in 0..N {
         let x = fastrand::f32() * CUBE_SIDE - CUBE_SIDE / 2.0;
         let y = fastrand::f32() * CUBE_SIDE - CUBE_SIDE / 2.0;

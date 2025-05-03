@@ -16,7 +16,6 @@ use glam::IVec2;
 use image::DynamicImage;
 use text_rect_pipeline::{DrawTextRect, TextRectRequests};
 use textured_rect_pipeline::{DrawTextureRect, TextureRectRequests};
-use tracing::debug;
 use winit::{
     dpi::PhysicalPosition,
     event::{MouseButton, MouseScrollDelta},
@@ -1477,7 +1476,8 @@ impl<'a> Ui<'a> {
                     // find the cluster where the pointer points to
                     if glyph_bounds.contains_point(mx as i32, my as i32) {
                         state.cursor = *cluster as usize;
-                        debug!("Setting cursor to {}", state.cursor);
+                        #[cfg(feature = "tracing")]
+                        tracing::debug!("Setting cursor to {}", state.cursor);
                         break;
                     }
                 }
@@ -1636,14 +1636,16 @@ impl<'a> Ui<'a> {
                     self.mouse.cursor_position.y as i32,
                 )
             {
-                debug!("Closing context menu over {id:?}");
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Closing context menu over {id:?}");
                 state.open = false;
             }
 
             self.ui.scissor_idx = scissor;
         } else {
             if contains_mouse && self.mouse.just_released.contains(&MouseButton::Right) {
-                debug!("Opening context menu over {id:?}");
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Opening context menu over {id:?}");
                 state.open = true;
                 state.offset = IVec2::new(
                     self.mouse.cursor_position.x as i32,

@@ -9,7 +9,6 @@ use cecs::{
     Component,
 };
 use glam::UVec2;
-use tracing::debug;
 use wgpu::{Backends, InstanceFlags, StoreOp, SurfaceTarget};
 
 pub use crate::camera::camera_bundle;
@@ -141,7 +140,8 @@ impl GraphicsState {
             .await
             .expect("Failed to create adapter");
 
-        debug!("Choosen adapter: {:?}", adapter);
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Choosen adapter: {:?}", adapter);
 
         let (device, queue) = adapter
             .request_device(
@@ -399,6 +399,7 @@ fn render_system(mut world: WorldAccess) {
          cameras: Query<&CameraBuffer>,
          render_commands: Query<&RenderCommandInternal>| {
             let Some(render_passes) = render_passes else {
+                #[cfg(feature = "tracing")]
                 tracing::trace!("No render pass has been registered");
                 return Ok(());
             };

@@ -10,7 +10,6 @@ use crate::renderer::{
 use crate::wgpu::include_wgsl;
 use crate::GameWorld;
 use cecs::prelude::*;
-use tracing::debug;
 
 use crate::{renderer::Extract, Plugin};
 
@@ -110,7 +109,8 @@ fn gc_text_textures(
 ) {
     texturerefs.0.retain(|id, handle| {
         if handle.upgrade().is_none() {
-            debug!(id, "Collecting expired text texture");
+            #[cfg(feature = "tracing")]
+            tracing::debug!(id, "Collecting expired text texture");
             pipeline.textures.remove(id);
             return false;
         }
@@ -245,6 +245,7 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
             let h = (scissor.0.height() as u32).min(size.height.saturating_sub(y));
 
             if w == 0 || h == 0 {
+                #[cfg(feature = "tracing")]
                 tracing::warn!(?scissor, "Scissor is outside of render target {:?}", **size);
                 continue;
             }

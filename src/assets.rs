@@ -5,7 +5,6 @@ use std::{
     ptr::NonNull,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use tracing::debug;
 
 use crate::Plugin;
 
@@ -197,8 +196,9 @@ impl<T> Assets<T> {
             },
         );
         debug_assert!(_old.is_none());
-        debug!(
-            id = tracing::field::debug(handle.id()),
+        #[cfg(feature = "tracing")]
+        tracing::debug!(
+            id = ?handle.id(),
             ty = std::any::type_name::<T>(),
             "Inserted new asset"
         );
