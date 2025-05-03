@@ -13,6 +13,9 @@ use anyhow::Context;
 use instant::Instant;
 use ui::UiPlugin;
 
+#[cfg(target_arch = "wasm32")]
+use winit::platform::web::WindowAttributesExtWebSys;
+
 // reexport
 pub use cecs;
 pub use glam;
@@ -20,6 +23,9 @@ pub use image;
 pub use parking_lot;
 pub use wgpu;
 pub use winit;
+
+#[cfg(target_arch = "wasm32")]
+pub use web_sys;
 
 use winit::{
     application::ApplicationHandler,
@@ -290,15 +296,35 @@ fn game_thread(game_world: Arc<Mutex<World>>, enabled: Arc<AtomicBool>) {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+pub struct BrenginCanvas(pub web_sys::HtmlCanvasElement);
+
 impl ApplicationHandler for RunningApp {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         let Some(app) = self.as_pending() else {
             return;
         };
-        let attributes = app.world.get_resource_or_default::<WindowAttributes>();
+        #[cfg(target_arch = "wasm32")]
+        let canvas = app
+            .world
+            .remove_resource::<BrenginCanvas>()
+            .expect("BrenginCanvas resource has to be set before run");
+
+        #[allow(unused_mut)]
+        let mut attributes = *app
+            .world
+            .remove_resource::<WindowAttributes>()
+            .unwrap_or_default();
+
+        #[cfg(target_arch = "wasm32")]
+        let attributes = attributes.with_canvas(Some(canvas.0));
+
         let window = event_loop
             .create_window(attributes.clone())
             .expect("Failed to create window");
+
+        app.world.insert_resource(attributes);
+
         let window = Arc::new(window);
         // FIXME:
         // do not block here
