@@ -1343,7 +1343,7 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub fn input_string(&mut self, content: &mut String) -> Response<()> {
+    pub fn input_string(&mut self, content: &mut String) -> Response<InputResponse> {
         self.begin_widget();
         let id = self.current_id();
         let last_layer = self.push_layer();
@@ -1355,6 +1355,8 @@ impl<'a> Ui<'a> {
                 ..Default::default()
             })
             .clone();
+
+        let mut changed = false;
 
         state.cursor = state.cursor.min(content.len());
         let mouse_pos = self.mouse.cursor_position;
@@ -1407,6 +1409,7 @@ impl<'a> Ui<'a> {
                             if state.cursor > 0 {
                                 state.cursor -= 1;
                                 content.remove(state.cursor);
+                                changed = true;
                             }
                         });
                     }
@@ -1414,9 +1417,11 @@ impl<'a> Ui<'a> {
                         cursor_update!({
                             if state.cursor < content.len() {
                                 content.remove(state.cursor);
+                                changed = true;
                             }
                         });
                     }
+                    // TODO: ctrl + c, ctrl + v
                     _ => {
                         if let Some(text) = self
                             .keyboard
@@ -1425,6 +1430,7 @@ impl<'a> Ui<'a> {
                             .and_then(|ev| ev.logical_key.to_text())
                         {
                             content.insert_str(state.cursor, text);
+                            changed = true;
                             state.cursor += text.len();
                         }
                     }
@@ -1529,7 +1535,7 @@ impl<'a> Ui<'a> {
         Response {
             hovered: self.ids.hovered == id,
             active: self.ids.active == id,
-            inner: (),
+            inner: InputResponse { changed },
             rect,
         }
     }
@@ -2405,4 +2411,9 @@ impl Default for TextInputState {
             can_move: true,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct InputResponse {
+    pub changed: bool,
 }
