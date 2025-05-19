@@ -234,7 +234,7 @@ fn buttons_ui(
                     ui.label("v");
                     ui.label(&label.0);
 
-                    ui.text_input(&mut form.data);
+                    ui.input_string(&mut form.data);
                 });
             });
         },

@@ -1343,7 +1343,7 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub fn text_input(&mut self, content: &mut String) -> Response<()> {
+    pub fn input_string(&mut self, content: &mut String) -> Response<()> {
         self.begin_widget();
         let id = self.current_id();
         let last_layer = self.push_layer();
