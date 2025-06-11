@@ -310,8 +310,7 @@ impl ApplicationHandler for RunningApp {
             .remove_resource::<BrenginCanvas>()
             .expect("BrenginCanvas resource has to be set before run");
 
-        #[allow(unused_mut)]
-        let mut attributes = *app
+        let attributes = *app
             .world
             .remove_resource::<WindowAttributes>()
             .unwrap_or_default();
