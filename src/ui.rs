@@ -248,6 +248,60 @@ impl UiState {
     }
 }
 
+#[derive(Default, Clone)]
+pub struct ThemeOverride {
+    pub background: Option<ThemeEntry>,
+    pub primary_color: Option<Color>,
+    pub secondary_color: Option<Color>,
+    pub button_default: Option<ThemeEntry>,
+    pub button_hovered: Option<Option<ThemeEntry>>,
+    pub button_pressed: Option<Option<ThemeEntry>>,
+
+    pub context_background: Option<ThemeEntry>,
+
+    pub drop_target_default: Option<ThemeEntry>,
+    pub drop_target_hovered: Option<Option<ThemeEntry>>,
+
+    pub text_padding: Option<u16>,
+    pub font_size: Option<u16>,
+    pub padding: Option<u16>,
+    pub scroll_bar_size: Option<u16>,
+    pub window_title_height: Option<u8>,
+    pub font: Option<Handle<OwnedTypeFace>>,
+    pub window_padding: Option<u8>,
+}
+
+impl ThemeOverride {
+    /// The returned ThemeOverride will revert the effects of this apply
+    pub fn apply(mut self, theme: &mut Theme) -> Self {
+        macro_rules! apply {
+            ($field: ident) => {
+                if let Some(x) = self.$field.take() {
+                    self.$field = Some(std::mem::replace(&mut theme.$field, x));
+                }
+            };
+        }
+        apply!(background);
+        apply!(primary_color);
+        apply!(secondary_color);
+        apply!(button_default);
+        apply!(button_hovered);
+        apply!(button_pressed);
+        apply!(context_background);
+        apply!(drop_target_default);
+        apply!(drop_target_hovered);
+        apply!(text_padding);
+        apply!(font_size);
+        apply!(padding);
+        apply!(scroll_bar_size);
+        apply!(window_title_height);
+        apply!(font);
+        apply!(window_padding);
+
+        self
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LayoutDirection {
     TopDown,
@@ -652,6 +706,20 @@ impl<'a> Ui<'a> {
         ///////////////////////
 
         *self.theme = t;
+    }
+
+    pub fn with_theme_override(
+        &mut self,
+        theme: ThemeOverride,
+        mut contents: impl FnMut(&mut Self),
+    ) {
+        let theme = theme.apply(&mut self.theme);
+
+        ///////////////////////
+        contents(self);
+        ///////////////////////
+
+        theme.apply(&mut self.theme);
     }
 
     pub fn image(

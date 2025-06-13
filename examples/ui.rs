@@ -216,10 +216,10 @@ fn buttons_ui(
             vertical: VerticalAlignment::Center,
         },
         |ui| {
-            ui.with_theme(
-                brengin::ui::Theme {
-                    font_size: 24,
-                    ..ui.theme().clone()
+            ui.with_theme_override(
+                brengin::ui::ThemeOverride {
+                    font_size: Some(24),
+                    ..Default::default()
                 },
                 |ui| {
                     ui.label("My panel is centered!!");
