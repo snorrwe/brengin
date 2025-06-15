@@ -1454,12 +1454,24 @@ impl<'a> Ui<'a> {
                 match k {
                     KeyCode::ArrowLeft => {
                         cursor_update!({
-                            state.cursor = state.cursor.saturating_sub(1);
+                            if self.keyboard.pressed.contains(&KeyCode::ControlLeft)
+                                || self.keyboard.pressed.contains(&KeyCode::ControlRight)
+                            {
+                                state.cursor = 0;
+                            } else {
+                                state.cursor = state.cursor.saturating_sub(1);
+                            }
                         });
                     }
                     KeyCode::ArrowRight => {
                         cursor_update!({
-                            state.cursor = content.len().min(state.cursor + 1);
+                            if self.keyboard.pressed.contains(&KeyCode::ControlLeft)
+                                || self.keyboard.pressed.contains(&KeyCode::ControlRight)
+                            {
+                                state.cursor = content.len();
+                            } else {
+                                state.cursor = content.len().min(state.cursor + 1);
+                            }
                         });
                     }
                     KeyCode::Home => {
