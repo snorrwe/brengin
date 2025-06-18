@@ -14,7 +14,9 @@ use instant::Instant;
 use ui::UiPlugin;
 
 #[cfg(target_arch = "wasm32")]
-use winit::platform::web::WindowAttributesExtWebSys;
+pub use web_sys;
+#[cfg(target_arch = "wasm32")]
+use winit::platform::web::WindowAttributesExtWebSys as _;
 
 // reexport
 pub use cecs;
@@ -23,9 +25,6 @@ pub use image;
 pub use parking_lot;
 pub use wgpu;
 pub use winit;
-
-#[cfg(target_arch = "wasm32")]
-pub use web_sys;
 
 use winit::{
     application::ApplicationHandler,
@@ -202,8 +201,19 @@ impl Default for App {
     }
 }
 
+type WinitState = GraphicsState;
+
+#[cfg(target_arch = "wasm32")]
+type EVProxy = winit::event_loop::EventLoopProxy<WinitState>;
+#[cfg(not(target_arch = "wasm32"))]
+type EVProxy = ();
+
 enum RunningApp {
-    Pending(App),
+    Pending {
+        app: App,
+        #[cfg(target_arch = "wasm32")]
+        proxy: Option<EVProxy>,
+    },
     Initialized {
         render_world: World,
         render_extract: SystemStage<'static>,
@@ -215,17 +225,40 @@ enum RunningApp {
 }
 
 impl RunningApp {
+    pub fn new(app: App, #[cfg(target_arch = "wasm32")] proxy: EVProxy) -> Self {
+        Self::Pending {
+            app,
+            #[cfg(target_arch = "wasm32")]
+            proxy: Some(proxy),
+        }
+    }
+}
+
+impl RunningApp {
     fn as_pending(&mut self) -> Option<&mut App> {
-        if let Self::Pending(v) = self {
+        if let Self::Pending { app: v, .. } = self {
             Some(v)
         } else {
             None
         }
     }
 
+    #[allow(unused)]
+    fn take_proxy(&mut self) -> Option<EVProxy> {
+        #[cfg(target_arch = "wasm32")]
+        if let Self::Pending { proxy, .. } = self {
+            proxy.take()
+        } else {
+            None
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        None
+    }
+
     fn world_mut(&mut self) -> &mut World {
         match self {
-            RunningApp::Pending(app) => &mut app.render_app_mut().world,
+            RunningApp::Pending { app, .. } => &mut app.render_app_mut().world,
             RunningApp::Initialized { render_world, .. } => render_world,
             RunningApp::Terminated => unreachable!(),
         }
@@ -299,7 +332,7 @@ fn game_thread(game_world: Arc<Mutex<World>>, enabled: Arc<AtomicBool>) {
 #[cfg(target_arch = "wasm32")]
 pub struct BrenginCanvas(pub web_sys::HtmlCanvasElement);
 
-impl ApplicationHandler for RunningApp {
+impl ApplicationHandler<WinitState> for RunningApp {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         let Some(app) = self.as_pending() else {
             return;
@@ -325,20 +358,38 @@ impl ApplicationHandler for RunningApp {
         app.world.insert_resource(attributes);
 
         let window = Arc::new(window);
-        // FIXME:
-        // do not block here
+        app.render_app_mut().insert_resource(Arc::clone(&window));
         let size = window.inner_size();
-        let graphics_state = pollster::block_on(GraphicsState::new(
-            Arc::clone(&window),
-            glam::UVec2 {
-                x: size.width,
-                y: size.height,
-            },
-        ));
 
-        app.render_app_mut().insert_resource(window);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let graphics_state = pollster::block_on(GraphicsState::new(
+                window,
+                glam::UVec2 {
+                    x: size.width,
+                    y: size.height,
+                },
+            ));
 
-        self.initialize_pending(graphics_state);
+            self.initialize_pending(graphics_state);
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(proxy) = self.take_proxy() {
+                wasm_bindgen_futures::spawn_local(async move {
+                    let graphics_state = GraphicsState::new(
+                        window,
+                        glam::UVec2 {
+                            x: size.width,
+                            y: size.height,
+                        },
+                    )
+                    .await;
+
+                    assert!(proxy.send_event(graphics_state).is_ok())
+                });
+            }
+        }
     }
 
     fn window_event(
@@ -474,6 +525,10 @@ impl ApplicationHandler for RunningApp {
         #[cfg(feature = "tracing")]
         tracing::trace!("✓ about_to_wait");
     }
+
+    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: WinitState) {
+        self.initialize_pending(event);
+    }
 }
 
 impl App {
@@ -556,7 +611,9 @@ impl App {
     }
 
     pub async fn run(mut self) -> anyhow::Result<()> {
-        let event_loop = EventLoop::new().context("Failed to initialize EventLoop")?;
+        let event_loop = EventLoop::<WinitState>::with_user_event()
+            .build()
+            .context("Failed to initialize EventLoop")?;
 
         let window = self.world.run_view_system(|desc: Res<WindowDescriptor>| {
             WindowAttributes::default()
@@ -567,7 +624,15 @@ impl App {
 
         self.world.insert_resource(window);
 
-        let mut app = RunningApp::Pending(self);
+        let mut app;
+        #[cfg(target_arch = "wasm32")]
+        {
+            app = RunningApp::new(self, event_loop.create_proxy())
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            app = RunningApp::new(self)
+        };
         event_loop.run_app(&mut app)?;
 
         Ok(())
