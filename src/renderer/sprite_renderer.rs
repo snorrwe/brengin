@@ -446,7 +446,7 @@ impl SpritePipeline {
         }: &mut RenderCommandInput,
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
-        for (_, sheet) in self.sheets.iter() {
+        for (_, sheet) in self.sheets.iter().filter(|(_, s)| s.count > 0) {
             render_pass.set_bind_group(0, *camera, &[]);
             render_pass.set_bind_group(1, &sheet.spritesheet_bind_group, &[]);
             render_pass.set_bind_group(2, &sheet.spritesheet_gpu, &[]);
