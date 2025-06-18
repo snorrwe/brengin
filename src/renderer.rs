@@ -9,7 +9,7 @@ use cecs::{
     Component,
 };
 use glam::UVec2;
-use wgpu::{Backends, InstanceFlags, StoreOp, SurfaceTarget};
+use wgpu::{InstanceFlags, StoreOp, SurfaceTarget};
 
 pub use crate::camera::camera_bundle;
 use crate::{
@@ -123,7 +123,10 @@ impl GraphicsState {
         let flags = InstanceFlags::debugging();
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: Backends::all(),
+            #[cfg(not(target_arch = "wasm32"))]
+            backends: wgpu::Backends::PRIMARY,
+            #[cfg(target_arch = "wasm32")]
+            backends: wgpu::Backends::GL,
             flags,
             backend_options: wgpu::BackendOptions::default(),
         });
