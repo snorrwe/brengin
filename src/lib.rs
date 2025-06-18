@@ -475,6 +475,11 @@ impl ApplicationHandler<WinitState> for RunningApp {
                     .cursor_position = position;
             }
             WindowEvent::RedrawRequested => {
+                #[cfg(target_arch = "wasm32")]
+                {
+                    game_world.lock().tick();
+                }
+
                 extract_render_data(&game_world, render_world, render_extract);
 
                 render_world.tick();
