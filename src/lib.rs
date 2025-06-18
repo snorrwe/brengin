@@ -236,6 +236,32 @@ impl RunningApp {
             game_thread.join().expect("Failed to join game thread");
         }
     }
+
+    /// panics if self is not Pending
+    fn initialize_pending(&mut self, graphics_state: GraphicsState) {
+        let app = self.as_pending().unwrap();
+        app.render_app_mut().insert_resource(graphics_state);
+
+        let InitializedWorlds {
+            game_world,
+            render_world,
+            render_extract,
+        } = std::mem::take(app).build();
+        let game_world = Arc::new(Mutex::new(game_world));
+        let enabled = Arc::new(AtomicBool::new(true));
+        let game_thread = std::thread::spawn({
+            let game_world = Arc::clone(&game_world);
+            let enabled = Arc::clone(&enabled);
+            move || game_thread(game_world, enabled)
+        });
+        *self = RunningApp::Initialized {
+            render_world,
+            game_world,
+            game_thread,
+            render_extract,
+            enabled,
+        };
+    }
 }
 
 fn game_thread(game_world: Arc<Mutex<World>>, enabled: Arc<AtomicBool>) {
@@ -285,28 +311,9 @@ impl ApplicationHandler for RunningApp {
             },
         ));
 
-        app.render_app_mut().insert_resource(graphics_state);
         app.render_app_mut().insert_resource(window);
 
-        let InitializedWorlds {
-            game_world,
-            render_world,
-            render_extract,
-        } = std::mem::take(app).build();
-        let game_world = Arc::new(Mutex::new(game_world));
-        let enabled = Arc::new(AtomicBool::new(true));
-        let game_thread = std::thread::spawn({
-            let game_world = Arc::clone(&game_world);
-            let enabled = Arc::clone(&enabled);
-            move || game_thread(game_world, enabled)
-        });
-        *self = RunningApp::Initialized {
-            render_world,
-            game_world,
-            game_thread,
-            render_extract,
-            enabled,
-        };
+        self.initialize_pending(graphics_state);
     }
 
     fn window_event(
