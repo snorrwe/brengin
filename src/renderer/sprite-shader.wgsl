@@ -30,8 +30,9 @@ struct Vertex {
 
 struct Instance {
     @location(2) pos_scale: vec4<f32>,
-    @location(3) sprite_index: u32,
-    @location(4) flip: u32,
+    @location(3) scale_y: f32,
+    @location(4) sprite_index: u32,
+    @location(5) flip: u32,
 }
 
 struct VertexOutput {
@@ -76,13 +77,13 @@ fn vs_main(
     out.uv = total_uv;
 
     // billboarding
-    let scale = instance.pos_scale.w;
+    let scale_x = instance.pos_scale.w;
     var pos = vec4<f32>(instance.pos_scale.xyz, 1.0);
     let up: vec4<f32> = camera.view_inv[1];
     let right: vec4<f32> = camera.view_inv[0];
 
-    pos += right * model.pos.x * scale;
-    pos += up * model.pos.y * scale;
+    pos += right * model.pos.x * scale_x;
+    pos += up * model.pos.y * instance.scale_y;
 
     out.clip_position = camera.view_proj * pos;
     return out;

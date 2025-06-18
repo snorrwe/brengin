@@ -180,6 +180,7 @@ fn compute_sprite_instances(
         *instance = SpriteInstanceRaw {
             index: i.index,
             pos_scale: [pos.x, pos.y, pos.z, scale.x],
+            scale_y: scale.y,
             flip: i.flip as u32,
         };
     });
@@ -473,6 +474,7 @@ impl<'a> RenderCommand<'a> for SpriteRenderCommand {
 #[derive(Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct SpriteInstanceRaw {
     pos_scale: [f32; 4],
+    scale_y: f32,
     index: u32,
     /// bool
     flip: u32,
@@ -494,11 +496,16 @@ impl SpriteInstanceRaw {
                 wgpu::VertexAttribute {
                     offset: ROW_SIZE,
                     shader_location: 3,
-                    format: wgpu::VertexFormat::Uint32,
+                    format: wgpu::VertexFormat::Float32,
                 },
                 wgpu::VertexAttribute {
                     offset: ROW_SIZE + 4,
                     shader_location: 4,
+                    format: wgpu::VertexFormat::Uint32,
+                },
+                wgpu::VertexAttribute {
+                    offset: ROW_SIZE + 4 + 4,
+                    shader_location: 5,
                     format: wgpu::VertexFormat::Uint32,
                 },
             ],
