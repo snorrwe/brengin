@@ -2326,6 +2326,20 @@ impl<'a> UiRoot<'a> {
 
         *self.0.theme = t;
     }
+
+    pub fn with_theme_override(
+        &mut self,
+        theme: ThemeOverride,
+        mut contents: impl FnMut(&mut Self),
+    ) {
+        let theme = theme.apply(&mut self.0.theme);
+
+        ///////////////////////
+        contents(self);
+        ///////////////////////
+
+        theme.apply(&mut self.0.theme);
+    }
 }
 
 unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
