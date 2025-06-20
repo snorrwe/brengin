@@ -335,16 +335,9 @@ impl ApplicationHandler for RunningApp {
         };
         match event {
             #[cfg(not(target_family = "wasm"))]
-            WindowEvent::CloseRequested
-            | WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        state: ElementState::Pressed,
-                        physical_key: PhysicalKey::Code(KeyCode::Escape),
-                        ..
-                    },
-                ..
-            } => {
+            WindowEvent::CloseRequested => {
+                #[cfg(feature = "tracing")]
+                tracing::info!("Close requested. Stopping game loop");
                 self.stop();
                 event_loop.exit();
             }
