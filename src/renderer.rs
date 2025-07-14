@@ -1,3 +1,4 @@
+pub mod background_renderer;
 pub mod sprite_renderer;
 pub mod texture;
 
@@ -308,12 +309,14 @@ impl Plugin for RendererPlugin {
         app.add_extract_system(extract_window_size);
         app.add_plugin(CameraPlugin);
         app.add_plugin(SpriteRendererPlugin);
+        app.add_plugin(background_renderer::BackgroundPlugin);
         app.add_plugin(ExtractionPlugin::<RenderCommandInternal>::default());
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RenderPass {
+    Background = 1,
     Transparent = 4,
     Ui = 5,
 }
@@ -326,6 +329,7 @@ impl RenderPass {
         state: &GraphicsState,
     ) -> wgpu::RenderPass<'a> {
         match self {
+            RenderPass::Background => self.begin_background(view, encoder),
             RenderPass::Transparent => self.begin_transparent(view, encoder, state),
             RenderPass::Ui => self.begin_ui(view, encoder, state),
         }
@@ -386,6 +390,28 @@ impl RenderPass {
                 }),
                 stencil_ops: None,
             }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        })
+    }
+
+    fn begin_background<'a>(
+        self,
+        view: &wgpu::TextureView,
+        encoder: &'a mut wgpu::CommandEncoder,
+    ) -> wgpu::RenderPass<'a> {
+        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Background Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                depth_slice: None,
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
         })
