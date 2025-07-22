@@ -20,7 +20,7 @@ fastrand = "2.3.0"
 glam = { version = "0.30.3", features = ["bytemuck"] }
 image = { version = "0.25.6", default-features = false, features = ["png"] }
 smallvec = "1.15.1"
-wgpu = { version = "25.0.2" }
+wgpu = "26.0.1"
 winit = "0.30"
 kira = { version = "0.10", optional = true }
 instant = { version = "0.1.13", features = [] }

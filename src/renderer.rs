@@ -126,6 +126,7 @@ impl GraphicsState {
             backends: Backends::all(),
             flags,
             backend_options: wgpu::BackendOptions::default(),
+            memory_budget_thresholds: wgpu::MemoryBudgetThresholds::default(),
         });
         let surface = instance
             .create_surface(window)
@@ -341,6 +342,7 @@ impl RenderPass {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view,
                 resolve_target: None,
+                depth_slice: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: StoreOp::Store,
@@ -370,6 +372,7 @@ impl RenderPass {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view,
                 resolve_target: None,
+                depth_slice: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: StoreOp::Store,
@@ -417,6 +420,7 @@ fn render_system(mut world: WorldAccess) {
                 let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Clear Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        depth_slice: None,
                         view: &view,
                         resolve_target: None,
                         ops: wgpu::Operations {
