@@ -1,4 +1,3 @@
-use crate::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
 use crate::prelude::*;
 use crate::renderer::{texture, GraphicsState, RenderCommand, RenderCommandPlugin};
 use crate::{App, DefaultPlugins, Plugin};
@@ -11,14 +10,43 @@ struct BackgroundPipeline {
     render_pipeline: wgpu::RenderPipeline,
 }
 
+fn texture_bind_group_layout(device: &wgpu::Device, label: &str) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                // This should match the filterable field of the
+                // corresponding Texture entry above.
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+        label: Some(label),
+    })
+}
+
 impl BackgroundPipeline {
     fn new(renderer: &GraphicsState) -> Self {
+        let texture_bind_group_layout =
+            texture_bind_group_layout(&renderer.device, "background-texture-layout");
+
         let render_pipeline_layout =
             renderer
                 .device()
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Background Render Pipeline Layout"),
-                    bind_group_layouts: &[],
+                    label: Some("background-render-pipeline-layout"),
+                    bind_group_layouts: &[&texture_bind_group_layout],
                     push_constant_ranges: &[],
                 });
 
@@ -30,7 +58,7 @@ impl BackgroundPipeline {
             renderer
                 .device()
                 .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("Background Render Pipeline"),
+                    label: Some("background-render-pipeline"),
                     layout: Some(&render_pipeline_layout),
                     vertex: wgpu::VertexState {
                         module: &shader,
@@ -84,6 +112,8 @@ impl<'a> RenderCommand<'a> for BackgroundPipeline {
 
         pipeline: &'r Self::Parameters,
     ) {
+        // FIXME:
+        // bind texture, only draw if background texture is setup
         render_pass.set_pipeline(&pipeline.render_pipeline);
         render_pass.draw(0..3, 0..1);
     }
