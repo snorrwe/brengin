@@ -1,39 +1,15 @@
 use crate::prelude::*;
+use crate::renderer::texture::texture_bind_group_layout;
 use crate::renderer::{texture, GraphicsState, RenderCommand, RenderCommandPlugin};
 use crate::{App, DefaultPlugins, Plugin};
 use glam::Vec3;
-use wgpu::include_wgsl;
+use wgpu::{include_wgsl, Texture};
 
 pub struct BackgroundPlugin;
 
 struct BackgroundPipeline {
     render_pipeline: wgpu::RenderPipeline,
-}
-
-fn texture_bind_group_layout(device: &wgpu::Device, label: &str) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    multisampled: false,
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                // This should match the filterable field of the
-                // corresponding Texture entry above.
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                count: None,
-            },
-        ],
-        label: Some(label),
-    })
+    texture: Option<BackgroundTextureRenderingData>,
 }
 
 impl BackgroundPipeline {
@@ -98,7 +74,10 @@ impl BackgroundPipeline {
                     cache: None,
                 });
 
-        Self { render_pipeline }
+        Self {
+            render_pipeline,
+            texture: None,
+        }
     }
 }
 
@@ -112,11 +91,17 @@ impl<'a> RenderCommand<'a> for BackgroundPipeline {
 
         pipeline: &'r Self::Parameters,
     ) {
-        // FIXME:
-        // bind texture, only draw if background texture is setup
-        render_pass.set_pipeline(&pipeline.render_pipeline);
-        render_pass.draw(0..3, 0..1);
+        if let Some(d) = pipeline.texture.as_ref() {
+            render_pass.set_bind_group(0, &d.texture_bind_group, &[]);
+            render_pass.set_pipeline(&pipeline.render_pipeline);
+            render_pass.draw(0..3, 0..1);
+        }
     }
+}
+
+pub struct BackgroundTextureRenderingData {
+    pub texture_bind_group: wgpu::BindGroup,
+    pub texture: Texture,
 }
 
 impl Plugin for BackgroundPlugin {

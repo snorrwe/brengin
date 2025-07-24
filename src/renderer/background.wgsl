@@ -23,25 +23,9 @@ fn vs_main(vertex: Vertex) -> VertexOutput {
     return out;
 }
 
-fn mandelbrot(c: vec2<f32>) -> f32 {
-    let B: f32 = 256.0;
-    var l = 0.0;
-    var z = vec2<f32>(0);
-    for (var i = 0; i < 512; i++) {
-        z = vec2<f32>(z.x * z.x - z.y * z.y, 2 * z.x * z.y) + c;
-        if dot(z, z) > (B * B) {break;}
-        l += 1.0;
-    }
-    if l > 511.0 {
-        return 0.0;
-    }
-
-    return l - log2(log2(dot(z, z))) + 4.0;
-}
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let l = mandelbrot(in.uv * 2 - vec2(1.5, 1));
-    let color = 1.0 - 0.5 + 0.5 * cos(0.3 + l * 0.15 + vec3(0.6, 0.6, 0.0));
-    return vec4<f32>(color, 1.0);
+    let color = textureSample(texture, texture_sampler, in.uv);
+    return vec4<f32>(color.rgb, 1.0);
 }
