@@ -113,33 +113,32 @@ fn extract_background(
     game_world: Res<GameWorld>,
 ) {
     game_world.world().run_view_system(
-        |img: Option<Res<BackgroundImage>>, images: Res<Assets<DynamicImage>>| match img {
-            Some(img) => {
-                let id = img.0.id();
-                let img = images.get(&img.0);
+        |img: Option<Res<BackgroundImage>>, images: Res<Assets<DynamicImage>>| {
+            let Some(img) = img else {
+                pipeline.texture.take();
+                return;
+            };
+            let id = img.0.id();
+            let img = images.get(&img.0);
 
-                if let Some(t) = pipeline.texture.as_ref().map(|t| t.id) {
-                    if t == id {
-                        // texture is already registered
-                        return;
-                    }
-                    // new texture, clear the old one
-                    pipeline.texture.take();
+            if let Some(t) = pipeline.texture.as_ref().map(|t| t.id) {
+                if t == id {
+                    // texture is already registered
+                    return;
                 }
-                let texture =
-                    texture::Texture::from_image(renderer.device(), renderer.queue(), img, None)
-                        .expect("Failed to create texture");
-
-                let (_, texture_bind_group) = texture_to_bindings(&renderer.device, &texture);
-                pipeline.texture = Some(BackgroundTextureRenderingData {
-                    id,
-                    texture,
-                    texture_bind_group,
-                });
-            }
-            None => {
+                // new texture, clear the old one
                 pipeline.texture.take();
             }
+            let texture =
+                texture::Texture::from_image(renderer.device(), renderer.queue(), img, None)
+                    .expect("Failed to create texture");
+
+            let (_, texture_bind_group) = texture_to_bindings(&renderer.device, &texture);
+            pipeline.texture = Some(BackgroundTextureRenderingData {
+                id,
+                texture,
+                texture_bind_group,
+            });
         },
     );
 }
