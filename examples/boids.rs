@@ -6,12 +6,14 @@ use brengin::{
     glam::{Quat, Vec2, Vec3},
     prelude::*,
     renderer::{
+        background_renderer::BackgroundImage,
         camera_bundle,
         sprite_renderer::{self, SpriteSheet},
     },
     transform::{self, transform_bundle, Transform},
     App, DefaultPlugins, DeltaTime, Plugin, Stage,
 };
+use image::DynamicImage;
 
 struct Boid;
 
@@ -84,6 +86,14 @@ fn update_boids_pos(mut q: Query<(&mut LastPos, &Pos)>) {
     });
 }
 
+fn setup_background(mut cmd: Commands, mut assets: ResMut<Assets<DynamicImage>>) {
+    let image = image::load_from_memory(include_bytes!("assets/boom3.png"))
+        .expect("Failed to load background");
+    let handle = assets.insert(image);
+
+    cmd.insert_resource(BackgroundImage(handle));
+}
+
 fn setup_boids(mut cmd: Commands, mut assets: ResMut<assets::Assets<SpriteSheet>>) {
     //camera
     cmd.spawn()
@@ -153,6 +163,7 @@ impl Plugin for GamePlugin {
         });
 
         app.add_startup_system(setup_boids);
+        app.add_startup_system(setup_background);
         app.insert_resource(BoidConfig {
             radius: 30.0,
             separation_radius: 10.0,

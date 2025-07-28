@@ -1,9 +1,9 @@
-use crate::prelude::*;
-use crate::renderer::texture::texture_bind_group_layout;
+use crate::renderer::texture::{texture_bind_group_layout, texture_to_bindings};
 use crate::renderer::{texture, GraphicsState, RenderCommand, RenderCommandPlugin};
-use crate::{App, DefaultPlugins, Plugin};
-use glam::Vec3;
-use wgpu::{include_wgsl, Texture};
+use crate::Plugin;
+use crate::{prelude::*, GameWorld};
+use image::DynamicImage;
+use wgpu::include_wgsl;
 
 pub struct BackgroundPlugin;
 
@@ -100,8 +100,48 @@ impl<'a> RenderCommand<'a> for BackgroundPipeline {
 }
 
 pub struct BackgroundTextureRenderingData {
+    pub id: AssetId,
     pub texture_bind_group: wgpu::BindGroup,
-    pub texture: Texture,
+    pub texture: texture::Texture,
+}
+
+pub struct BackgroundImage(pub Handle<DynamicImage>);
+
+fn extract_background(
+    mut pipeline: ResMut<BackgroundPipeline>,
+    renderer: Res<GraphicsState>,
+    game_world: Res<GameWorld>,
+) {
+    game_world.world().run_view_system(
+        |img: Option<Res<BackgroundImage>>, images: Res<Assets<DynamicImage>>| match img {
+            Some(img) => {
+                let id = img.0.id();
+                let img = images.get(&img.0);
+
+                if let Some(t) = pipeline.texture.as_ref().map(|t| t.id) {
+                    if t == id {
+                        // texture is already registered
+                        return;
+                    }
+                    // new texture, clear the old one
+                    pipeline.texture.take();
+                }
+                let texture =
+                    texture::Texture::from_image(renderer.device(), renderer.queue(), img, None)
+                        .expect("Failed to create texture");
+
+                let (_, texture_bind_group) = texture_to_bindings(&renderer.device, &texture);
+                pipeline.texture = Some(BackgroundTextureRenderingData {
+                    id,
+                    texture,
+                    texture_bind_group,
+                });
+            }
+            None => {
+                pipeline.texture.take();
+            }
+        },
+    );
 }
 
 impl Plugin for BackgroundPlugin {
@@ -109,6 +149,8 @@ impl Plugin for BackgroundPlugin {
         app.add_plugin(RenderCommandPlugin::<BackgroundPipeline>::new(
             crate::renderer::RenderPass::Background,
         ));
+        app.require_plugin(AssetsPlugin::<DynamicImage>::default());
+        app.extact_stage.add_system(extract_background);
         if let Some(ref mut app) = app.render_app {
             app.add_startup_system(setup_pipeline);
         }
