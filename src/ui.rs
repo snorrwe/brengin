@@ -9,6 +9,9 @@ pub mod text;
 pub mod text_rect_pipeline;
 pub mod textured_rect_pipeline;
 
+#[cfg(test)]
+mod tests;
+
 use std::{any::TypeId, collections::HashMap, ptr::NonNull, time::Duration};
 
 use cecs::{prelude::*, query};
@@ -2510,4 +2513,50 @@ impl Default for TextInputState {
 #[derive(Debug, Clone)]
 pub struct InputResponse {
     pub changed: bool,
+}
+
+/// return the offset by which the rect was repositioned
+pub fn align_rect(
+    rect: &mut UiRect,
+    bounds: &UiRect,
+    horizontal: Option<HorizontalAlignment>,
+    vertical: Option<VerticalAlignment>,
+    padding: IVec2,
+) -> IVec2 {
+    let dx;
+    match horizontal {
+        Some(HorizontalAlignment::Left) => {
+            let min_x = bounds.min_x + padding.x;
+            dx = min_x - rect.min_x;
+        }
+        Some(HorizontalAlignment::Center) => {
+            dx = bounds.center_x() - rect.center_x();
+        }
+        Some(HorizontalAlignment::Right) => {
+            let max_x = bounds.max_x - padding.x;
+            dx = max_x - rect.max_x;
+        }
+        None => dx = 0,
+    }
+
+    let dy;
+    match vertical {
+        Some(VerticalAlignment::Top) => {
+            let min_y = bounds.min_y + padding.y;
+            dy = min_y - rect.min_y;
+        }
+        Some(VerticalAlignment::Center) => {
+            dy = bounds.center_y() - rect.center_y();
+        }
+        Some(VerticalAlignment::Bottom) => {
+            let max_y = bounds.max_y - padding.y;
+            dy = max_y - rect.max_y;
+        }
+        None => dy = 0,
+    }
+
+    rect.offset_x(dx);
+    rect.offset_y(dy);
+
+    IVec2::new(dx, dy)
 }
