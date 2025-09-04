@@ -214,7 +214,7 @@ impl GraphicsState {
         self.size
     }
 
-    pub fn surface(&self) -> &wgpu::Surface {
+    pub fn surface<'a>(&'a self) -> &'a wgpu::Surface<'a> {
         &self.surface
     }
 
