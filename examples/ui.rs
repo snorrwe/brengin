@@ -1,6 +1,6 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
 use brengin::ui::{HorizontalAlignment, ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment};
-use brengin::{prelude::*, transform};
+use brengin::{prelude::*, transform, CloseRequest};
 use brengin::{App, DefaultPlugins};
 use image::DynamicImage;
 
@@ -81,7 +81,7 @@ fn back(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
     );
 }
 
-fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
+fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>, cr: Res<CloseRequest>) {
     let MenuState::Main = *state else { return };
     ctx.panel(
         brengin::ui::PanelDescriptor {
@@ -100,6 +100,9 @@ fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
             }
             if ui.button("ImageGrid").inner.pressed {
                 *state = MenuState::ImageGrid;
+            }
+            if ui.button("Exit").inner.pressed {
+                cr.request_close();
             }
         },
     );
