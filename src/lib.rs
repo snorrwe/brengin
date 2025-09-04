@@ -244,7 +244,7 @@ impl RunningApp {
 
         let InitializedWorlds {
             game_world,
-            render_world,
+            mut render_world,
             render_extract,
         } = std::mem::take(app).build();
         let game_world = Arc::new(Mutex::new(game_world));
@@ -254,6 +254,15 @@ impl RunningApp {
             let enabled = Arc::clone(&enabled);
             move || game_thread(game_world, enabled)
         });
+
+        let (close_tx, close_rx) = crossbeam::channel::bounded(4);
+
+        game_world
+            .lock()
+            .insert_resource(CloseRequest { tx: close_tx });
+
+        render_world.insert_resource(CloseRequestRx { rx: close_rx });
+
         *self = RunningApp::Initialized {
             render_world,
             game_world,
@@ -288,6 +297,26 @@ fn game_thread(game_world: Arc<Mutex<World>>, enabled: Arc<AtomicBool>) {
         };
         std::thread::sleep(sleep);
     }
+}
+
+pub struct CloseRequest {
+    tx: crossbeam::channel::Sender<()>,
+}
+
+impl CloseRequest {
+    pub fn request_close(&self) {
+        self.tx
+            .send(())
+            .inspect_err(|_err| {
+                #[cfg(feature = "tracing")]
+                tracing::error!(?_err, "Failed to send close request");
+            })
+            .unwrap_or(());
+    }
+}
+
+struct CloseRequestRx {
+    rx: crossbeam::channel::Receiver<()>,
 }
 
 impl ApplicationHandler for RunningApp {
@@ -392,6 +421,15 @@ impl ApplicationHandler for RunningApp {
                     .cursor_position = position;
             }
             WindowEvent::RedrawRequested => {
+                if render_world
+                    .get_resource::<CloseRequestRx>()
+                    .map(|CloseRequestRx { rx }| rx.try_recv().is_ok())
+                    .unwrap_or(false)
+                {
+                    event_loop.exit();
+                    return;
+                }
+
                 extract_render_data(&game_world, render_world, render_extract);
 
                 render_world.tick();

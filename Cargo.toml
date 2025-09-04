@@ -28,6 +28,7 @@ pollster = "0.4.0"
 parking_lot = "0.12.4"
 rustybuzz = "0.20.1"
 tiny-skia = "0.11.4"
+crossbeam = { version = "0.8.4", features = ["crossbeam-channel", "nightly"] }
 
 [dev-dependencies]
 tracing-subscriber = "0.3.19"
