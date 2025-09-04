@@ -335,8 +335,7 @@ impl UiCoord {
             UiCoord::Absolute(x) => x,
             UiCoord::Percent(p) => {
                 let p = p as f64 / 100.0;
-                let x = max as f64 * p;
-                x as i32
+                (max as f64 * p).round() as i32
             }
         }
     }
