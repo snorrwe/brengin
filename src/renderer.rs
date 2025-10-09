@@ -10,7 +10,7 @@ use cecs::{
     Component,
 };
 use glam::UVec2;
-use wgpu::{Backends, InstanceFlags, StoreOp, SurfaceTarget};
+use wgpu::{Backends, ExperimentalFeatures, InstanceFlags, StoreOp, SurfaceTarget};
 
 pub use crate::camera::camera_bundle;
 use crate::{
@@ -159,6 +159,7 @@ impl GraphicsState {
                 // TODO: lett application control this
                 memory_hints: wgpu::MemoryHints::Performance,
                 trace: wgpu::Trace::Off,
+                experimental_features: ExperimentalFeatures::disabled(),
             })
             .await
             .unwrap();
