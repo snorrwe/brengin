@@ -1690,15 +1690,15 @@ impl<'a> Ui<'a> {
             self.ui.id_stack.push(0);
             self.ui.layer = CONTEXT_LAYER + 2;
 
+            let outline_size = 2;
+            let padding = self.theme.padding as i32;
             let mut bounds = old_bounds;
-            // TODO:
-            // take viewport into account
             bounds.move_to_x(state.offset.x + bounds.width() / 2);
             bounds.move_to_y(state.offset.y + bounds.height() / 2);
+            bounds.max_x = self.ui.scissors[0].max_x - 2 * padding - outline_size;
+            bounds.max_y = self.ui.scissors[0].max_y - 2 * padding - outline_size;
 
             let new_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
-            let padding = self.theme.padding as i32;
-            let outline_size = 2;
 
             let scissor = self.push_scissor(UiRect {
                 min_x: bounds.min_x - 2 * padding - outline_size,
