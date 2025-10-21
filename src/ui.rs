@@ -121,6 +121,7 @@ pub struct UiIds {
     hovered: UiId,
     active: UiId,
     dragged: UiId,
+    context_menu: UiId,
 }
 pub struct NextUiIds(pub UiIds);
 
@@ -387,6 +388,11 @@ impl<'a> Ui<'a> {
     #[inline]
     pub fn is_anything_dragged(&self) -> bool {
         self.ids.dragged != UiId::SENTINEL
+    }
+
+    #[inline]
+    pub fn is_context_menu_open(&self) -> bool {
+        self.ids.context_menu != UiId::SENTINEL
     }
 
     pub fn clear_active(&mut self) {
@@ -1679,6 +1685,7 @@ impl<'a> Ui<'a> {
 
         if state.open {
             self.begin_widget();
+            self.next_ids.0.context_menu = id;
             let history_start = self.ui.rect_history.len();
             self.ui.id_stack.push(0);
             self.ui.layer = CONTEXT_LAYER + 2;
@@ -1742,10 +1749,15 @@ impl<'a> Ui<'a> {
 
             self.ui.scissor_idx = scissor;
         } else {
-            if contains_mouse && self.mouse.just_released.contains(&MouseButton::Right) {
+            if contains_mouse
+                && self.mouse.just_released.contains(&MouseButton::Right)
+                && !self.is_context_menu_open()
+                && self.next_ids.0.context_menu == UiId::SENTINEL
+            {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("Opening context menu over {id:?}");
                 state.open = true;
+                self.next_ids.0.context_menu = id;
                 state.offset = IVec2::new(
                     self.mouse.cursor_position.x as i32,
                     self.mouse.cursor_position.y as i32,
@@ -1755,6 +1767,9 @@ impl<'a> Ui<'a> {
         self.ui.layer = old_layer;
 
         let open = state.open;
+        if self.ids.context_menu == id && !open {
+            self.next_ids.0.context_menu = UiId::SENTINEL;
+        }
         self.insert_memory(id, state);
         let resp = ContextMenuResponse {
             open,
