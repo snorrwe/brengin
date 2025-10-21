@@ -1189,6 +1189,7 @@ impl<'a> Ui<'a> {
             0x04a5e5ff,
             self.ui.layer,
         );
+        self.push_layer();
         self.ui.id_stack.push(0);
         let history_start = self.ui.rect_history.len();
         ///////////////////////
@@ -1211,10 +1212,20 @@ impl<'a> Ui<'a> {
                 // prevent overlap
                 scissor_bounds.max_x -= scroll_bar_size;
             }
-            self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_size, layer + 2, &mut state);
+            self.horizontal_scroll_bar(
+                &scissor_bounds,
+                scroll_bar_size,
+                self.ui.layer + 2,
+                &mut state,
+            );
         }
         if desc.height.is_some() {
-            self.vertical_scroll_bar(&scissor_bounds, scroll_bar_size, layer + 2, &mut state);
+            self.vertical_scroll_bar(
+                &scissor_bounds,
+                scroll_bar_size,
+                self.ui.layer + 2,
+                &mut state,
+            );
         }
         self.ui.id_stack.pop();
         self.insert_memory(id, state);
