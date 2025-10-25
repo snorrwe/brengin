@@ -190,11 +190,12 @@ pub struct Theme {
 
     pub text_padding: u16,
     pub font_size: u16,
-    pub padding: u16,
     pub scroll_bar_size: u16,
     pub window_title_height: u8,
     pub font: Handle<OwnedTypeFace>,
     pub window_padding: u8,
+
+    pub padding: Padding,
 }
 
 impl Default for Theme {
@@ -213,7 +214,7 @@ impl Default for Theme {
 
             text_padding: 5,
             font_size: 12,
-            padding: 5,
+            padding: Padding::splat_abs(5),
             scroll_bar_size: 12,
             window_title_height: 24,
             font: Default::default(),
@@ -268,7 +269,7 @@ pub struct ThemeOverride {
 
     pub text_padding: Option<u16>,
     pub font_size: Option<u16>,
-    pub padding: Option<u16>,
+    pub padding: Option<Padding>,
     pub scroll_bar_size: Option<u16>,
     pub window_title_height: Option<u8>,
     pub font: Option<Handle<OwnedTypeFace>>,
@@ -739,19 +740,24 @@ impl<'a> Ui<'a> {
         self.begin_widget();
         let id = self.current_id();
         let layer = self.ui.layer;
-        let padding = self.theme.padding as i32;
+        let [p_left, p_right, p_top, p_bot] = self
+            .theme
+            .padding
+            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+        let p_horizontal = p_left + p_right;
+        let p_vertical = p_bot + p_top;
 
         let width = width.as_abolute(self.ui.bounds.width());
         let height = height.as_abolute(self.ui.bounds.height());
 
         let x = self.ui.bounds.min_x;
         let y = self.ui.bounds.min_y;
-        self.image_rect(x + padding, y + padding, width, height, image, layer);
+        self.image_rect(x + p_left, y + p_top, width, height, image, layer);
         let rect = UiRect {
             min_x: x,
             min_y: y,
-            max_x: x + width + padding * 2,
-            max_y: y + height + padding * 2,
+            max_x: x + width + p_horizontal,
+            max_y: y + height + p_vertical,
         };
         self.submit_rect(id, rect);
 
@@ -774,8 +780,11 @@ impl<'a> Ui<'a> {
         let mut h = 0;
         let x = self.ui.bounds.min_x;
         let y = self.ui.bounds.min_y;
-        let padding = self.theme.padding as i32;
-        let [x, y] = [x + padding, y + padding];
+        let [p_left, _p_right, p_top, _p_bot] = self
+            .theme
+            .padding
+            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+        let [x, y] = [x + p_left, y + p_top];
         let mut text_y = y;
         let mut line_height = 0;
         for line in label.split('\n') {
@@ -819,14 +828,17 @@ impl<'a> Ui<'a> {
 
     /// When a widget has been completed, submit its bounding rectangle
     fn submit_rect(&mut self, id: UiId, rect: UiRect) {
-        let padding = self.theme.padding as i32;
+        let [p_left, _p_right, p_top, _p_bot] = self
+            .theme
+            .padding
+            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
         match self.ui.layout_dir {
             LayoutDirection::TopDown => {
-                let dy = rect.height() + 2 * padding;
+                let dy = rect.height() + p_top;
                 self.ui.bounds.min_y += dy;
             }
             LayoutDirection::LeftRight => {
-                let dx = rect.width() + 2 * padding;
+                let dx = rect.width() + p_left;
                 self.ui.bounds.min_x += dx;
             }
         }
@@ -882,8 +894,11 @@ impl<'a> Ui<'a> {
         let mut h = 0;
         let x = self.ui.bounds.min_x;
         let y = self.ui.bounds.min_y;
-        let padding = self.theme.padding as i32;
-        let [x, y] = [x + padding, y + padding];
+        let [p_left, _p_right, p_top, _p_bot] = self
+            .theme
+            .padding
+            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+        let [x, y] = [x + p_left, y + p_top];
         let text_padding = self.theme.text_padding as i32;
         let mut text_y = y + text_padding;
         for line in label.split('\n').filter(|l| !l.is_empty()) {
@@ -1304,12 +1319,15 @@ impl<'a> Ui<'a> {
         }
 
         let history = std::mem::take(&mut self.ui.rect_history);
-        let padding = self.theme.padding as i32;
+        let [_p_left, p_right, _p_top, p_bot] = self
+            .theme
+            .padding
+            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
         self.ui.bounds = UiRect {
             min_x: state.pos.x,
             min_y: state.pos.y,
-            max_x: state.pos.x + state.size.x + padding,
-            max_y: state.pos.y + state.size.y + padding,
+            max_x: state.pos.x + state.size.x + p_right,
+            max_y: state.pos.y + state.size.y + p_bot,
         };
         let last_scissor = self.ui.scissor_idx;
         if is_being_dragged {
@@ -1552,8 +1570,11 @@ impl<'a> Ui<'a> {
         let mut h = 0;
         let x = self.ui.bounds.min_x;
         let y = self.ui.bounds.min_y;
-        let padding = self.theme.padding as i32;
-        let [x, y] = [x + padding, y + padding];
+        let [p_left, _p_right, p_top, _p_bot] = self
+            .theme
+            .padding
+            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+        let [x, y] = [x + p_left, y + p_top];
         if !content.is_empty() {
             let mouse_up = self.mouse_up();
             let (handle, e) =
@@ -1691,20 +1712,26 @@ impl<'a> Ui<'a> {
             self.ui.layer = CONTEXT_LAYER + 2;
 
             let outline_size = 2;
-            let padding = self.theme.padding as i32;
+            let [p_left, p_right, p_top, p_bot] = self
+                .theme
+                .padding
+                .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+            let p_horizontal = p_left + p_right;
+            let p_vertical = p_bot + p_top;
+
             let mut bounds = old_bounds;
             bounds.move_to_x(state.offset.x + bounds.width() / 2);
             bounds.move_to_y(state.offset.y + bounds.height() / 2);
-            bounds.max_x = self.ui.scissors[0].max_x - 2 * padding - outline_size;
-            bounds.max_y = self.ui.scissors[0].max_y - 2 * padding - outline_size;
+            bounds.max_x = self.ui.scissors[0].max_x - p_horizontal - outline_size;
+            bounds.max_y = self.ui.scissors[0].max_y - p_vertical - outline_size;
 
             let new_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
 
             let scissor = self.push_scissor(UiRect {
-                min_x: bounds.min_x - 2 * padding - outline_size,
-                min_y: bounds.min_y - 2 * padding - outline_size,
-                max_x: bounds.max_x + 2 * padding + outline_size,
-                max_y: bounds.max_y + 2 * padding + outline_size,
+                min_x: bounds.min_x - p_horizontal - outline_size,
+                min_y: bounds.min_y - p_vertical - outline_size,
+                max_x: bounds.max_x + p_horizontal + outline_size,
+                max_y: bounds.max_y + p_vertical + outline_size,
             });
 
             ///////////////////////
@@ -1716,18 +1743,18 @@ impl<'a> Ui<'a> {
             let context_bounds = self.history_bounding_rect(history_start);
 
             self.color_rect(
-                context_bounds.min_x - padding - outline_size,
-                context_bounds.min_y - padding - outline_size,
-                context_bounds.width() + padding * 2 + outline_size * 2,
-                context_bounds.height() + padding * 2 + outline_size * 2,
+                context_bounds.min_x - p_left - outline_size,
+                context_bounds.min_y - p_top - outline_size,
+                context_bounds.width() + p_horizontal + outline_size * 2,
+                context_bounds.height() + p_vertical + outline_size * 2,
                 0xFF,
                 CONTEXT_LAYER,
             );
             self.theme_rect(
-                context_bounds.min_x - padding,
-                context_bounds.min_y - padding,
-                context_bounds.width() + padding * 2,
-                context_bounds.height() + padding * 2,
+                context_bounds.min_x - p_left,
+                context_bounds.min_y - p_top,
+                context_bounds.width() + p_horizontal,
+                context_bounds.height() + p_vertical,
                 CONTEXT_LAYER + 1,
                 self.theme.context_background.clone(),
             );
@@ -1814,6 +1841,57 @@ impl<'a> Ui<'a> {
 
         let bounds = self.history_bounding_rect(history_start);
         self.submit_rect(id, bounds);
+    }
+
+    pub fn padding(&mut self, m: Padding, mut contents: impl FnMut(&mut Self)) {
+        self.begin_widget();
+        let id = self.current_id();
+        let bounds = self.ui.bounds;
+
+        let [left, right, top, bottom] = m.as_abs(bounds.width(), bounds.height());
+
+        self.ui.bounds.min_x += left;
+        self.ui.bounds.max_x -= right;
+        self.ui.bounds.min_y += top;
+        self.ui.bounds.max_y -= bottom;
+
+        let history_start = self.ui.rect_history.len();
+
+        contents(self);
+
+        self.ui.bounds = bounds;
+
+        let bounds = self.history_bounding_rect(history_start);
+        self.submit_rect(id, bounds);
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Padding {
+    pub left: UiCoord,
+    pub right: UiCoord,
+    pub top: UiCoord,
+    pub bottom: UiCoord,
+}
+
+impl Padding {
+    pub fn splat_abs(p: i32) -> Self {
+        Padding {
+            left: UiCoord::Absolute(p),
+            right: UiCoord::Absolute(p),
+            top: UiCoord::Absolute(p),
+            bottom: UiCoord::Absolute(p),
+        }
+    }
+
+    /// return left,right,top,bottom
+    pub fn as_abs(self, max_horizontal: i32, max_vertical: i32) -> [i32; 4] {
+        [
+            self.left.as_abolute(max_horizontal),
+            self.right.as_abolute(max_horizontal),
+            self.top.as_abolute(max_vertical),
+            self.bottom.as_abolute(max_vertical),
+        ]
     }
 }
 
