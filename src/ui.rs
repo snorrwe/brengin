@@ -1679,26 +1679,15 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub fn context_menu<'b>(
+    fn context_menu_from_response<'b>(
         &'b mut self,
-        mut contents: impl FnMut(&mut Self) + 'b,
+        id: UiId,
+        resp: Response<()>,
         mut context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
-        self.begin_widget();
-        let id = self.current_id();
         let old_bounds = self.ui.bounds;
         let old_layer = self.push_layer();
-
-        self.begin_widget();
-        let history_start = self.ui.rect_history.len();
-        self.ui.id_stack.push(0);
         let contains_mouse = self.contains_mouse(id);
-        ///////////////////////
-        contents(self);
-        ///////////////////////
-        self.ui.id_stack.pop();
-        let content_bounds = self.submit_rect_group(id, history_start);
-
         let mut state = self
             .remove_memory::<ContextMenuState>(id)
             .map(|x| *x)
@@ -1800,17 +1789,42 @@ impl<'a> Ui<'a> {
         self.insert_memory(id, state);
         let resp = ContextMenuResponse {
             open,
-            inner: Response {
-                hovered: self.is_hovered(id),
-                active: self.is_active(id),
-                rect: content_bounds,
-                inner: (),
-            },
+            inner: resp,
             ui: self,
             id,
         };
 
         resp
+    }
+
+    pub fn context_menu<'b>(
+        &'b mut self,
+        mut contents: impl FnMut(&mut Self) + 'b,
+        context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
+    ) -> ContextMenuResponse<'b, 'a> {
+        self.begin_widget();
+        let id = self.current_id();
+        let old_layer = self.push_layer();
+
+        self.begin_widget();
+        let history_start = self.ui.rect_history.len();
+        self.ui.id_stack.push(0);
+        ///////////////////////
+        contents(self);
+        ///////////////////////
+        self.ui.id_stack.pop();
+        let content_bounds = self.submit_rect_group(id, history_start);
+
+        self.ui.layer = old_layer;
+
+        let resp = Response {
+            hovered: self.is_hovered(id),
+            active: self.is_active(id),
+            rect: content_bounds,
+            inner: (),
+        };
+
+        self.context_menu_from_response(id, resp, context_menu)
     }
 
     pub fn allocate_area(
@@ -1982,6 +1996,17 @@ pub struct Response<T> {
     pub active: bool,
     pub rect: UiRect,
     pub inner: T,
+}
+
+impl<T> Response<T> {
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Response<U> {
+        Response {
+            hovered: self.hovered,
+            active: self.active,
+            rect: self.rect,
+            inner: f(self.inner),
+        }
+    }
 }
 
 pub type ButtonResponse = Response<ButtonState>;
