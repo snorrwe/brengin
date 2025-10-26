@@ -1,7 +1,5 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
-use brengin::ui::{
-    ContextMenuState, HorizontalAlignment, ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment,
-};
+use brengin::ui::{HorizontalAlignment, ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment};
 use brengin::{prelude::*, transform, CloseRequest};
 use brengin::{App, DefaultPlugins};
 use image::DynamicImage;
