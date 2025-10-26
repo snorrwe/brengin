@@ -77,6 +77,9 @@
             ]
             ++ x11libs
           );
+          # fix rendering getting stuck on startup
+          WAYLAND_DISPLAY = "";
+
         };
       }
     );
