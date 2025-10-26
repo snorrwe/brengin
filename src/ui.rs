@@ -762,6 +762,7 @@ impl<'a> Ui<'a> {
         self.submit_rect(id, rect);
 
         Response {
+            id,
             hovered: self.ids.hovered == id,
             active: self.ids.active == id,
             inner: (),
@@ -819,6 +820,7 @@ impl<'a> Ui<'a> {
         };
         self.submit_rect(id, rect);
         Response {
+            id,
             hovered: self.ids.hovered == id,
             active: self.ids.active == id,
             inner: (),
@@ -951,6 +953,7 @@ impl<'a> Ui<'a> {
         };
         self.submit_rect(id, rect);
         ButtonResponse {
+            id,
             hovered: self.ids.hovered == id,
             active: self.ids.active == id,
             inner: ButtonState { pressed },
@@ -1272,6 +1275,7 @@ impl<'a> Ui<'a> {
         self.submit_rect(id, bounds);
         self.ui.rect_history.push(bounds);
         Response {
+            id,
             hovered: self.is_hovered(id),
             active: self.is_active(id),
             rect: bounds,
@@ -1373,6 +1377,7 @@ impl<'a> Ui<'a> {
         DragResponse {
             is_being_dragged,
             inner: Response {
+                id,
                 hovered: self.is_hovered(id),
                 active: is_being_dragged,
                 rect: content_bounds,
@@ -1440,6 +1445,7 @@ impl<'a> Ui<'a> {
         DropResponse {
             dropped: state.dropped,
             inner: Response {
+                id,
                 hovered: self.is_hovered(id),
                 active: state.dropped,
                 rect: content_bounds,
@@ -1657,6 +1663,7 @@ impl<'a> Ui<'a> {
             active: self.ids.active == id,
             inner: InputResponse { changed },
             rect,
+            id,
         }
     }
 
@@ -1681,12 +1688,10 @@ impl<'a> Ui<'a> {
 
     fn context_menu_from_response<'b>(
         &'b mut self,
-        id: UiId,
         resp: Response<()>,
         mut context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
-        let old_bounds = self.ui.bounds;
-        let old_layer = self.push_layer();
+        let id = resp.id;
         let contains_mouse = self.contains_mouse(id);
         let mut state = self
             .remove_memory::<ContextMenuState>(id)
@@ -1698,7 +1703,7 @@ impl<'a> Ui<'a> {
             self.next_ids.0.context_menu = id;
             let history_start = self.ui.rect_history.len();
             self.ui.id_stack.push(0);
-            self.ui.layer = CONTEXT_LAYER + 2;
+            let old_layer = std::mem::replace(&mut self.ui.layer, CONTEXT_LAYER + 2);
 
             let outline_size = 2;
             let [p_left, p_right, p_top, p_bot] = self
@@ -1708,7 +1713,7 @@ impl<'a> Ui<'a> {
             let p_horizontal = p_left + p_right;
             let p_vertical = p_bot + p_top;
 
-            let mut bounds = old_bounds;
+            let mut bounds = resp.rect;
             bounds.move_to_x(state.offset.x + bounds.width() / 2);
             bounds.move_to_y(state.offset.y + bounds.height() / 2);
             bounds.max_x = self.ui.scissors[0].max_x - p_horizontal - outline_size;
@@ -1764,6 +1769,7 @@ impl<'a> Ui<'a> {
             }
 
             self.ui.scissor_idx = scissor;
+            self.ui.layer = old_layer;
         } else {
             if contains_mouse
                 && self.mouse.just_released.contains(&MouseButton::Right)
@@ -1780,7 +1786,6 @@ impl<'a> Ui<'a> {
                 );
             }
         }
-        self.ui.layer = old_layer;
 
         let open = state.open;
         if self.ids.context_menu == id && !open {
@@ -1822,9 +1827,20 @@ impl<'a> Ui<'a> {
             active: self.is_active(id),
             rect: content_bounds,
             inner: (),
+            id,
         };
 
-        self.context_menu_from_response(id, resp, context_menu)
+        self.context_menu_from_response(resp, context_menu)
+    }
+
+    pub fn open_context_menu(&mut self, id: UiId) {
+        self.get_memory_or_default::<ContextMenuState>(id).open = true;
+    }
+
+    pub fn close_context_menu(&mut self, id: UiId) {
+        if let Some(m) = self.get_memory_mut::<ContextMenuState>(id) {
+            m.open = false;
+        }
     }
 
     pub fn allocate_area(
@@ -1996,6 +2012,7 @@ pub struct Response<T> {
     pub active: bool,
     pub rect: UiRect,
     pub inner: T,
+    pub id: UiId,
 }
 
 impl<T> Response<T> {
@@ -2004,8 +2021,27 @@ impl<T> Response<T> {
             hovered: self.hovered,
             active: self.active,
             rect: self.rect,
+            id: self.id,
             inner: f(self.inner),
         }
+    }
+
+    pub fn map_unit(self) -> Response<()> {
+        Response {
+            hovered: self.hovered,
+            active: self.active,
+            rect: self.rect,
+            id: self.id,
+            inner: (),
+        }
+    }
+
+    pub fn context_menu<'a, 'b>(
+        self,
+        ui: &'b mut Ui<'a>,
+        context_menu: impl FnMut(&mut Ui<'a>, &mut ContextMenuState) + 'b,
+    ) -> ContextMenuResponse<'b, 'a> {
+        ui.context_menu_from_response(self.map_unit(), context_menu)
     }
 }
 

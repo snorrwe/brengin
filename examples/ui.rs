@@ -1,5 +1,7 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
-use brengin::ui::{HorizontalAlignment, ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment};
+use brengin::ui::{
+    ContextMenuState, HorizontalAlignment, ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment,
+};
 use brengin::{prelude::*, transform, CloseRequest};
 use brengin::{App, DefaultPlugins};
 use image::DynamicImage;
@@ -238,6 +240,20 @@ fn buttons_ui(
                     ui.label(&label.0);
 
                     ui.input_string(&mut form.data);
+                });
+
+                // opening a context menu on-demand by user code
+                let resp = ui.button("Open context menu");
+                if resp.inner.pressed {
+                    ui.open_context_menu(resp.id);
+                }
+                resp.context_menu(ui, |ui, s| {
+                    ui.vertical(|ui| {
+                        ui.label("hello");
+                        if ui.button("close").inner.pressed {
+                            s.open = false;
+                        }
+                    });
                 });
             });
         },
