@@ -1176,13 +1176,13 @@ impl<'a> Ui<'a> {
                     }
                     *t += dt;
                     // TODO: animation at edge?
-                    // TODO: the min needs work, doesn't work as intended
-                    *t = t.clamp(0.0, 1.0 - 1.0 / (line_height as f32));
+                    *t = t.clamp(0.0, 1.0);
                 }
             }
         }
-        let offset_x = state.tx * state.content_width as f32;
-        let offset_y = state.ty * state.content_height as f32;
+
+        let offset_x = state.tx * state.scroll_width as f32;
+        let offset_y = state.ty * state.scroll_height as f32;
         self.insert_memory(id, state);
 
         let old_bounds = self.ui.bounds;
@@ -1222,13 +1222,20 @@ impl<'a> Ui<'a> {
         let last_id = self.ui.id_stack.pop().unwrap();
         let children_bounds = self.history_bounding_rect(history_start);
 
+        let scroll_bar_size = self.theme.scroll_bar_size as i32;
+
         let state = self.get_memory_mut::<ScrollState>(id).unwrap();
 
-        state.content_width = children_bounds.width();
-        state.content_height = children_bounds.height();
+        // compute the area of the scroll. Area = content bounds - viewport, so only the overlap is
+        // counted
+        state.scroll_width = children_bounds
+            .width()
+            .saturating_sub(width.saturating_sub(line_height as i32 + scroll_bar_size));
+        state.scroll_height = children_bounds
+            .height()
+            .saturating_sub(height.saturating_sub(line_height as i32 + scroll_bar_size));
         let mut state = *state;
 
-        let scroll_bar_size = self.theme.scroll_bar_size as i32;
         self.ui.id_stack.push(last_id);
         if desc.width.is_some() {
             let mut scissor_bounds = scissor_bounds;
@@ -2614,8 +2621,8 @@ struct ScrollState {
     /// goes from -1 to 0
     pub tx: f32,
     pub ty: f32,
-    pub content_width: i32,
-    pub content_height: i32,
+    pub scroll_width: i32,
+    pub scroll_height: i32,
 }
 
 fn bounding_rect(history: &[UiRect]) -> UiRect {
