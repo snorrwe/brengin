@@ -1840,11 +1840,16 @@ impl<'a> Ui<'a> {
         self.context_menu_from_response(resp, context_menu)
     }
 
-    pub fn open_context_menu(&mut self, id: UiId) {
-        let cur_pos = self.mouse.cursor_position;
+    /// pos is the offset of the context_menu in screen space.
+    /// if pos is None, then the context menu is opened at the cursor position
+    pub fn open_context_menu(&mut self, id: UiId, pos: Option<IVec2>) {
+        let offset = pos.unwrap_or_else(|| {
+            let cur_pos = self.mouse.cursor_position;
+            IVec2::new(cur_pos.x as i32, cur_pos.y as i32)
+        });
         let state = self.get_memory_or_default::<ContextMenuState>(id);
         state.open = true;
-        state.offset = IVec2::new(cur_pos.x as i32, cur_pos.y as i32);
+        state.offset = offset;
     }
 
     pub fn close_context_menu(&mut self, id: UiId) {
