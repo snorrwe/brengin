@@ -1841,7 +1841,10 @@ impl<'a> Ui<'a> {
     }
 
     pub fn open_context_menu(&mut self, id: UiId) {
-        self.get_memory_or_default::<ContextMenuState>(id).open = true;
+        let cur_pos = self.mouse.cursor_position;
+        let state = self.get_memory_or_default::<ContextMenuState>(id);
+        state.open = true;
+        state.offset = IVec2::new(cur_pos.x as i32, cur_pos.y as i32);
     }
 
     pub fn close_context_menu(&mut self, id: UiId) {
