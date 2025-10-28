@@ -2023,6 +2023,26 @@ pub struct Response<T> {
 }
 
 impl<T> Response<T> {
+    pub fn as_ref(&self) -> Response<&T> {
+        Response {
+            hovered: self.hovered,
+            active: self.active,
+            rect: self.rect,
+            id: self.id,
+            inner: &self.inner,
+        }
+    }
+
+    pub fn as_mut(&mut self) -> Response<&mut T> {
+        Response {
+            hovered: self.hovered,
+            active: self.active,
+            rect: self.rect,
+            id: self.id,
+            inner: &mut self.inner,
+        }
+    }
+
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Response<U> {
         Response {
             hovered: self.hovered,
@@ -2033,7 +2053,7 @@ impl<T> Response<T> {
         }
     }
 
-    pub fn map_unit(self) -> Response<()> {
+    pub fn map_unit(&self) -> Response<()> {
         Response {
             hovered: self.hovered,
             active: self.active,
@@ -2044,7 +2064,7 @@ impl<T> Response<T> {
     }
 
     pub fn context_menu<'a, 'b>(
-        self,
+        &self,
         ui: &'b mut Ui<'a>,
         context_menu: impl FnMut(&mut Ui<'a>, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
