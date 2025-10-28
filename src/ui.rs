@@ -2060,6 +2060,7 @@ impl ButtonResponse {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct ButtonState {
     pub pressed: bool,
 }
