@@ -243,7 +243,7 @@ fn buttons_ui(
                 // opening a context menu on-demand by user code
                 let resp = ui.button("Open context menu");
                 if resp.inner.pressed {
-                    ui.open_context_menu(resp.id);
+                    ui.open_context_menu(resp.id, None);
                 }
                 resp.context_menu(ui, |ui, s| {
                     ui.vertical(|ui| {
