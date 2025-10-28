@@ -114,8 +114,8 @@ pub struct ShapingResult {
 
 fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
     let ids = &mut rhs.0;
-    ids.sort_unstable_by_key(|x| x.layer);
-    for mut i in ids.drain(..) {
+    ids.sort_by_key(|x| -(x.layer as i32));
+    for mut i in ids.drain(..).rev() {
         if i.has_added_flag(InteractionFlag::Hovered) {
             lhs.hovered = i.id;
         }
@@ -1451,6 +1451,7 @@ impl<'a> Ui<'a> {
             is_being_dragged = true;
             if self.mouse_up() {
                 self.set_not_active(id);
+                state.dragged = false;
                 self.next_ids
                     .push(id, DRAG_LAYER)
                     .remove_flag(InteractionFlag::Dragged);
@@ -1463,19 +1464,25 @@ impl<'a> Ui<'a> {
                     (self.mouse.cursor_position.y - drag_start.y) as i32,
                 );
 
-                state.pos = drag_anchor + offset;
-                self.next_ids
-                    .push(id, DRAG_LAYER)
-                    .add_flag(InteractionFlag::Dragged);
+                if offset.length_squared() > 5 {
+                    state.dragged = true;
+                }
+                if state.dragged {
+                    state.pos = drag_anchor + offset;
+                    self.next_ids
+                        .push(id, DRAG_LAYER)
+                        .add_flag(InteractionFlag::Dragged);
+                }
             }
         } else {
             state.pos = IVec2::new(old_bounds.min_x, old_bounds.min_y);
             if !self.is_anything_active() && self.contains_mouse(id) && self.mouse_down() {
                 is_being_dragged = true;
                 state.drag_start = self.mouse.cursor_position;
+                state.dragged = false;
                 self.next_ids
                     .push(id, DRAG_LAYER)
-                    .add_flag(InteractionFlag::Dragged);
+                    .add_flag(InteractionFlag::Active);
             }
         }
 
@@ -2149,6 +2156,7 @@ struct DragState {
     pub drag_anchor: IVec2,
     pub pos: IVec2,
     pub size: IVec2,
+    pub dragged: bool,
 }
 
 #[derive(Debug)]
