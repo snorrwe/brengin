@@ -46,7 +46,7 @@ impl Plugin for UiPlugin {
 
         app.insert_resource(UiState::new());
         app.insert_resource(UiIds::default());
-        app.insert_resource(NextUiIds(UiIds::default()));
+        app.insert_resource(NextUiIds(Default::default()));
         app.insert_resource(TextTextureCache::default());
         app.insert_resource(UiMemory::default());
 
@@ -112,8 +112,43 @@ pub struct ShapingResult {
     pub texture: TextDrawResponse,
 }
 
-fn update_ids(mut lhs: ResMut<UiIds>, rhs: Res<NextUiIds>) {
-    *lhs = rhs.0;
+fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
+    let ids = &mut rhs.0;
+    ids.sort_unstable_by_key(|x| x.layer);
+    for mut i in ids.drain(..) {
+        if i.has_added_flag(InteractionFlag::Hovered) {
+            lhs.hovered = i.id;
+        }
+        if i.has_added_flag(InteractionFlag::Active) {
+            lhs.active = i.id;
+        }
+        if i.has_added_flag(InteractionFlag::Dragged) {
+            lhs.hovered = i.id;
+            lhs.active = i.id;
+            lhs.dragged = i.id;
+        }
+        if i.has_added_flag(InteractionFlag::ContextMenu) {
+            lhs.context_menu = i.id;
+        }
+        if lhs.dragged == i.id && i.has_removed_flag(InteractionFlag::Dragged) {
+            lhs.dragged = UiId::SENTINEL;
+            if !i.has_added_flag(InteractionFlag::Hovered) {
+                i.remove_flag(InteractionFlag::Hovered);
+            }
+            if !i.has_added_flag(InteractionFlag::Active) {
+                i.remove_flag(InteractionFlag::Active);
+            }
+        }
+        if lhs.hovered == i.id && i.has_removed_flag(InteractionFlag::Hovered) {
+            lhs.hovered = UiId::SENTINEL;
+        }
+        if lhs.active == i.id && i.has_removed_flag(InteractionFlag::Active) {
+            lhs.active = UiId::SENTINEL;
+        }
+        if i.has_removed_flag(InteractionFlag::ContextMenu) {
+            lhs.context_menu = UiId::SENTINEL;
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -123,7 +158,101 @@ pub struct UiIds {
     dragged: UiId,
     context_menu: UiId,
 }
-pub struct NextUiIds(pub UiIds);
+pub struct NextUiIds(pub Vec<NextUiIdSet>);
+
+impl NextUiIds {
+    pub fn push(&mut self, id: UiId, layer: u16) -> &mut NextUiIdSet {
+        if self.0.last_mut().map(|x| x.id != id).unwrap_or(true) {
+            self.0.push(NextUiIdSet {
+                layer,
+                id,
+                added_flags: 0,
+                removed_flags: 0,
+            });
+        }
+        self.0.last_mut().unwrap()
+    }
+}
+
+// bit flags
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum InteractionFlag {
+    Hovered = 1,
+    Active = 2,
+    Dragged = 4,
+    ContextMenu = 8,
+}
+
+impl InteractionFlag {
+    fn write_interaction_flags(f: &mut std::fmt::Formatter<'_>, flags: u8) -> std::fmt::Result {
+        write!(f, "[")?;
+        if (flags & (Self::Hovered as u8)) != 0 {
+            write!(f, "Hovered ")?;
+        } else {
+            write!(f, "!Hovered ")?;
+        }
+        if (flags & (Self::Active as u8)) != 0 {
+            write!(f, "Active ")?;
+        } else {
+            write!(f, "!Active ")?;
+        }
+        if (flags & (Self::Dragged as u8)) != 0 {
+            write!(f, "Dragged ")?;
+        } else {
+            write!(f, "!Dragged ")?;
+        }
+        if (flags & (Self::ContextMenu as u8)) != 0 {
+            write!(f, "ContextMenu")?;
+        } else {
+            write!(f, "!ContextMenu")?;
+        }
+        write!(f, "]")
+    }
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct NextUiIdSet {
+    pub id: UiId,
+    pub layer: u16,
+    pub added_flags: u8,
+    pub removed_flags: u8,
+}
+
+impl std::fmt::Debug for NextUiIdSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NextUiIdSet")
+            .field("id", &self.id)
+            .field("layer", &self.layer)
+            .field_with("added_flags", |f| {
+                InteractionFlag::write_interaction_flags(f, self.added_flags)
+            })
+            .field_with("removed_flags", |f| {
+                InteractionFlag::write_interaction_flags(f, self.removed_flags)
+            })
+            .finish()
+    }
+}
+
+impl NextUiIdSet {
+    pub fn add_flag(&mut self, flag: InteractionFlag) {
+        self.added_flags |= flag as u8;
+        self.removed_flags &= !(flag as u8);
+    }
+
+    pub fn remove_flag(&mut self, flag: InteractionFlag) {
+        self.added_flags &= !(flag as u8);
+        self.removed_flags |= flag as u8;
+    }
+
+    pub fn has_added_flag(&self, flag: InteractionFlag) -> bool {
+        (self.added_flags & flag as u8) != 0
+    }
+
+    pub fn has_removed_flag(&self, flag: InteractionFlag) -> bool {
+        (self.removed_flags & flag as u8) != 0
+    }
+}
 
 /// UI context object. Use this to builder your user interface
 pub struct UiState {
@@ -378,12 +507,16 @@ impl<'a> Ui<'a> {
 
     #[inline]
     fn set_hovered(&mut self, id: UiId) {
-        self.next_ids.0.hovered = id;
+        self.next_ids
+            .push(id, self.ui.layer)
+            .add_flag(InteractionFlag::Hovered);
     }
 
     #[inline]
     fn set_active(&mut self, id: UiId) {
-        self.next_ids.0.active = id;
+        self.next_ids
+            .push(id, self.ui.layer)
+            .add_flag(InteractionFlag::Active);
     }
 
     #[inline]
@@ -397,7 +530,9 @@ impl<'a> Ui<'a> {
     }
 
     pub fn clear_active(&mut self) {
-        self.next_ids.0.active = UiId::SENTINEL;
+        self.next_ids
+            .push(UiId::SENTINEL, self.ui.layer)
+            .remove_flag(InteractionFlag::Active);
     }
 
     #[inline]
@@ -448,6 +583,11 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
+    pub fn has_context_menu(&self, id: UiId) -> bool {
+        self.ids.context_menu == id
+    }
+
+    #[inline]
     pub fn mouse_up(&self) -> bool {
         self.mouse.just_released.contains(&MouseButton::Left)
     }
@@ -477,14 +617,18 @@ impl<'a> Ui<'a> {
     #[inline]
     fn set_not_active(&mut self, id: UiId) {
         if self.ids.active == id {
-            self.next_ids.0.active = UiId::SENTINEL;
+            self.next_ids
+                .push(id, self.ui.layer)
+                .remove_flag(InteractionFlag::Active);
         }
     }
 
     #[inline]
     fn set_not_hovered(&mut self, id: UiId) {
         if self.ids.hovered == id {
-            self.next_ids.0.hovered = UiId::SENTINEL;
+            self.next_ids
+                .push(id, self.ui.layer)
+                .remove_flag(InteractionFlag::Hovered);
         }
     }
 
@@ -887,7 +1031,7 @@ impl<'a> Ui<'a> {
                 self.set_active(id);
             }
         }
-        if contains_mouse && !self.is_anything_active() {
+        if contains_mouse {
             self.set_hovered(id);
         }
 
@@ -954,8 +1098,8 @@ impl<'a> Ui<'a> {
         self.submit_rect(id, rect);
         ButtonResponse {
             id,
-            hovered: self.ids.hovered == id,
-            active: self.ids.active == id,
+            hovered: self.is_hovered(id),
+            active,
             inner: ButtonState { pressed },
             rect,
         }
@@ -1307,7 +1451,9 @@ impl<'a> Ui<'a> {
             is_being_dragged = true;
             if self.mouse_up() {
                 self.set_not_active(id);
-                self.next_ids.0.dragged = UiId::SENTINEL;
+                self.next_ids
+                    .push(id, DRAG_LAYER)
+                    .remove_flag(InteractionFlag::Dragged);
             } else {
                 let drag_anchor = state.drag_anchor;
                 let drag_start = state.drag_start;
@@ -1318,14 +1464,18 @@ impl<'a> Ui<'a> {
                 );
 
                 state.pos = drag_anchor + offset;
+                self.next_ids
+                    .push(id, DRAG_LAYER)
+                    .add_flag(InteractionFlag::Dragged);
             }
         } else {
             state.pos = IVec2::new(old_bounds.min_x, old_bounds.min_y);
             if !self.is_anything_active() && self.contains_mouse(id) && self.mouse_down() {
                 is_being_dragged = true;
                 state.drag_start = self.mouse.cursor_position;
-                self.set_active(id);
-                self.next_ids.0.dragged = id;
+                self.next_ids
+                    .push(id, DRAG_LAYER)
+                    .add_flag(InteractionFlag::Dragged);
             }
         }
 
@@ -1698,19 +1848,22 @@ impl<'a> Ui<'a> {
         resp: Response<()>,
         mut context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
-        let id = resp.id;
-        let contains_mouse = self.contains_mouse(id);
+        let parent_id = resp.id;
+        let contains_mouse = self.contains_mouse(parent_id);
+
+        self.ui.id_stack.push(0);
+        self.begin_widget();
+        let id = self.current_id();
+
         let mut state = self
-            .remove_memory::<ContextMenuState>(id)
+            .remove_memory::<ContextMenuState>(parent_id)
             .map(|x| *x)
             .unwrap_or_default();
 
-        if state.open {
-            self.begin_widget();
-            self.next_ids.0.context_menu = id;
+        if self.has_context_menu(parent_id) || state.open {
             let history_start = self.ui.rect_history.len();
-            self.ui.id_stack.push(0);
             let old_layer = std::mem::replace(&mut self.ui.layer, CONTEXT_LAYER + 2);
+            let old_bounds = self.ui.bounds;
 
             let outline_size = 2;
             let [p_left, p_right, p_top, p_bot] = self
@@ -1735,6 +1888,7 @@ impl<'a> Ui<'a> {
                 max_y: bounds.max_y + p_vertical + outline_size,
             });
 
+            self.ui.id_stack.push(0);
             ///////////////////////
             context_menu(self, &mut state);
             ///////////////////////
@@ -1743,11 +1897,27 @@ impl<'a> Ui<'a> {
 
             let context_bounds = self.history_bounding_rect(history_start);
 
-            self.color_rect(
+            let mut bounds = context_bounds;
+            bounds = bounds.grow_over_point(
                 context_bounds.min_x - p_left - outline_size,
                 context_bounds.min_y - p_top - outline_size,
-                context_bounds.width() + p_horizontal + outline_size * 2,
-                context_bounds.height() + p_vertical + outline_size * 2,
+            );
+            bounds = bounds.grow_over_point(
+                context_bounds.max_x + p_left + outline_size,
+                context_bounds.max_y + p_top + outline_size,
+            );
+            self.submit_rect(id, bounds);
+            if self.contains_mouse(id) {
+                self.next_ids
+                    .push(id, CONTEXT_LAYER)
+                    .add_flag(InteractionFlag::Hovered);
+            }
+
+            self.color_rect(
+                bounds.min_x,
+                bounds.min_y,
+                bounds.width(),
+                bounds.height(),
                 0xFF,
                 CONTEXT_LAYER,
             );
@@ -1764,46 +1934,51 @@ impl<'a> Ui<'a> {
                 .rect_history
                 .resize_with(history_start, || unreachable!());
 
-            if !self.mouse.pressed.is_empty()
-                && !context_bounds.contains_point(
-                    self.mouse.cursor_position.x as i32,
-                    self.mouse.cursor_position.y as i32,
-                )
-            {
+            if !self.mouse.pressed.is_empty() && !self.contains_mouse(id) {
                 #[cfg(feature = "tracing")]
-                tracing::debug!("Closing context menu over {id:?}");
+                tracing::debug!("Closing context menu over {parent_id:?}");
                 state.open = false;
             }
 
             self.ui.scissor_idx = scissor;
             self.ui.layer = old_layer;
+            self.ui.bounds = old_bounds;
         } else {
             if contains_mouse
                 && self.mouse.just_released.contains(&MouseButton::Right)
                 && !self.is_context_menu_open()
-                && self.next_ids.0.context_menu == UiId::SENTINEL
             {
                 #[cfg(feature = "tracing")]
-                tracing::debug!("Opening context menu over {id:?}");
+                tracing::debug!("Opening context menu over {parent_id:?}");
                 state.open = true;
-                self.next_ids.0.context_menu = id;
                 state.offset = IVec2::new(
                     self.mouse.cursor_position.x as i32,
                     self.mouse.cursor_position.y as i32,
                 );
             }
         }
+        self.ui.id_stack.pop();
 
         let open = state.open;
-        if self.ids.context_menu == id && !open {
-            self.next_ids.0.context_menu = UiId::SENTINEL;
+        let is_currently_open = self.has_context_menu(parent_id);
+        if is_currently_open {
+            if !open {
+                self.next_ids
+                    .push(parent_id, self.ui.layer)
+                    .remove_flag(InteractionFlag::ContextMenu);
+            }
+        } else if open {
+            self.next_ids
+                .push(parent_id, self.ui.layer)
+                .add_flag(InteractionFlag::ContextMenu);
         }
-        self.insert_memory(id, state);
+        state.open = is_currently_open;
+        self.insert_memory(parent_id, state);
         let resp = ContextMenuResponse {
             open,
             inner: resp,
             ui: self,
-            id,
+            id: parent_id,
         };
 
         resp
@@ -1850,11 +2025,17 @@ impl<'a> Ui<'a> {
         let state = self.get_memory_or_default::<ContextMenuState>(id);
         state.open = true;
         state.offset = offset;
+        self.next_ids
+            .push(id, self.ui.layer)
+            .remove_flag(InteractionFlag::ContextMenu);
     }
 
     pub fn close_context_menu(&mut self, id: UiId) {
         if let Some(m) = self.get_memory_mut::<ContextMenuState>(id) {
             m.open = false;
+            self.next_ids
+                .push(id, self.ui.layer)
+                .remove_flag(InteractionFlag::ContextMenu);
         }
     }
 
@@ -2309,6 +2490,7 @@ impl<'a> Default for WindowDescriptor<'a> {
 
 pub const WINDOW_LAYER: u16 = 100;
 pub const CONTEXT_LAYER: u16 = 10000;
+pub const DRAG_LAYER: u16 = 10000;
 
 #[derive(Default, Debug)]
 struct WindowAllocator {

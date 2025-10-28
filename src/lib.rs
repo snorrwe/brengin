@@ -1,3 +1,5 @@
+#![feature(debug_closure_helpers)]
+
 pub mod assets;
 pub mod camera;
 pub mod prelude;
