@@ -1557,6 +1557,12 @@ impl<'a> Ui<'a> {
         l
     }
 
+    pub fn on_next_layer(&mut self, mut contents: impl FnMut(&mut Self)) {
+        let l = self.push_layer();
+        contents(self);
+        self.ui.layer = l;
+    }
+
     pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self, DropState)) -> DropResponse {
         self.begin_widget();
         let id = self.current_id();
