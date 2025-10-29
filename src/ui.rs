@@ -1979,7 +1979,6 @@ impl<'a> Ui<'a> {
                 .push(parent_id, self.ui.layer)
                 .add_flag(InteractionFlag::ContextMenu);
         }
-        state.open = is_currently_open;
         self.insert_memory(parent_id, state);
         let resp = ContextMenuResponse {
             open,
