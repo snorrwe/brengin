@@ -116,7 +116,7 @@ pub struct ShapingResult {
 fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
     let ids = &mut rhs.0;
     ids.sort_by_key(|x| -(x.layer as i32));
-    for mut i in ids.drain(..).rev() {
+    for mut i in ids.drain(..) {
         if i.has_added_flag(InteractionFlag::Hovered) {
             lhs.hovered = i.id;
         }
