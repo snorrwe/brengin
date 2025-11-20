@@ -112,6 +112,7 @@ pub struct ShapingResult {
     pub texture: TextDrawResponse,
 }
 
+/// assign new ids, lhs = rhs
 fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
     let ids = &mut rhs.0;
     ids.sort_by_key(|x| -(x.layer as i32));
