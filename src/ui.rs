@@ -1484,7 +1484,7 @@ impl<'a> Ui<'a> {
                 state.drag_start = self.mouse.cursor_position;
                 state.dragged = false;
                 self.next_ids
-                    .push(id, DRAG_LAYER)
+                    .push(id, self.ui.layer)
                     .add_flag(InteractionFlag::Active);
             }
         }
