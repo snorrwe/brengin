@@ -115,38 +115,40 @@ pub struct ShapingResult {
 /// assign new ids, lhs = rhs
 fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
     let ids = &mut rhs.0;
-    ids.sort_by_key(|x| -(x.layer as i32));
-    for mut i in ids.drain(..) {
-        if i.has_added_flag(InteractionFlag::Hovered) {
-            lhs.hovered = i.id;
+    let active_item = ids.iter().max_by_key(|x| x.layer);
+    if let Some(idset) = active_item {
+        if idset.has_added_flag(InteractionFlag::Hovered) {
+            lhs.hovered = idset.id;
         }
-        if i.has_added_flag(InteractionFlag::Active) {
-            lhs.active = i.id;
+        if idset.has_added_flag(InteractionFlag::Active) {
+            lhs.active = idset.id;
         }
-        if i.has_added_flag(InteractionFlag::Dragged) {
-            lhs.hovered = i.id;
-            lhs.active = i.id;
-            lhs.dragged = i.id;
+        if idset.has_added_flag(InteractionFlag::Dragged) {
+            lhs.hovered = idset.id;
+            lhs.active = idset.id;
+            lhs.dragged = idset.id;
         }
-        if i.has_added_flag(InteractionFlag::ContextMenu) {
-            lhs.context_menu = i.id;
+        if idset.has_added_flag(InteractionFlag::ContextMenu) {
+            lhs.context_menu = idset.id;
         }
-        if lhs.dragged == i.id && i.has_removed_flag(InteractionFlag::Dragged) {
+    }
+    for mut idset in ids.drain(..) {
+        if lhs.dragged == idset.id && idset.has_removed_flag(InteractionFlag::Dragged) {
             lhs.dragged = UiId::SENTINEL;
-            if !i.has_added_flag(InteractionFlag::Hovered) {
-                i.remove_flag(InteractionFlag::Hovered);
+            if !idset.has_added_flag(InteractionFlag::Hovered) {
+                idset.remove_flag(InteractionFlag::Hovered);
             }
-            if !i.has_added_flag(InteractionFlag::Active) {
-                i.remove_flag(InteractionFlag::Active);
+            if !idset.has_added_flag(InteractionFlag::Active) {
+                idset.remove_flag(InteractionFlag::Active);
             }
         }
-        if lhs.hovered == i.id && i.has_removed_flag(InteractionFlag::Hovered) {
+        if lhs.hovered == idset.id && idset.has_removed_flag(InteractionFlag::Hovered) {
             lhs.hovered = UiId::SENTINEL;
         }
-        if lhs.active == i.id && i.has_removed_flag(InteractionFlag::Active) {
+        if lhs.active == idset.id && idset.has_removed_flag(InteractionFlag::Active) {
             lhs.active = UiId::SENTINEL;
         }
-        if i.has_removed_flag(InteractionFlag::ContextMenu) {
+        if idset.has_removed_flag(InteractionFlag::ContextMenu) {
             lhs.context_menu = UiId::SENTINEL;
         }
     }
