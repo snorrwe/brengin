@@ -1876,7 +1876,8 @@ impl<'a> Ui<'a> {
             .map(|x| *x)
             .unwrap_or_default();
 
-        if self.has_context_menu(parent_id) || state.open {
+        state.open = self.has_context_menu(parent_id);
+        if state.open {
             let history_start = self.ui.rect_history.len();
             let old_layer = std::mem::replace(&mut self.ui.layer, CONTEXT_LAYER + 2);
             let old_bounds = self.ui.bounds;
