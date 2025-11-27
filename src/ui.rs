@@ -1478,13 +1478,18 @@ impl<'a> Ui<'a> {
             }
         } else {
             state.pos = IVec2::new(old_bounds.min_x, old_bounds.min_y);
-            if !self.is_anything_active() && self.contains_mouse(id) && self.mouse_down() {
-                is_being_dragged = true;
-                state.drag_start = self.mouse.cursor_position;
-                state.dragged = false;
+            if !self.is_anything_active() && self.contains_mouse(id) {
                 self.next_ids
                     .push(id, self.ui.layer)
-                    .add_flag(InteractionFlag::Active);
+                    .add_flag(InteractionFlag::Hovered);
+                if self.mouse_down() {
+                    is_being_dragged = true;
+                    state.drag_start = self.mouse.cursor_position;
+                    state.dragged = false;
+                    self.next_ids
+                        .push(id, self.ui.layer)
+                        .add_flag(InteractionFlag::Active);
+                }
             }
         }
 
