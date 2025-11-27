@@ -124,7 +124,6 @@ fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
             lhs.active = idset.id;
         }
         if idset.has_added_flag(InteractionFlag::Dragged) {
-            lhs.hovered = idset.id;
             lhs.active = idset.id;
             lhs.dragged = idset.id;
         }
