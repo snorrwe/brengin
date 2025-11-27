@@ -134,9 +134,6 @@ fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
     for mut idset in ids.drain(..) {
         if lhs.dragged == idset.id && idset.has_removed_flag(InteractionFlag::Dragged) {
             lhs.dragged = UiId::SENTINEL;
-            if !idset.has_added_flag(InteractionFlag::Hovered) {
-                idset.remove_flag(InteractionFlag::Hovered);
-            }
             if !idset.has_added_flag(InteractionFlag::Active) {
                 idset.remove_flag(InteractionFlag::Active);
             }
@@ -1479,16 +1476,14 @@ impl<'a> Ui<'a> {
         } else {
             state.pos = IVec2::new(old_bounds.min_x, old_bounds.min_y);
             if !self.is_anything_active() && self.contains_mouse(id) {
-                self.next_ids
-                    .push(id, self.ui.layer)
-                    .add_flag(InteractionFlag::Hovered);
+                self.set_hovered(id);
                 if self.mouse_down() {
                     is_being_dragged = true;
                     state.drag_start = self.mouse.cursor_position;
                     state.dragged = false;
-                    self.next_ids
-                        .push(id, self.ui.layer)
-                        .add_flag(InteractionFlag::Active);
+                    self.set_active(id);
+                } else {
+                    self.set_hovered(id);
                 }
             }
         }
@@ -1582,11 +1577,16 @@ impl<'a> Ui<'a> {
         state.dragged = self.ids.dragged;
 
         if self.is_anything_dragged() {
-            if self.contains_mouse(id) {
-                state.hovered = true;
+            state.hovered = self.is_hovered(id);
+            if state.hovered {
                 if self.mouse_up() {
                     state.dropped = true;
                 }
+                if !self.contains_mouse(id) {
+                    self.set_not_hovered(id);
+                }
+            } else if self.contains_mouse(id) {
+                self.set_hovered(id);
             }
         }
 
