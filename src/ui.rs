@@ -115,8 +115,8 @@ pub struct ShapingResult {
 /// assign new ids, lhs = rhs
 fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
     let ids = &mut rhs.0;
-    let active_item = ids.iter().max_by_key(|x| x.layer);
-    if let Some(idset) = active_item {
+    ids.sort_by_key(|x| x.layer);
+    for mut idset in ids.drain(..) {
         if idset.has_added_flag(InteractionFlag::Hovered) {
             lhs.hovered = idset.id;
         }
@@ -130,8 +130,6 @@ fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
         if idset.has_added_flag(InteractionFlag::ContextMenu) {
             lhs.context_menu = idset.id;
         }
-    }
-    for mut idset in ids.drain(..) {
         if lhs.dragged == idset.id && idset.has_removed_flag(InteractionFlag::Dragged) {
             lhs.dragged = UiId::SENTINEL;
             if !idset.has_added_flag(InteractionFlag::Active) {
