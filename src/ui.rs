@@ -185,6 +185,11 @@ impl Color {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct UiDebug {
+    pub enable: bool,
+}
+
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
@@ -210,6 +215,14 @@ impl Plugin for UiPlugin {
         app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(begin_frame);
         });
+        app.with_nested_stage(
+            crate::Stage::Update,
+            SystemStage::new("debug")
+                .with_should_run(|debug: Option<Res<UiDebug>>| {
+                    debug.map(|d| d.enable).unwrap_or(false)
+                })
+                .with_system(draw_bounding_boxes),
+        );
         app.with_stage(crate::Stage::PostUpdate, |s| {
             s.add_system(submit_frame_color_rects)
                 .add_system(submit_frame_text_rects)
@@ -3539,6 +3552,43 @@ fn bounding_rect(history: &[UiRect]) -> UiRect {
         min_y,
         max_x,
         max_y,
+    }
+}
+
+fn draw_bounding_boxes(mut ui: UiRoot) {
+    let mut boxes: Vec<_> =
+        ui.0.ui
+            .bounding_boxes
+            .iter()
+            .map(|(k, v)| (*k, *v))
+            .collect();
+    boxes.sort_unstable_by_key(|(k, _)| *k);
+
+    let ui = &mut ui.0;
+    for (id, rect) in boxes.into_iter() {
+        let (handle, e) = ui.shape_and_draw_line(format!("{}/{}", id.parent as i32, id.index), 12);
+        let pic = &e.texture;
+        let line_width = pic.width() as i32;
+        let line_height = pic.height() as i32;
+        ui.color_rect_with_outline(
+            rect.min_x,
+            rect.min_y,
+            line_width,
+            line_height,
+            Color::from_rgba(0x0000008F),
+            2,
+            Color::BLACK,
+            9999,
+        );
+        ui.text_rect(
+            rect.min_x,
+            rect.min_y,
+            line_width,
+            line_height,
+            Color::WHITE,
+            10000,
+            handle,
+        );
     }
 }
 
