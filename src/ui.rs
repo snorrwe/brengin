@@ -183,28 +183,33 @@ pub enum InteractionFlag {
 
 impl InteractionFlag {
     fn write_interaction_flags(f: &mut std::fmt::Formatter<'_>, flags: u8) -> std::fmt::Result {
-        write!(f, "[")?;
+        write!(f, "[ ")?;
+        let mut has = false;
         if (flags & (Self::Hovered as u8)) != 0 {
-            write!(f, "Hovered ")?;
-        } else {
-            write!(f, "!Hovered ")?;
+            write!(f, "Hovered")?;
+            has = true;
         }
         if (flags & (Self::Active as u8)) != 0 {
-            write!(f, "Active ")?;
-        } else {
-            write!(f, "!Active ")?;
+            if has {
+                write!(f, " ")?;
+            }
+            write!(f, "Active")?;
+            has = true;
         }
         if (flags & (Self::Dragged as u8)) != 0 {
-            write!(f, "Dragged ")?;
-        } else {
-            write!(f, "!Dragged ")?;
+            if has {
+                write!(f, " ")?;
+            }
+            write!(f, "Dragged")?;
+            has = true;
         }
         if (flags & (Self::ContextMenu as u8)) != 0 {
+            if has {
+                write!(f, " ")?;
+            }
             write!(f, "ContextMenu")?;
-        } else {
-            write!(f, "!ContextMenu")?;
         }
-        write!(f, "]")
+        write!(f, " ]")
     }
 }
 
