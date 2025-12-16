@@ -1485,8 +1485,6 @@ impl<'a> Ui<'a> {
                     state.drag_start = self.mouse.cursor_position;
                     state.dragged = false;
                     self.set_active(id);
-                } else {
-                    self.set_hovered(id);
                 }
             }
         }
@@ -1588,7 +1586,8 @@ impl<'a> Ui<'a> {
                 if !self.contains_mouse(id) {
                     self.set_not_hovered(id);
                 }
-            } else if self.contains_mouse(id) {
+            }
+            if self.contains_mouse(id) {
                 self.set_hovered(id);
             }
         }
