@@ -57,6 +57,7 @@ impl Plugin for UiPlugin {
         app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(begin_frame);
         });
+        #[cfg(debug_assertions)]
         app.with_stage(crate::Stage::Update, |s| {
             s.add_system(draw_bounding_boxes);
         });
