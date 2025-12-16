@@ -1584,6 +1584,7 @@ impl<'a> Ui<'a> {
         if self.is_anything_dragged() {
             state.hovered = self.is_hovered(id);
             if state.hovered {
+                self.set_hovered(id);
                 if self.mouse_up() {
                     state.dropped = true;
                 }
