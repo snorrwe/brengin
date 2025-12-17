@@ -1294,6 +1294,9 @@ impl<'a> Ui<'a> {
 
         'scroll_handler: {
             if self.contains_mouse(id) {
+                self.set_hovered(id);
+            }
+            if self.is_hovered(id) {
                 let mut dt = 0.0;
                 for ds in self.mouse.scroll.iter() {
                     match ds {
