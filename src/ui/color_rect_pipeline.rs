@@ -103,8 +103,7 @@ impl RectPipeline {
                     layout: Some(&renderer.device().create_pipeline_layout(
                         &wgpu::PipelineLayoutDescriptor {
                             label: Some("Ui Color Rect Render Pipeline Layout"),
-                            bind_group_layouts: &[],
-                            push_constant_ranges: &[],
+                            ..Default::default()
                         },
                     )),
                     vertex: wgpu::VertexState {
@@ -144,7 +143,7 @@ impl RectPipeline {
                         mask: !0,
                         alpha_to_coverage_enabled: false,
                     },
-                    multiview: None,
+                    multiview_mask: None,
                     cache: None,
                 });
 
@@ -177,7 +176,7 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
             let h = (scissor.0.height() as u32).min(size.height.saturating_sub(y));
 
             if w == 0 || h == 0 {
-                #[cfg(feature="tracing")]
+                #[cfg(feature = "tracing")]
                 tracing::warn!(?scissor, "Scissor is outside of render target {:?}", **size);
                 continue;
             }

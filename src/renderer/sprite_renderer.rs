@@ -360,7 +360,7 @@ impl SpritePipeline {
                         &texture_bind_group_layout,
                         &sprite_sheet_layout,
                     ],
-                    push_constant_ranges: &[],
+                    ..Default::default()
                 });
         let render_pipeline =
             renderer
@@ -408,7 +408,7 @@ impl SpritePipeline {
                         mask: !0,
                         alpha_to_coverage_enabled: true,
                     },
-                    multiview: None,
+                    multiview_mask: None,
                     cache: None,
                 });
 

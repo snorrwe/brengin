@@ -363,6 +363,7 @@ impl RenderPass {
             }),
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         })
     }
 
@@ -391,8 +392,7 @@ impl RenderPass {
                 }),
                 stencil_ops: None,
             }),
-            timestamp_writes: None,
-            occlusion_query_set: None,
+            ..Default::default()
         })
     }
 
@@ -412,9 +412,7 @@ impl RenderPass {
                     store: StoreOp::Store,
                 },
             })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
+            ..Default::default()
         })
     }
 }
@@ -455,9 +453,7 @@ fn render_system(mut world: WorldAccess) {
                             store: wgpu::StoreOp::Store,
                         },
                     })],
-                    depth_stencil_attachment: None,
-                    occlusion_query_set: None,
-                    timestamp_writes: None,
+                    ..Default::default()
                 });
             }
             for camera_buffer in cameras.iter() {

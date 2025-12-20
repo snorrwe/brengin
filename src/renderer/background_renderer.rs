@@ -23,7 +23,7 @@ impl BackgroundPipeline {
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("background-render-pipeline-layout"),
                     bind_group_layouts: &[&texture_bind_group_layout],
-                    push_constant_ranges: &[],
+                    ..Default::default()
                 });
 
         let shader = renderer
@@ -70,7 +70,7 @@ impl BackgroundPipeline {
                         mask: !0,
                         alpha_to_coverage_enabled: true,
                     },
-                    multiview: None,
+                    multiview_mask: None,
                     cache: None,
                 });
 

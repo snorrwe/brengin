@@ -173,7 +173,7 @@ impl TextPipeline {
                         &wgpu::PipelineLayoutDescriptor {
                             label: Some("Ui Text Rect Render Pipeline Layout"),
                             bind_group_layouts: &[&texture_bind_group_layout],
-                            push_constant_ranges: &[],
+                            ..Default::default()
                         },
                     )),
                     vertex: wgpu::VertexState {
@@ -213,7 +213,7 @@ impl TextPipeline {
                         mask: !0,
                         alpha_to_coverage_enabled: false,
                     },
-                    multiview: None,
+                    multiview_mask: None,
                     cache: None,
                 });
 

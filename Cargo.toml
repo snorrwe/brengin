@@ -12,17 +12,17 @@ parallel = ["cecs/parallel"]
 tracing = ["dep:tracing", "cecs/tracing"]
 
 [dependencies]
-tracing = { version = "0.1.41", optional = true }
-cecs = { git = "https://github.com/caolo-game/cecs", default-features = false }
+tracing = { version = "0.1.44", optional = true }
+cecs = { git = "https://github.com/snorrwe/cecs", default-features = false }
 anyhow = "1.0.100"
 bytemuck = { version = "1.24.0", features = ["derive"] }
 fastrand = "2.3.0"
-glam = { version = "0.30.8", features = ["bytemuck"] }
-image = { version = "0.25.8", default-features = false, features = ["png"] }
+glam = { version = "0.30.9", features = ["bytemuck"] }
+image = { version = "0.25.9", default-features = false, features = ["png"] }
 smallvec = "1.15.1"
-wgpu = "27.0.1"
+wgpu = "28.0.0"
 winit = "0.30"
-kira = { version = "0.10", optional = true }
+kira = { version = "0.11", optional = true }
 instant = { version = "0.1.13", features = [] }
 pollster = "0.4.0"
 parking_lot = "0.12.5"
@@ -31,7 +31,7 @@ tiny-skia = "0.11.4"
 crossbeam = { version = "0.8.4", features = ["crossbeam-channel", "nightly"] }
 
 [dev-dependencies]
-tracing-subscriber = "0.3.20"
+tracing-subscriber = "0.3.22"
 
 [[example]]
 name = "boids"

@@ -35,7 +35,7 @@ impl MandelbrotPipeline {
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Mandelbrot Render Pipeline Layout"),
                     bind_group_layouts: &[],
-                    push_constant_ranges: &[],
+                    ..Default::default()
                 });
 
         let shader = renderer
@@ -88,7 +88,7 @@ impl MandelbrotPipeline {
                         mask: !0,
                         alpha_to_coverage_enabled: true,
                     },
-                    multiview: None,
+                    multiview_mask: None,
                     cache: None,
                 });
 
