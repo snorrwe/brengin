@@ -2135,6 +2135,22 @@ impl Padding {
         }
     }
 
+    pub fn horizontal(c: UiCoord) -> Self {
+        Padding {
+            left: c,
+            right: c,
+            ..Default::default()
+        }
+    }
+
+    pub fn vertical(c: UiCoord) -> Self {
+        Padding {
+            top: c,
+            bottom: c,
+            ..Default::default()
+        }
+    }
+
     /// return left,right,top,bottom
     pub fn as_abs(self, max_horizontal: i32, max_vertical: i32) -> [i32; 4] {
         [
