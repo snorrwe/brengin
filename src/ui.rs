@@ -2119,34 +2119,34 @@ impl<'a> Ui<'a> {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Padding {
-    pub left: UiCoord,
-    pub right: UiCoord,
-    pub top: UiCoord,
-    pub bottom: UiCoord,
+    pub left: Option<UiCoord>,
+    pub right: Option<UiCoord>,
+    pub top: Option<UiCoord>,
+    pub bottom: Option<UiCoord>,
 }
 
 impl Padding {
     pub fn splat_abs(p: i32) -> Self {
         Padding {
-            left: UiCoord::Absolute(p),
-            right: UiCoord::Absolute(p),
-            top: UiCoord::Absolute(p),
-            bottom: UiCoord::Absolute(p),
+            left: Some(UiCoord::Absolute(p)),
+            right: Some(UiCoord::Absolute(p)),
+            top: Some(UiCoord::Absolute(p)),
+            bottom: Some(UiCoord::Absolute(p)),
         }
     }
 
     pub fn horizontal(c: UiCoord) -> Self {
         Padding {
-            left: c,
-            right: c,
+            left: Some(c),
+            right: Some(c),
             ..Default::default()
         }
     }
 
     pub fn vertical(c: UiCoord) -> Self {
         Padding {
-            top: c,
-            bottom: c,
+            top: Some(c),
+            bottom: Some(c),
             ..Default::default()
         }
     }
@@ -2154,10 +2154,12 @@ impl Padding {
     /// return left,right,top,bottom
     pub fn as_abs(self, max_horizontal: i32, max_vertical: i32) -> [i32; 4] {
         [
-            self.left.as_abolute(max_horizontal),
-            self.right.as_abolute(max_horizontal),
-            self.top.as_abolute(max_vertical),
-            self.bottom.as_abolute(max_vertical),
+            self.left.map(|c| c.as_abolute(max_horizontal)).unwrap_or(0),
+            self.right
+                .map(|c| c.as_abolute(max_horizontal))
+                .unwrap_or(0),
+            self.top.map(|c| c.as_abolute(max_vertical)).unwrap_or(0),
+            self.bottom.map(|c| c.as_abolute(max_vertical)).unwrap_or(0),
         ]
     }
 }
