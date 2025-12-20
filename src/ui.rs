@@ -2126,6 +2126,17 @@ pub struct Padding {
 }
 
 impl Padding {
+    /// Combine two padding structs. If a given padding field is Some in `self`, then it is selected,
+    /// else the corresponding field in `other` is selected
+    pub fn or(self, other: Padding) -> Self {
+        Self {
+            left: self.left.or(other.left),
+            right: self.right.or(other.right),
+            top: self.top.or(other.top),
+            bottom: self.bottom.or(other.bottom),
+        }
+    }
+
     pub fn splat_abs(p: i32) -> Self {
         Padding {
             left: Some(UiCoord::Absolute(p)),
