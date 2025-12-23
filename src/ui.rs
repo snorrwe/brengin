@@ -2051,8 +2051,8 @@ impl<'a> Ui<'a> {
         state.open = true;
         state.offset = offset;
         self.next_ids
-            .push(id, self.ui.layer)
-            .remove_flag(InteractionFlag::ContextMenu);
+            .push(id, CONTEXT_LAYER)
+            .add_flag(InteractionFlag::ContextMenu);
     }
 
     pub fn close_context_menu(&mut self, id: UiId) {
