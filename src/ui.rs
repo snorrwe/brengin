@@ -345,7 +345,7 @@ impl Default for Theme {
 
             text_padding: 5,
             font_size: 12,
-            padding: Padding::splat_abs(5),
+            padding: Padding::splat(5),
             scroll_bar_size: 12,
             window_title_height: 24,
             font: Default::default(),
@@ -2137,16 +2137,18 @@ impl Padding {
         }
     }
 
-    pub fn splat_abs(p: i32) -> Self {
+    pub fn splat(p: impl Into<UiCoord>) -> Self {
+        let p = p.into();
         Padding {
-            left: Some(UiCoord::Absolute(p)),
-            right: Some(UiCoord::Absolute(p)),
-            top: Some(UiCoord::Absolute(p)),
-            bottom: Some(UiCoord::Absolute(p)),
+            left: Some(p),
+            right: Some(p),
+            top: Some(p),
+            bottom: Some(p),
         }
     }
 
-    pub fn horizontal(c: UiCoord) -> Self {
+    pub fn horizontal(c: impl Into<UiCoord>) -> Self {
+        let c = c.into();
         Padding {
             left: Some(c),
             right: Some(c),
@@ -2154,7 +2156,8 @@ impl Padding {
         }
     }
 
-    pub fn vertical(c: UiCoord) -> Self {
+    pub fn vertical(c: impl Into<UiCoord>) -> Self {
+        let c = c.into();
         Padding {
             top: Some(c),
             bottom: Some(c),
