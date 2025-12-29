@@ -927,7 +927,7 @@ impl<'a> Ui<'a> {
         let mut h = 0;
         let x = self.ui.bounds.min_x;
         let y = self.ui.bounds.min_y;
-        let [p_left, _p_right, p_top, _p_bot] = self
+        let [p_left, p_right, p_top, p_bot] = self
             .theme
             .padding
             .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
@@ -961,8 +961,8 @@ impl<'a> Ui<'a> {
         let rect = UiRect {
             min_x: x,
             min_y: y,
-            max_x: x + w,
-            max_y: y + h,
+            max_x: x + w + p_right,
+            max_y: y + h + p_bot,
         };
         self.submit_rect(id, rect);
         Response {
