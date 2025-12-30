@@ -560,7 +560,7 @@ impl Plugin for SpriteRendererPlugin {
         app.add_plugin(RenderCommandPlugin::<SpriteRenderCommand>::new(
             RenderPass::Transparent,
         ));
-        app.extact_stage.add_system(add_missing_sheets);
+        app.extract_stage.add_system(add_missing_sheets);
 
         if let Some(ref mut app) = app.render_app {
             app.add_startup_system(setup);

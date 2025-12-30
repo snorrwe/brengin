@@ -149,7 +149,7 @@ impl Plugin for BackgroundPlugin {
             crate::renderer::RenderPass::Background,
         ));
         app.require_plugin(AssetsPlugin::<DynamicImage>::default());
-        app.extact_stage.add_system(extract_background);
+        app.extract_stage.add_system(extract_background);
         if let Some(ref mut app) = app.render_app {
             app.add_startup_system(setup_pipeline);
         }

@@ -358,7 +358,7 @@ impl Plugin for UiTextRectPlugin {
         app.add_plugin(RenderCommandPlugin::<RectRenderCommand>::new(
             RenderPass::Ui,
         ));
-        app.extact_stage.add_system(extract_shaping_results);
+        app.extract_stage.add_system(extract_shaping_results);
         if let Some(ref mut renderer) = app.render_app {
             renderer.add_startup_system(setup_renderer);
             renderer.with_stage(crate::Stage::Update, |s| {

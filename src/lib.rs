@@ -166,7 +166,7 @@ pub struct App {
     startup_systems: SystemStageBuilder<'static>,
     plugins: HashSet<TypeId>,
 
-    extact_stage: SystemStageBuilder<'static>,
+    extract_stage: SystemStageBuilder<'static>,
     pub render_app: Option<Box<App>>,
 }
 
@@ -500,7 +500,7 @@ impl App {
             world,
             stages: Default::default(),
             startup_systems: SystemStage::new("startup"),
-            extact_stage: SystemStage::new("extract"),
+            extract_stage: SystemStage::new("extract"),
             plugins: Default::default(),
             render_app: None,
         }
@@ -559,7 +559,7 @@ impl App {
         &mut self,
         sys: impl cecs::systems::IntoSystem<'static, P, ()>,
     ) -> &mut Self {
-        self.extact_stage.add_system(sys);
+        self.extract_stage.add_system(sys);
         self
     }
 
@@ -611,7 +611,7 @@ impl App {
             .map(|a| a._build())
             .unwrap_or_else(|| World::new(4));
         let render_extract =
-            std::mem::replace(&mut self.extact_stage, SystemStage::new("nil")).build();
+            std::mem::replace(&mut self.extract_stage, SystemStage::new("nil")).build();
         let w = self._build();
         InitializedWorlds {
             game_world: w,
