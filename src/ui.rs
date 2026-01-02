@@ -883,8 +883,7 @@ impl<'a> Ui<'a> {
         width: UiCoord,
         height: UiCoord,
     ) -> Response<()> {
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
         let layer = self.ui.layer;
         let [p_left, p_right, p_top, p_bot] = self
             .theme
@@ -917,8 +916,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn label(&mut self, label: impl Into<String>) -> Response<()> {
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
         let layer = self.ui.layer;
         let label = label.into();
 
@@ -993,16 +991,16 @@ impl<'a> Ui<'a> {
         self.ui.bounding_boxes.insert(id, rect);
     }
 
-    fn begin_widget(&mut self) {
+    pub fn begin_widget(&mut self) -> UiId {
         *self.ui.id_stack.last_mut().unwrap() += 1;
+        self.current_id()
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
-        self.begin_widget();
+        let id = self.begin_widget();
         let layer = self.ui.layer;
         let label = label.into();
 
-        let id = self.current_id();
         let mut pressed = false;
         let contains_mouse = self.contains_mouse(id);
         let mut color = self.theme.button_default.clone();
@@ -1166,7 +1164,7 @@ impl<'a> Ui<'a> {
         layer: u16,
         parent_state: &mut ScrollState,
     ) {
-        self.begin_widget();
+        let id = self.begin_widget();
 
         // bar
         let bounds = UiRect {
@@ -1176,7 +1174,6 @@ impl<'a> Ui<'a> {
             max_y: scissor_bounds.max_y,
         };
         self.color_rect_from_rect(bounds, 0xFF0000FF, layer);
-        let id = self.current_id();
         self.ui.bounding_boxes.insert(id, bounds);
 
         // pip
@@ -1226,7 +1223,7 @@ impl<'a> Ui<'a> {
         layer: u16,
         parent_state: &mut ScrollState,
     ) {
-        self.begin_widget();
+        let id = self.begin_widget();
 
         // bar
         let bounds = UiRect {
@@ -1236,7 +1233,6 @@ impl<'a> Ui<'a> {
             max_y: scissor_bounds.max_y,
         };
         self.color_rect_from_rect(bounds, 0xaaFF00FF, layer);
-        let id = self.current_id();
         self.ui.bounding_boxes.insert(id, bounds);
 
         // pip
@@ -1278,8 +1274,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn scroll_area(&mut self, desc: ScrollDescriptor, mut contents: impl FnMut(&mut Self)) {
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
         let width = desc
             .width
             .unwrap_or(UiCoord::Percent(100))
@@ -1426,8 +1421,7 @@ impl<'a> Ui<'a> {
         bounds.resize_h(height);
         // TODO: layout
 
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
         self.submit_rect(id, bounds);
         self.ui.rect_history.push(bounds);
         Response {
@@ -1440,8 +1434,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn drag_source(&mut self, mut contents: impl FnMut(&mut Self)) -> DragResponse {
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
         let old_bounds = self.ui.bounds;
 
         let mut state = self
@@ -1570,8 +1563,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self, DropState)) -> DropResponse {
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
         let old_bounds = self.ui.bounds;
         let og_layer = self.push_layer();
         let bg_layer = self.push_layer();
@@ -1637,8 +1629,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn input_string(&mut self, content: &mut String) -> Response<InputResponse> {
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
         let last_layer = self.push_layer();
         let layer = self.ui.layer;
 
@@ -1877,8 +1868,7 @@ impl<'a> Ui<'a> {
         let contains_mouse = self.contains_mouse(parent_id);
 
         self.ui.id_stack.push(0);
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
 
         let mut state = self
             .remove_memory::<ContextMenuState>(parent_id)
@@ -2014,10 +2004,10 @@ impl<'a> Ui<'a> {
         mut contents: impl FnMut(&mut Self) + 'b,
         context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
         let old_layer = self.push_layer();
 
+        // TODO: ??
         self.begin_widget();
         let history_start = self.ui.rect_history.len();
         self.ui.id_stack.push(0);
@@ -2070,8 +2060,7 @@ impl<'a> Ui<'a> {
         height: UiCoord,
         mut contents: impl FnMut(&mut Self),
     ) {
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
         let bounds = self.ui.bounds;
 
         let width = width.as_abolute(bounds.width());
@@ -2095,8 +2084,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn padding(&mut self, m: Padding, mut contents: impl FnMut(&mut Self)) {
-        self.begin_widget();
-        let id = self.current_id();
+        let id = self.begin_widget();
         let bounds = self.ui.bounds;
 
         let [left, right, top, bottom] = m.as_abs(bounds.width(), bounds.height());
@@ -2630,8 +2618,7 @@ impl<'a> UiRoot<'a> {
             self.0.ui.bounds = title_bounds;
             self.0.push_scissor(title_bounds);
             self.0.label(desc.name);
-            self.0.begin_widget();
-            let title_id = self.0.current_id();
+            let title_id = self.0.begin_widget();
             if self.0.is_active(title_id) {
                 if self.0.mouse_up() {
                     self.0.set_not_active(title_id);
