@@ -546,6 +546,17 @@ impl App {
         self
     }
 
+    /// Nest another cecs stage in the given `stage`
+    pub fn with_nested_stage(&mut self, stage: Stage, s: SystemStageBuilder<'static>) -> &mut Self {
+        let stage = self
+            .stages
+            .entry(stage)
+            .or_insert_with(move || SystemStageBuilder::new(format!("Stage-{:?}", stage)));
+
+        stage.add_nested_stage(s);
+        self
+    }
+
     pub fn add_startup_system<P>(
         &mut self,
         sys: impl cecs::systems::IntoSystem<'static, P, ()>,
