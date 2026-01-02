@@ -538,7 +538,7 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
-    fn parent(&self) -> IdxType {
+    pub fn parent(&self) -> IdxType {
         if self.ui.id_stack.len() >= 2 {
             self.ui.id_stack[self.ui.id_stack.len() - 2]
         } else {
@@ -547,13 +547,12 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
-    fn current_idx(&self) -> IdxType {
+    pub fn current_idx(&self) -> IdxType {
         assert!(!self.ui.id_stack.is_empty());
         unsafe { *self.ui.id_stack.last().unwrap_unchecked() }
     }
 
-    #[inline]
-    fn current_id(&self) -> UiId {
+    pub fn current_id(&self) -> UiId {
         let index = self.current_idx();
         let hash = {
             let mut hash = fnv_1a_u32(self.ui.root_hash);
