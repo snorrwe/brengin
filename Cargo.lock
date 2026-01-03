@@ -303,7 +303,7 @@ dependencies = [
 [[package]]
 name = "cecs"
 version = "0.1.8"
-source = "git+https://github.com/snorrwe/cecs#7cfbe62669d21401960026dc0adaaee7b397b3f7"
+source = "git+https://github.com/snorrwe/cecs#0f22b6183d264d84a4318310175a819f6de890eb"
 dependencies = [
  "cache-padded",
  "cfg-if",
