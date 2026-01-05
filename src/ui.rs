@@ -634,7 +634,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn horizontal(&mut self, mut contents: impl FnMut(&mut Self)) {
-        self.begin_widget();
+        let id = self.begin_widget();
         let layout = self.ui.layout_dir;
         let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
@@ -646,11 +646,11 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.pop();
         self.ui.layout_dir = layout;
         self.ui.bounds = bounds;
-        self.submit_rect_group(self.current_id(), history_start);
+        self.submit_rect_group(id, history_start);
     }
 
     pub fn vertical(&mut self, mut contents: impl FnMut(&mut Self)) {
-        self.begin_widget();
+        let id = self.begin_widget();
         let layout = self.ui.layout_dir;
         let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
@@ -662,7 +662,24 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.pop();
         self.ui.layout_dir = layout;
         self.ui.bounds = bounds;
-        self.submit_rect_group(self.current_id(), history_start);
+        self.submit_rect_group(id, history_start);
+    }
+
+    /// If `hide` is true, then the inner contents are not rendered
+    /// Useful for keeping the Id stack consistent
+    pub fn hidden(&mut self, hide: bool, mut contents: impl FnMut(&mut Self)) {
+        let id = self.begin_widget();
+        let history_start = self.ui.rect_history.len();
+        if !hide {
+            let bounds = self.ui.bounds;
+            self.ui.id_stack.push(0);
+            ///////////////////////
+            contents(self);
+            ///////////////////////
+            self.ui.id_stack.pop();
+            self.ui.bounds = bounds;
+        }
+        self.submit_rect_group(id, history_start);
     }
 
     /// submit a new rect that contains all rects submitted beginning at history_start index
