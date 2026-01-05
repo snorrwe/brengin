@@ -126,6 +126,8 @@ fn update_time(mut time: ResMut<Time>, mut dt: ResMut<DeltaTime>) {
 }
 
 /// extraction
+///
+/// move rendering data from the game simulation to the rendering database
 pub fn extract_render_data(
     game_world: &Mutex<World>,
     render_world: &mut World,
