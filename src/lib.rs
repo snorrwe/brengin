@@ -131,11 +131,7 @@ pub fn extract_render_data(
     render_world: &mut World,
     render_extract: &SystemStage,
 ) {
-    let Some(mut gw) = game_world.try_lock_for(Duration::from_millis(6)) else {
-        #[cfg(feature = "tracing")]
-        tracing::debug!("game_world lock failed. rendering the previous frame");
-        return;
-    };
+    let mut gw = game_world.lock();
     render_world
         .run_system(|mut tick: ResMut<ExtractionTick>| {
             tick.0 += 1;
