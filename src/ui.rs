@@ -308,6 +308,7 @@ impl From<Handle<DynamicImage>> for ThemeEntry {
 #[derive(Clone)]
 pub struct Theme {
     pub background: ThemeEntry,
+    pub window_background: ThemeEntry,
     pub primary_color: Color,
     pub secondary_color: Color,
     pub button_default: ThemeEntry,
@@ -332,6 +333,7 @@ pub struct Theme {
 impl Default for Theme {
     fn default() -> Self {
         Theme {
+            window_background: 0x0395d5ff.into(),
             background: 0x04a5e5ff.into(),
             context_background: 0x02a3e3ff.into(),
             primary_color: 0xcdd6f4ff,
@@ -387,6 +389,7 @@ impl UiState {
 #[derive(Default, Clone)]
 pub struct ThemeOverride {
     pub background: Option<ThemeEntry>,
+    pub window_background: Option<ThemeEntry>,
     pub primary_color: Option<Color>,
     pub secondary_color: Option<Color>,
     pub button_default: Option<ThemeEntry>,
@@ -418,6 +421,7 @@ impl ThemeOverride {
             };
         }
         apply!(background);
+        apply!(window_background);
         apply!(primary_color);
         apply!(secondary_color);
         apply!(button_default);
@@ -1365,13 +1369,13 @@ impl<'a> Ui<'a> {
         let scissor_idx = self.push_scissor(scissor_bounds);
 
         let layer = self.push_layer();
-        self.color_rect(
+        self.theme_rect(
             bounds.min_x,
             bounds.min_y,
             width,
             height,
-            0x04a5e5ff,
             self.ui.layer,
+            self.theme.background.clone(),
         );
         self.push_layer();
         self.ui.id_stack.push(0);
@@ -2619,13 +2623,13 @@ impl<'a> UiRoot<'a> {
         let layer = self.0.ui.layer;
         self.0.ui.layer = WINDOW_LAYER;
         // window background
-        self.0.color_rect(
+        self.0.theme_rect(
             bounds.min_x,
             bounds.min_y,
             width + padding * 2,
             height + padding * 2,
-            0x0395d5ff,
             WINDOW_LAYER,
+            self.theme().window_background.clone(),
         );
         self.0.ui.id_stack.push(0);
         ///////////////////////
