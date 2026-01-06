@@ -267,7 +267,7 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
     ctx.panel(
         brengin::ui::PanelDescriptor {
             width: UiCoord::Percent(50),
-            height: 200.into(),
+            height: 400.into(),
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
         },

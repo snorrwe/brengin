@@ -64,16 +64,18 @@ pub struct GlyphBufferBounds {
 
 pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBounds {
     let info = glyphs.glyph_infos();
-    let pos = glyphs.glyph_positions();
+    let glyph_positions = glyphs.glyph_positions();
+
+    let bounds = face.global_bounding_box();
 
     let mut maxx = 0;
-    let mut maxy = 0;
+    let mut maxy = bounds.height() as i32;
     let mut padding_x = 0;
-    let mut padding_y = 0;
-    let mut glyph_bounds = Vec::with_capacity(pos.len());
-    for (pos, info) in pos.into_iter().zip(info.into_iter()) {
-        let glyph_id = info.glyph_id;
-        let bounds = face.glyph_bounding_box(rustybuzz::ttf_parser::GlyphId(glyph_id as u16));
+    let mut padding_y = -bounds.y_min as u32;
+    let mut glyph_bounds = Vec::with_capacity(glyph_positions.len());
+    for (pos, info) in glyph_positions.into_iter().zip(info.into_iter()) {
+        let glyph_id = rustybuzz::ttf_parser::GlyphId(info.glyph_id as u16);
+        let bounds = face.glyph_bounding_box(glyph_id);
         if let Some(bounds) = bounds {
             glyph_bounds.push((
                 info.cluster,
@@ -139,30 +141,31 @@ pub fn draw_glyph_buffer(
     let bounds = get_bounds(face, glyphs);
 
     let scaling_factor = height as f32 / bounds.bounds.height() as f32;
+    let scaling_factor = scaling_factor * 1.65; // FIXME: ??????
 
     let mut builder = TextOutlineBuilder::new();
     builder.scaling_factor = scaling_factor;
 
-    builder.xoffset = bounds.padding_x as f32 * builder.scaling_factor;
-    builder.yoffset = bounds.padding_y as f32 * builder.scaling_factor;
+    builder.xoffset = bounds.padding_x as f32 * scaling_factor;
+    builder.yoffset = bounds.padding_y as f32 * scaling_factor;
 
     let mut pixmap = tiny_skia::Pixmap::new(
-        ((bounds.bounds.width() + bounds.padding_x as i32) as f32 * builder.scaling_factor) as u32,
-        ((bounds.bounds.height() + bounds.padding_y as i32) as f32 * builder.scaling_factor) as u32,
+        (bounds.bounds.width() as f32 * scaling_factor) as u32,
+        (bounds.bounds.height() as f32 * scaling_factor) as u32,
     )
     .context("Failed to create pixmap")?;
 
     let info = glyphs.glyph_infos();
-    let pos = glyphs.glyph_positions();
-    for (pos, info) in pos.into_iter().zip(info.into_iter()) {
+    let glyph_positions = glyphs.glyph_positions();
+    for (pos, info) in glyph_positions.into_iter().zip(info.into_iter()) {
         let glyph_id = info.glyph_id;
         face.outline_glyph(
             rustybuzz::ttf_parser::GlyphId(glyph_id as u16),
             &mut builder,
         );
-        builder.xoffset += pos.x_advance as f32 * builder.scaling_factor;
-        builder.yoffset += pos.y_advance as f32 * builder.scaling_factor;
-        builder.draw(0xFFFFFFFF, &mut pixmap);
+        builder.xoffset += pos.x_advance as f32 * scaling_factor;
+        builder.yoffset += pos.y_advance as f32 * scaling_factor;
+        builder.draw(!0, &mut pixmap);
     }
     Ok(TextDrawResponse {
         pixmap,
