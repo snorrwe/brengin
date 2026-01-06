@@ -464,6 +464,8 @@ pub struct Theme {
     pub button_default: ThemeEntry,
     pub button_hovered: Option<ThemeEntry>,
     pub button_pressed: Option<ThemeEntry>,
+    /// if unavailable, then fall back to primary_color
+    pub button_text_color: Option<Color>,
 
     pub context_background: ThemeEntry,
 
@@ -491,6 +493,7 @@ impl Default for Theme {
             button_default: 0x212224ff.into(),
             button_hovered: Some(0x45475aff.into()),
             button_pressed: Some(0x585b70ff.into()),
+            button_text_color: None,
 
             drop_target_default: 0x0.into(),
             drop_target_hovered: Some(0xcdd6f4ff.into()),
@@ -545,6 +548,7 @@ pub struct ThemeOverride {
     pub button_default: Option<ThemeEntry>,
     pub button_hovered: Option<Option<ThemeEntry>>,
     pub button_pressed: Option<Option<ThemeEntry>>,
+    pub button_text_color: Option<Option<Color>>,
 
     pub context_background: Option<ThemeEntry>,
 
@@ -577,6 +581,7 @@ impl ThemeOverride {
         apply!(button_default);
         apply!(button_hovered);
         apply!(button_pressed);
+        apply!(button_text_color);
         apply!(context_background);
         apply!(drop_target_default);
         apply!(drop_target_hovered);
@@ -1173,10 +1178,10 @@ impl<'a> Ui<'a> {
 
         let mut pressed = false;
         let contains_mouse = self.contains_mouse(id);
-        let mut color = self.theme.button_default.clone();
+        let mut bg_color = self.theme.button_default.clone();
         let active = self.is_active(id);
         if active {
-            color = self
+            bg_color = self
                 .theme
                 .button_pressed
                 .as_ref()
@@ -1189,7 +1194,7 @@ impl<'a> Ui<'a> {
                 self.set_not_active(id);
             }
         } else if self.is_hovered(id) {
-            color = self
+            bg_color = self
                 .theme
                 .button_hovered
                 .as_ref()
@@ -1217,6 +1222,10 @@ impl<'a> Ui<'a> {
         let [x, y] = [x + p_left, y + p_top];
         let text_padding = self.theme.text_padding as i32;
         let mut text_y = y + text_padding;
+        let text_color = self
+            .theme
+            .button_text_color
+            .unwrap_or(self.theme.primary_color);
         for line in label.split('\n').filter(|l| !l.is_empty()) {
             let (handle, e) =
                 self.shape_and_draw_line(line.to_owned(), self.theme.font_size as u32);
@@ -1248,7 +1257,7 @@ impl<'a> Ui<'a> {
                 text_y + delta,
                 line_width,
                 line_height,
-                self.theme.primary_color,
+                text_color,
                 layer + 2,
                 handle,
             );
@@ -1257,7 +1266,7 @@ impl<'a> Ui<'a> {
         // background
         let w = w + 2 * text_padding;
         let h = h + 2 * text_padding;
-        self.theme_rect(x, y, w, h, layer, color);
+        self.theme_rect(x, y, w, h, layer, bg_color);
 
         let rect = UiRect {
             min_x: x,
