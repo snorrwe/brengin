@@ -131,6 +131,7 @@ impl Color {
     pub const YELLOW: Self = Color::from_rgb(0xFFFF00);
     pub const GREEN: Self = Color::from_rgb(0x00FF00);
     pub const BLUE: Self = Color::from_rgb(0x0000FF);
+    pub const WHITE: Self = Color::from_rgb(0xFFFFFF);
 
     pub const fn from_rgba(rgba: u32) -> Self {
         Self(rgba)
