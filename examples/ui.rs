@@ -11,6 +11,7 @@ struct UiState {
     boid: Handle<DynamicImage>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MenuState {
     Main,
     DragNDrop,
@@ -231,13 +232,7 @@ Mauris ut pharetra orci.
 Maecenas ac convallis ligula, id interdum turpis.
 "#;
 
-fn buttons_ui(
-    mut ctx: UiRoot,
-    mut label: ResMut<Label>,
-    state: Res<MenuState>,
-    mut form: ResMut<FormState>,
-) {
-    let MenuState::Buttons = *state else { return };
+fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormState>) {
     ctx.panel(
         brengin::ui::PanelDescriptor {
             width: UiCoord::Percent(100),
@@ -393,7 +388,11 @@ async fn game() {
     app.add_startup_system(setup);
     app.add_startup_system(load_image);
     app.with_stage(brengin::Stage::Update, |s| {
-        s.add_system(buttons_ui);
+        s.add_nested_stage(
+            SystemStage::new("buttons-ui")
+                .with_should_run(|state: Res<MenuState>| MenuState::Buttons == *state)
+                .with_system(buttons_ui),
+        );
         s.add_system(menu);
         s.add_system(dnd_ui);
         s.add_system(back);
