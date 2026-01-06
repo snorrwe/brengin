@@ -31,8 +31,20 @@ use {
     text::{OwnedTypeFace, TextDrawResponse},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct Color(pub u32);
+
+impl std::fmt::Debug for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let rgba: [u8; 4] = bytemuck::cast(self.0);
+        f.debug_struct("Color")
+            .field("r", &rgba[0])
+            .field("g", &rgba[1])
+            .field("b", &rgba[2])
+            .field("a", &rgba[3])
+            .finish()
+    }
+}
 
 impl Default for Color {
     fn default() -> Self {
