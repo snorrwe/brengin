@@ -31,7 +31,68 @@ use {
     text::{OwnedTypeFace, TextDrawResponse},
 };
 
-pub type Color = u32;
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
+pub struct Color(pub u32);
+
+impl Default for Color {
+    fn default() -> Self {
+        Self(0xFF)
+    }
+}
+
+impl From<u32> for Color {
+    fn from(value: u32) -> Self {
+        Self::from_rgba(value)
+    }
+}
+
+impl Color {
+    pub const BLACK: Self = Color::from_rgb(0);
+    pub const RED: Self = Color::from_rgb(0xFF0000);
+    pub const YELLOW: Self = Color::from_rgb(0xFFFF00);
+    pub const GREEN: Self = Color::from_rgb(0x00FF00);
+    pub const BLUE: Self = Color::from_rgb(0x0000FF);
+
+    pub const fn from_rgba(rgba: u32) -> Self {
+        Self(rgba)
+    }
+
+    pub const fn from_rgb(rgb: u32) -> Self {
+        Self((rgb << 8) | 0xFF)
+    }
+
+    /// consumes at most 4 items, in order rgba
+    pub fn from_slice(bytes: &[u8]) -> Self {
+        let mut res = 0xFF;
+
+        for (i, b) in bytes.iter().enumerate().take(4) {
+            res |= (*b as u32) << (32 - 8 * i);
+        }
+
+        // only 1 item has been submitted, splat it
+        if res & 0xFF0000FF == res {
+            let byte = res >> 24;
+            res |= byte << 16;
+            res |= byte << 8;
+        }
+
+        Color(res)
+    }
+
+    pub const fn splat_rgb(byte: u8) -> Self {
+        let byte = byte as u32;
+        Self(byte << 24 | byte << 16 | byte << 8 | 0xFF)
+    }
+
+    pub fn as_rgba(&self) -> [u8; 4] {
+        bytemuck::cast(self.0)
+    }
+
+    pub fn as_rgb(&self) -> [u8; 3] {
+        let a = self.as_rgba();
+        [a[0], a[1], a[2]]
+    }
+}
 
 pub struct UiPlugin;
 
@@ -299,6 +360,12 @@ impl From<Color> for ThemeEntry {
     }
 }
 
+impl From<u32> for ThemeEntry {
+    fn from(value: u32) -> Self {
+        Self::Color(Color::from_rgba(value))
+    }
+}
+
 impl From<Handle<DynamicImage>> for ThemeEntry {
     fn from(value: Handle<DynamicImage>) -> Self {
         Self::Image(value)
@@ -336,8 +403,8 @@ impl Default for Theme {
             window_background: 0x0395d5ff.into(),
             background: 0x04a5e5ff.into(),
             context_background: 0x02a3e3ff.into(),
-            primary_color: 0xcdd6f4ff,
-            secondary_color: 0x212224ff,
+            primary_color: 0xcdd6f4ff.into(),
+            secondary_color: 0x212224ff.into(),
             button_default: 0x212224ff.into(),
             button_hovered: Some(0x45475aff.into()),
             button_pressed: Some(0x585b70ff.into()),
@@ -763,7 +830,7 @@ impl<'a> Ui<'a> {
             y,
             w: width,
             h: height,
-            color,
+            color: color.0,
             layer,
             scissor,
         })
@@ -821,7 +888,7 @@ impl<'a> Ui<'a> {
             y,
             w: width,
             h: height,
-            color,
+            color: color.0,
             layer,
             shaping,
             scissor,
@@ -1084,7 +1151,7 @@ impl<'a> Ui<'a> {
                     text_y + 1,
                     line_width,
                     line_height,
-                    0x000000FF,
+                    Color::BLACK,
                     layer + 1,
                     handle.clone(),
                 );
@@ -1193,7 +1260,7 @@ impl<'a> Ui<'a> {
             max_x: scissor_bounds.max_x,
             max_y: scissor_bounds.max_y,
         };
-        self.color_rect_from_rect(bounds, 0xFF0000FF, layer);
+        self.color_rect_from_rect(bounds, 0xFF0000FF.into(), layer);
         self.ui.bounding_boxes.insert(id, bounds);
 
         // pip
@@ -1232,7 +1299,7 @@ impl<'a> Ui<'a> {
             max_x: scissor_bounds.max_x,
             max_y: y + scroll_bar_width,
         };
-        self.color_rect_from_rect(control_box, 0xFF0AA0FF, layer + 1);
+        self.color_rect_from_rect(control_box, 0xFF0AA0FF.into(), layer + 1);
         self.ui.bounding_boxes.insert(id, control_box);
     }
 
@@ -1252,7 +1319,7 @@ impl<'a> Ui<'a> {
             max_x: scissor_bounds.max_x,
             max_y: scissor_bounds.max_y,
         };
-        self.color_rect_from_rect(bounds, 0xaaFF00FF, layer);
+        self.color_rect_from_rect(bounds, 0xaaFF00FF.into(), layer);
         self.ui.bounding_boxes.insert(id, bounds);
 
         // pip
@@ -1289,7 +1356,7 @@ impl<'a> Ui<'a> {
             max_x: x + scroll_bar_height,
             max_y: scissor_bounds.max_y,
         };
-        self.color_rect_from_rect(control_box, 0xFF0AA0FF, layer + 1);
+        self.color_rect_from_rect(control_box, 0xFF0AA0FF.into(), layer + 1);
         self.ui.bounding_boxes.insert(id, control_box);
     }
 
@@ -1954,7 +2021,7 @@ impl<'a> Ui<'a> {
                 bounds.min_y,
                 bounds.width(),
                 bounds.height(),
-                0xFF,
+                Color::BLACK,
                 CONTEXT_LAYER,
             );
             self.theme_rect(
@@ -2667,7 +2734,7 @@ impl<'a> UiRoot<'a> {
             }
             self.0.submit_rect(title_id, title_bounds);
             self.0
-                .color_rect_from_rect(title_bounds, 0x00ffffff, WINDOW_LAYER);
+                .color_rect_from_rect(title_bounds, Color::from_rgb(0x00ffff), WINDOW_LAYER);
         }
         ///////////////////////
         ///////////////////////
