@@ -211,6 +211,7 @@ dependencies = [
  "pollster",
  "rustybuzz",
  "smallvec",
+ "thiserror 2.0.17",
  "tiny-skia",
  "tracing",
  "tracing-subscriber",
