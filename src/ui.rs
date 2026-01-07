@@ -1236,7 +1236,7 @@ impl<'a> Ui<'a> {
             if !active {
                 // add a shadow
                 self.text_rect(
-                    x + text_padding + 1,
+                    x + text_padding,
                     text_y + 1,
                     line_width,
                     line_height,
