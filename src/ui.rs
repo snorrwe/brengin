@@ -1150,17 +1150,13 @@ impl<'a> Ui<'a> {
 
     /// When a widget has been completed, submit its bounding rectangle
     fn submit_rect(&mut self, id: UiId, rect: UiRect) {
-        let [p_left, _p_right, p_top, _p_bot] = self
-            .theme
-            .padding
-            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
         match self.ui.layout_dir {
             LayoutDirection::TopDown => {
-                let dy = rect.height() + p_top;
+                let dy = rect.height();
                 self.ui.bounds.min_y += dy;
             }
             LayoutDirection::LeftRight => {
-                let dx = rect.width() + p_left;
+                let dx = rect.width();
                 self.ui.bounds.min_x += dx;
             }
         }
