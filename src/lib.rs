@@ -66,6 +66,9 @@ pub struct GameWorld {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Tick(pub u64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExtractionTick(pub u32);
 
 unsafe impl Send for GameWorld {}
@@ -119,10 +122,11 @@ impl Timer {
     }
 }
 
-fn update_time(mut time: ResMut<Time>, mut dt: ResMut<DeltaTime>) {
+fn update_time(mut time: ResMut<Time>, mut dt: ResMut<DeltaTime>, mut tick: ResMut<Tick>) {
     let now = instant::Instant::now();
     dt.0 = now - time.0;
     time.0 = now;
+    tick.0 += 1;
 }
 
 /// extraction
@@ -732,9 +736,7 @@ impl Plugin for InputPlugin {
         app.insert_resource(MouseInputs::default());
 
         app.with_stage(Stage::PreUpdate, |s| {
-            s.add_system(update_time)
-                .add_system(update_inputs)
-                .add_system(update_mouse_inputs);
+            s.add_system(update_inputs).add_system(update_mouse_inputs);
         });
     }
 }
@@ -744,6 +746,10 @@ impl Plugin for TimePlugin {
     fn build(self, app: &mut App) {
         app.insert_resource(Time(instant::Instant::now()));
         app.insert_resource(DeltaTime(std::time::Duration::default()));
+        app.insert_resource(Tick(0));
+        app.with_stage(Stage::PreUpdate, |s| {
+            s.add_system(update_time);
+        });
     }
 }
 
