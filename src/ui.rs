@@ -1,6 +1,6 @@
 use crate::{
     assets::{self, Assets, AssetsPlugin, Handle, WeakHandle},
-    DeltaTime, KeyBoardInputs, MouseInputs, Plugin, Timer,
+    DeltaTime, KeyBoardInputs, MouseInputs, Plugin, Tick, Timer,
 };
 
 pub mod color_rect_pipeline;
@@ -206,7 +206,8 @@ impl Plugin for UiPlugin {
             s.add_system(submit_frame_color_rects)
                 .add_system(submit_frame_text_rects)
                 .add_system(submit_frame_texture_rects)
-                .add_system(update_ids);
+                .add_system(update_ids)
+                .add_system(shaping_gc_system);
         });
     }
 }
@@ -255,6 +256,7 @@ pub struct TextTextureCache(pub HashMap<ShapeKey, assets::Handle<ShapingResult>>
 pub struct ShapingResult {
     pub glyphs: rustybuzz::GlyphBuffer,
     pub texture: TextDrawResponse,
+    last_access: u64,
 }
 
 /// assign new ids, lhs = rhs
@@ -658,6 +660,31 @@ pub enum VerticalAlignment {
     Bottom,
 }
 
+fn shaping_gc_system(
+    mut texture_cache: ResMut<TextTextureCache>,
+    shaping_results: Res<assets::Assets<ShapingResult>>,
+    tick: Res<Tick>,
+) {
+    // maximum number of items to be collected per tick
+    // TODO: configure
+    let mut max = 100;
+    texture_cache.0.retain(|_, k| {
+        if max == 0 {
+            return true;
+        }
+        let Some(sh) = shaping_results.get_by_id(k.id()) else {
+            max -= 1;
+            return false;
+        };
+        // TODO: configure ticks
+        let retain = tick.0.saturating_sub(sh.last_access) <= 120;
+        if !retain {
+            max -= 1;
+        }
+        retain
+    });
+}
+
 impl<'a> Ui<'a> {
     /// returns the last scissor_idx
     pub fn push_scissor(&mut self, scissor_bounds: UiRect) -> u32 {
@@ -1020,12 +1047,14 @@ impl<'a> Ui<'a> {
                 let shaping = ShapingResult {
                     glyphs,
                     texture: pic,
+                    last_access: 0,
                 };
 
                 self.shaping_results.insert(shaping)
             });
 
         let shape = self.shaping_results.get_mut(handle);
+        shape.last_access = self.tick.0;
         (handle.clone(), shape)
     }
 
@@ -2682,6 +2711,7 @@ pub struct Ui<'a> {
     memory: ResMut<'a, UiMemory>,
     fonts: Res<'a, Assets<OwnedTypeFace>>,
     delta_time: Res<'a, DeltaTime>,
+    tick: Res<'a, Tick>,
 }
 
 /// Root of the UI used to instantiate UI containers
@@ -2967,6 +2997,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         let ids = Res::new(db);
         let next_ids = ResMut::new(db);
         let delta_time = Res::new(db);
+        let tick = Res::new(db);
         Self(Ui {
             ids,
             next_ids,
@@ -2979,6 +3010,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
             memory,
             fonts,
             delta_time,
+            tick,
         })
     }
 
@@ -2992,6 +3024,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
     }
 
     fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
+        set.insert(TypeId::of::<Tick>());
         set.insert(TypeId::of::<DeltaTime>());
         set.insert(TypeId::of::<MouseInputs>());
         set.insert(TypeId::of::<UiIds>());
