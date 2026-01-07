@@ -1673,18 +1673,16 @@ impl<'a> Ui<'a> {
             max_y: state.pos.y + state.size.y + p_bot,
         };
         let last_scissor = self.ui.scissor_idx;
+        let layer = self.ui.layer;
         if is_being_dragged {
             // Ensure that the widget is rendered on screen by pushing a new scissor that holds the
             // widget.
             // Only do this for the dragged widget, otherwise a lot of redundant scissors are
             // created.
             self.push_scissor(self.ui.bounds);
+            self.ui.layer = DRAG_LAYER;
         }
-        let layer = self.ui.layer;
         self.ui.layer += 1;
-        if is_being_dragged {
-            self.ui.layer += 100;
-        }
         self.ui.id_stack.push(0);
         ///////////////////////
         contents(self);
