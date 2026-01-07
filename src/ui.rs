@@ -2261,7 +2261,8 @@ impl<'a> Ui<'a> {
         self.submit_rect(id, bounds);
     }
 
-    pub fn padding(&mut self, m: Padding, mut contents: impl FnMut(&mut Self)) {
+    /// Add a margin around the inner contents
+    pub fn margin(&mut self, m: Padding, mut contents: impl FnMut(&mut Self)) {
         let id = self.begin_widget();
         let bounds = self.ui.bounds;
 
