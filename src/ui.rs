@@ -1609,7 +1609,7 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub fn drag_source(&mut self, mut contents: impl FnMut(&mut Self)) -> DragResponse {
+    pub fn drag_source(&mut self, mut contents: impl FnMut(&mut Self, &DragState)) -> DragResponse {
         let id = self.begin_widget();
         let old_bounds = self.ui.bounds;
 
@@ -1685,7 +1685,7 @@ impl<'a> Ui<'a> {
         self.ui.layer += 1;
         self.ui.id_stack.push(0);
         ///////////////////////
-        contents(self);
+        contents(self, &state);
         ///////////////////////
         self.ui.layer = layer;
         self.ui.id_stack.pop();
@@ -2371,7 +2371,7 @@ pub struct ContextMenuState {
 }
 
 #[derive(Debug, Default)]
-struct DragState {
+pub struct DragState {
     pub drag_start: PhysicalPosition<f64>,
     pub drag_anchor: IVec2,
     pub pos: IVec2,

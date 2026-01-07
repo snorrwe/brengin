@@ -143,7 +143,7 @@ fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>, mut dnd: ResMut<Dnd>, ui_state
                             dropped_on = Some((i, j));
                         }
                         if ui
-                            .drag_source(|ui| {
+                            .drag_source(|ui, _| {
                                 ui.label(format!("item {n}"));
                                 ui.image(ui_state.boid.clone(), 32.into(), 32.into());
                             })
