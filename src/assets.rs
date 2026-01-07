@@ -248,9 +248,18 @@ struct AssetEntry<T> {
 }
 
 fn gc_assets<T: 'static>(mut assets: ResMut<Assets<T>>) {
-    assets
-        .assets
-        .retain(|_id, val| val.handle.data().data_references.load(Ordering::Relaxed) > 0);
+    assets.assets.retain(|_id, val| {
+        let retain = val.handle.data().data_references.load(Ordering::Relaxed) > 0;
+        #[cfg(feature = "tracing")]
+        if !retain {
+            tracing::debug!(
+                id = _id,
+                ty = std::any::type_name::<T>(),
+                "Garbage collecting"
+            );
+        }
+        retain
+    });
 }
 
 pub struct AssetsPlugin<T> {
