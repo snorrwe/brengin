@@ -2272,13 +2272,18 @@ impl<'a> Ui<'a> {
         self.ui.bounds.min_y += top;
         self.ui.bounds.max_y -= bottom;
 
+        let max_x = self.ui.bounds.max_x;
+        let max_y = self.ui.bounds.max_y;
+
         let history_start = self.ui.rect_history.len();
 
         contents(self);
 
         self.ui.bounds = bounds;
 
-        let bounds = self.history_bounding_rect(history_start);
+        let mut bounds = self.history_bounding_rect(history_start);
+        bounds.max_x = max_x.min(bounds.max_x - right).max(bounds.min_x);
+        bounds.max_y = max_y.min(bounds.max_y - bottom).max(bounds.min_y);
         self.submit_rect(id, bounds);
     }
 }

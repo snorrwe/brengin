@@ -43,11 +43,13 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                         for row in 0..4 {
                             ui.context_menu(
                                 |ui| {
-                                    ui.image(
-                                        ui_state.boid.clone(),
-                                        UiCoord::Percent(50),
-                                        UiCoord::Absolute(56),
-                                    );
+                                    ui.padding(brengin::ui::Padding::vertical(10), |ui| {
+                                        ui.image(
+                                            ui_state.boid.clone(),
+                                            UiCoord::Percent(50),
+                                            UiCoord::Absolute(56),
+                                        );
+                                    });
                                 },
                                 |ui, _| {
                                     ui.allocate_area(128.into(), 128.into(), |ui| {
