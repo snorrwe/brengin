@@ -1929,7 +1929,7 @@ impl<'a> Ui<'a> {
         let mut h = 0;
         let x = self.ui.bounds.min_x;
         let y = self.ui.bounds.min_y;
-        let [p_left, _p_right, p_top, _p_bot] = self
+        let [p_left, p_right, p_top, p_bot] = self
             .theme
             .padding
             .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
@@ -1992,6 +1992,8 @@ impl<'a> Ui<'a> {
                     self.theme.primary_color,
                     layer + 2,
                 );
+                // Do not consider the caret in the bounds
+                self.ui.rect_history.pop();
             }
         }
 
@@ -2002,10 +2004,10 @@ impl<'a> Ui<'a> {
         let w = w.max(self.theme.font_size as i32 * 10);
         let h = h.max(self.theme.font_size as i32);
         let rect = UiRect {
-            min_x: x,
-            min_y: y,
-            max_x: x + w,
-            max_y: y + h,
+            min_x: x - p_left,
+            min_y: y - p_bot,
+            max_x: x + w + p_right,
+            max_y: y + h + p_top,
         };
         self.color_rect_from_rect(rect, self.theme.secondary_color, layer);
         self.submit_rect(id, rect);
