@@ -12,7 +12,13 @@ pub mod textured_rect_pipeline;
 #[cfg(test)]
 mod tests;
 
-use std::{any::TypeId, collections::HashMap, ptr::NonNull, str::FromStr, time::Duration};
+use std::{
+    any::TypeId,
+    collections::{HashMap, HashSet},
+    ptr::NonNull,
+    str::FromStr,
+    time::Duration,
+};
 
 use cecs::{prelude::*, query};
 use glam::IVec2;
@@ -194,6 +200,7 @@ impl Plugin for UiPlugin {
         app.insert_resource(NextUiIds(Default::default()));
         app.insert_resource(TextTextureCache::default());
         app.insert_resource(UiMemory::default());
+        app.insert_resource(UiInputs::default());
 
         if app.get_resource::<Theme>().is_none() {
             app.insert_resource(Theme::default());
@@ -432,6 +439,27 @@ pub struct UiState {
     fallback_font: OwnedTypeFace,
 
     window_allocator: WindowAllocator,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct UiInputs {
+    /// keys consumed by the UI
+    pub keys: HashSet<KeyCode>,
+}
+
+impl UiInputs {
+    pub fn wants_input(&self) -> bool {
+        self.wants_keyboard() || self.wants_mouse()
+    }
+
+    pub fn wants_keyboard(&self) -> bool {
+        !self.keys.is_empty()
+    }
+
+    pub fn wants_mouse(&self) -> bool {
+        // TODO:
+        false
+    }
 }
 
 #[derive(Clone)]
@@ -1499,6 +1527,7 @@ impl<'a> Ui<'a> {
             if self.is_hovered(id) {
                 let mut dt = 0.0;
                 for ds in self.mouse.scroll.iter() {
+                    // TODO: insert mouse events into ui_inputs
                     match ds {
                         MouseScrollDelta::LineDelta(_, dy) => {
                             dt -= *dy / line_height as f32;
@@ -1513,6 +1542,9 @@ impl<'a> Ui<'a> {
                     if self.keyboard.pressed.contains(&KeyCode::ShiftLeft)
                         || self.keyboard.pressed.contains(&KeyCode::ShiftRight)
                     {
+                        self.ui_inputs.keys.insert(KeyCode::ShiftLeft);
+                        self.ui_inputs.keys.insert(KeyCode::ShiftRight);
+
                         if desc.width.is_none() {
                             break 'scroll_handler;
                         }
@@ -1886,10 +1918,13 @@ impl<'a> Ui<'a> {
             for k in self.keyboard.pressed.iter() {
                 match k {
                     KeyCode::ArrowLeft => {
+                        self.ui_inputs.keys.insert(KeyCode::ArrowLeft);
                         cursor_update!({
                             if self.keyboard.pressed.contains(&KeyCode::ControlLeft)
                                 || self.keyboard.pressed.contains(&KeyCode::ControlRight)
                             {
+                                self.ui_inputs.keys.insert(KeyCode::ControlLeft);
+                                self.ui_inputs.keys.insert(KeyCode::ControlRight);
                                 state.cursor = 0;
                             } else {
                                 state.cursor = state.cursor.saturating_sub(1);
@@ -1897,10 +1932,13 @@ impl<'a> Ui<'a> {
                         });
                     }
                     KeyCode::ArrowRight => {
+                        self.ui_inputs.keys.insert(KeyCode::ArrowRight);
                         cursor_update!({
                             if self.keyboard.pressed.contains(&KeyCode::ControlLeft)
                                 || self.keyboard.pressed.contains(&KeyCode::ControlRight)
                             {
+                                self.ui_inputs.keys.insert(KeyCode::ControlLeft);
+                                self.ui_inputs.keys.insert(KeyCode::ControlRight);
                                 state.cursor = desc.content.len();
                             } else {
                                 state.cursor = desc.content.len().min(state.cursor + 1);
@@ -1908,16 +1946,19 @@ impl<'a> Ui<'a> {
                         });
                     }
                     KeyCode::Home => {
+                        self.ui_inputs.keys.insert(KeyCode::Home);
                         cursor_update!({
                             state.cursor = 0;
                         });
                     }
                     KeyCode::End => {
+                        self.ui_inputs.keys.insert(KeyCode::End);
                         cursor_update!({
                             state.cursor = desc.content.len();
                         });
                     }
                     KeyCode::Backspace => {
+                        self.ui_inputs.keys.insert(KeyCode::Backspace);
                         cursor_update!({
                             if state.cursor > 0 {
                                 state.cursor -= 1;
@@ -1927,6 +1968,7 @@ impl<'a> Ui<'a> {
                         });
                     }
                     KeyCode::Delete => {
+                        self.ui_inputs.keys.insert(KeyCode::Delete);
                         cursor_update!({
                             if state.cursor < desc.content.len() {
                                 desc.content.remove(state.cursor);
@@ -1934,7 +1976,7 @@ impl<'a> Ui<'a> {
                             }
                         });
                     }
-                    // TODO: ctrl + c, ctrl + v
+                    // TODO: ctrl + c, ctrl + v, ctrl + a, selecting with shift
                     _ => {
                         if let Some(text) = self
                             .keyboard
@@ -1942,6 +1984,7 @@ impl<'a> Ui<'a> {
                             .get(k)
                             .and_then(|ev| ev.logical_key.to_text())
                         {
+                            self.ui_inputs.keys.insert(*k);
                             desc.content.insert_str(state.cursor, text);
                             changed = true;
                             state.cursor += text.len();
@@ -2595,7 +2638,11 @@ impl<'a> Columns<'a> {
     }
 }
 
-fn begin_frame(mut ui: ResMut<UiState>, window_size: Res<crate::renderer::WindowSize>) {
+fn begin_frame(
+    mut ui: ResMut<UiState>,
+    window_size: Res<crate::renderer::WindowSize>,
+    mut inputs: ResMut<UiInputs>,
+) {
     ui.layout_dir = LayoutDirection::TopDown;
     ui.root_hash = 0;
     ui.rect_history.clear();
@@ -2613,6 +2660,7 @@ fn begin_frame(mut ui: ResMut<UiState>, window_size: Res<crate::renderer::Window
     ui.scissors.push(b);
     ui.scissor_idx = 0;
     ui.layer = 0;
+    inputs.keys.clear();
 }
 
 // preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
@@ -2733,6 +2781,7 @@ pub struct Ui<'a> {
     fonts: Res<'a, Assets<OwnedTypeFace>>,
     delta_time: Res<'a, DeltaTime>,
     tick: Res<'a, Tick>,
+    ui_inputs: ResMut<'a, UiInputs>,
 }
 
 /// Root of the UI used to instantiate UI containers
@@ -3019,6 +3068,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         let next_ids = ResMut::new(db);
         let delta_time = Res::new(db);
         let tick = Res::new(db);
+        let keys = ResMut::new(db);
         Self(Ui {
             ids,
             next_ids,
@@ -3032,6 +3082,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
             fonts,
             delta_time,
             tick,
+            ui_inputs: keys,
         })
     }
 
@@ -3042,6 +3093,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         set.insert(TypeId::of::<Assets<ShapingResult>>());
         set.insert(TypeId::of::<Theme>());
         set.insert(TypeId::of::<UiMemory>());
+        set.insert(TypeId::of::<UiInputs>());
     }
 
     fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
