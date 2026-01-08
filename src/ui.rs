@@ -2378,6 +2378,32 @@ impl<'a> Ui<'a> {
         bounds.max_y = max_y.min(bounds.max_y - bottom).max(bounds.min_y);
         self.submit_rect(id, bounds);
     }
+
+    /// Add background to the widget. If background is None, then the Theme background is used
+    pub fn background(
+        &mut self,
+        background: Option<ThemeEntry>,
+        mut contents: impl FnMut(&mut Self),
+    ) {
+        let id = self.begin_widget();
+        let history_start = self.ui.rect_history.len();
+        let layer = self.push_layer();
+
+        contents(self);
+
+        self.ui.layer = layer;
+
+        let bounds = self.history_bounding_rect(history_start);
+        self.theme_rect(
+            bounds.min_x,
+            bounds.min_y,
+            bounds.width(),
+            bounds.height(),
+            layer,
+            background.unwrap_or_else(|| self.theme.background.clone()),
+        );
+        self.submit_rect(id, bounds);
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
