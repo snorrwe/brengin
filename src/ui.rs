@@ -1832,20 +1832,34 @@ impl<'a> Ui<'a> {
     }
 
     pub fn input_string(&mut self, content: &mut String) -> Response<InputResponse> {
+        self.input_string_impl(InputStringDescriptor {
+            content,
+            password: false,
+        })
+    }
+
+    pub fn input_password(&mut self, content: &mut String) -> Response<InputResponse> {
+        self.input_string_impl(InputStringDescriptor {
+            content,
+            password: true,
+        })
+    }
+
+    fn input_string_impl(&mut self, desc: InputStringDescriptor) -> Response<InputResponse> {
         let id = self.begin_widget();
         let last_layer = self.push_layer();
         let layer = self.ui.layer;
 
         let mut state = self
             .get_memory_or_insert::<TextInputState>(id, || TextInputState {
-                cursor: content.len(),
+                cursor: desc.content.len(),
                 ..Default::default()
             })
             .clone();
 
         let mut changed = false;
 
-        state.cursor = state.cursor.min(content.len());
+        state.cursor = state.cursor.min(desc.content.len());
         let mouse_pos = self.mouse.cursor_position;
 
         // handle input
@@ -1887,9 +1901,9 @@ impl<'a> Ui<'a> {
                             if self.keyboard.pressed.contains(&KeyCode::ControlLeft)
                                 || self.keyboard.pressed.contains(&KeyCode::ControlRight)
                             {
-                                state.cursor = content.len();
+                                state.cursor = desc.content.len();
                             } else {
-                                state.cursor = content.len().min(state.cursor + 1);
+                                state.cursor = desc.content.len().min(state.cursor + 1);
                             }
                         });
                     }
@@ -1900,22 +1914,22 @@ impl<'a> Ui<'a> {
                     }
                     KeyCode::End => {
                         cursor_update!({
-                            state.cursor = content.len();
+                            state.cursor = desc.content.len();
                         });
                     }
                     KeyCode::Backspace => {
                         cursor_update!({
                             if state.cursor > 0 {
                                 state.cursor -= 1;
-                                content.remove(state.cursor);
+                                desc.content.remove(state.cursor);
                                 changed = true;
                             }
                         });
                     }
                     KeyCode::Delete => {
                         cursor_update!({
-                            if state.cursor < content.len() {
-                                content.remove(state.cursor);
+                            if state.cursor < desc.content.len() {
+                                desc.content.remove(state.cursor);
                                 changed = true;
                             }
                         });
@@ -1928,7 +1942,7 @@ impl<'a> Ui<'a> {
                             .get(k)
                             .and_then(|ev| ev.logical_key.to_text())
                         {
-                            content.insert_str(state.cursor, text);
+                            desc.content.insert_str(state.cursor, text);
                             changed = true;
                             state.cursor += text.len();
                         }
@@ -1957,10 +1971,17 @@ impl<'a> Ui<'a> {
             .padding
             .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
         let [x, y] = [x + p_left, y + p_top];
-        if !content.is_empty() {
+        if !desc.content.is_empty() {
             let mouse_up = self.mouse_up();
-            let (handle, e) =
-                self.shape_and_draw_line(content.clone(), self.theme.font_size as u32);
+
+            let pl = if !desc.password {
+                desc.content.clone()
+            } else {
+                let width = desc.content.len();
+                format!("{:*>width$}", '*')
+            };
+
+            let (handle, e) = self.shape_and_draw_line(pl, self.theme.font_size as u32);
             let pic = &e.texture;
             let line_width = pic.width() as i32;
             let line_height = pic.height() as i32;
@@ -2005,7 +2026,7 @@ impl<'a> Ui<'a> {
                 // caret
 
                 // TODO: better position
-                let t = state.cursor as f64 / content.len() as f64;
+                let t = state.cursor as f64 / desc.content.len() as f64;
                 let cx = line_width as f64 * t;
                 self.color_rect(
                     x + cx as i32,
@@ -3201,4 +3222,9 @@ pub fn align_rect(
     rect.offset_y(dy);
 
     IVec2::new(dx, dy)
+}
+
+struct InputStringDescriptor<'a> {
+    content: &'a mut String,
+    password: bool,
 }

@@ -174,6 +174,7 @@ fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>, mut dnd: ResMut<Dnd>, ui_state
 #[derive(Debug, Default)]
 struct FormState {
     pub data: String,
+    pub pw: String,
 }
 
 const LOREM: &str = r#"
@@ -292,7 +293,14 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
                     ui.label("v");
                     ui.label(&label.0);
 
-                    ui.input_string(&mut form.data);
+                    ui.horizontal(|ui| {
+                        ui.label("username: ");
+                        ui.input_string(&mut form.data);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("password: ");
+                        ui.input_password(&mut form.pw);
+                    });
                 });
 
                 // opening a context menu on-demand by user code
