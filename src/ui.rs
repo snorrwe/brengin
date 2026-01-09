@@ -2014,7 +2014,10 @@ impl<'a> Ui<'a> {
             .theme
             .padding
             .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
-        let [x, y] = [x + p_left, y + p_top];
+        let text_padding = self.theme.text_padding as i32;
+        let [x, y] = [x + p_left + text_padding, y + p_top + text_padding];
+        let mut line_width = 0;
+        let mut line_height = self.theme.font_size as i32 + 7; // FIXME: +7??
         if !desc.content.is_empty() {
             let mouse_up = self.mouse_up();
 
@@ -2027,8 +2030,9 @@ impl<'a> Ui<'a> {
 
             let (handle, e) = self.shape_and_draw_line(pl, self.theme.font_size as u32);
             let pic = &e.texture;
-            let line_width = pic.width() as i32;
-            let line_height = pic.height() as i32;
+            line_width = pic.width() as i32;
+            line_height = pic.height() as i32;
+
             w = w.max(line_width);
             h += line_height;
 
@@ -2065,24 +2069,21 @@ impl<'a> Ui<'a> {
                 layer + 1,
                 handle,
             );
-
-            if is_active && state.show_caret {
-                // caret
-
-                // TODO: better position
-                let t = state.cursor as f64 / desc.content.len() as f64;
-                let cx = line_width as f64 * t;
-                self.color_rect(
-                    x + cx as i32,
-                    y,
-                    1,
-                    line_height,
-                    self.theme.primary_color,
-                    layer + 2,
-                );
-                // Do not consider the caret in the bounds
-                self.ui.rect_history.pop();
-            }
+        }
+        if is_active && state.show_caret {
+            // draw caret
+            //
+            // TODO: better position
+            let t = state.cursor as f64 / desc.content.len() as f64;
+            let cx = line_width as f64 * t;
+            self.color_rect(
+                x + cx as i32,
+                y,
+                1,
+                line_height,
+                self.theme.primary_color,
+                layer + 2,
+            );
         }
 
         if is_active && self.mouse_up() && !self.contains_mouse(id) {
@@ -2092,10 +2093,10 @@ impl<'a> Ui<'a> {
         let w = w.max(self.theme.font_size as i32 * 10);
         let h = h.max(self.theme.font_size as i32);
         let rect = UiRect {
-            min_x: x - p_left,
-            min_y: y - p_bot,
-            max_x: x + w + p_right,
-            max_y: y + h + p_top,
+            min_x: x - p_left - text_padding,
+            min_y: y - p_bot - text_padding,
+            max_x: x + w + p_right + text_padding,
+            max_y: y + h + p_top + text_padding,
         };
         self.color_rect_from_rect(rect, self.theme.secondary_color, layer);
         self.submit_rect(id, rect);
