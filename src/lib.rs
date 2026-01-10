@@ -120,6 +120,15 @@ impl Timer {
         self.just_finished = false;
         self.elapsed = Default::default();
     }
+
+    pub fn period(&self) -> Duration {
+        self.target
+    }
+
+    pub fn reset_period(&mut self, target: Duration) {
+        self.target = target;
+        self.reset();
+    }
 }
 
 fn update_time(mut time: ResMut<Time>, mut dt: ResMut<DeltaTime>, mut tick: ResMut<Tick>) {
