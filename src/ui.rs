@@ -2091,14 +2091,18 @@ impl<'a> Ui<'a> {
         }
 
         let w = w.max(self.theme.font_size as i32 * 10);
-        let h = h.max(self.theme.font_size as i32);
-        let rect = UiRect {
-            min_x: x - p_left - text_padding,
-            min_y: y - p_bot - text_padding,
-            max_x: x + w + p_right + text_padding,
-            max_y: y + h + p_top + text_padding,
+        let h = h.max(line_height);
+        let mut rect = UiRect {
+            min_x: x - text_padding,
+            min_y: y - text_padding,
+            max_x: x + w + text_padding,
+            max_y: y + h + text_padding,
         };
         self.color_rect_from_rect(rect, self.theme.secondary_color, layer);
+        rect.min_x -= p_left;
+        rect.min_y -= p_top;
+        rect.max_x += p_right;
+        rect.max_y += p_bot;
         self.submit_rect(id, rect);
         self.ui.layer = last_layer;
         self.insert_memory(id, state);
