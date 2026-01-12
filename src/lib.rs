@@ -32,7 +32,7 @@ use winit::{
 
 use parking_lot::Mutex;
 use std::{
-    any::TypeId,
+    any::{type_name, TypeId},
     collections::{HashMap, HashSet},
     ptr::NonNull,
     sync::{atomic::AtomicBool, Arc},
@@ -176,6 +176,9 @@ pub struct App {
     stages: std::collections::BTreeMap<Stage, SystemStageBuilder<'static>>,
     startup_systems: SystemStageBuilder<'static>,
     plugins: HashSet<TypeId>,
+    /// after build assert that these plugins are available
+    /// store id: type name
+    required_plugins: HashMap<TypeId, &'static str>,
 
     extract_stage: SystemStageBuilder<'static>,
     pub render_app: Option<Box<App>>,
@@ -513,6 +516,7 @@ impl App {
             startup_systems: SystemStage::new("startup"),
             extract_stage: SystemStage::new("extract"),
             plugins: Default::default(),
+            required_plugins: Default::default(),
             render_app: None,
         }
     }
@@ -535,6 +539,13 @@ impl App {
         if self.plugins.insert(TypeId::of::<T>()) {
             plugin.build(self);
         }
+        self
+    }
+
+    /// After the whole App has been built, assert that the specified plugin has been added
+    pub fn assert_plugin<T: Plugin + 'static>(&mut self) -> &mut Self {
+        self.required_plugins
+            .insert(TypeId::of::<T>(), type_name::<T>());
         self
     }
 
@@ -604,6 +615,13 @@ impl App {
     }
 
     fn _build(self) -> World {
+        for (id, name) in self.required_plugins {
+            assert!(
+                self.plugins.contains(&id),
+                "Plugin {name} is marked required but has not been initialized",
+            );
+        }
+
         let mut world = self.world;
         for (_, stage) in self
             .stages
