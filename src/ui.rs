@@ -444,17 +444,23 @@ pub struct UiState {
 
 #[derive(Debug, Clone, Default)]
 pub struct UiInputs {
+    pub wants_keyboard: bool,
     /// keys consumed by the UI
     pub keys: HashSet<KeyCode>,
 }
 
 impl UiInputs {
+    pub fn clear(&mut self) {
+        self.wants_keyboard = false;
+        self.keys.clear();
+    }
+
     pub fn wants_input(&self) -> bool {
         self.wants_keyboard() || self.wants_mouse()
     }
 
     pub fn wants_keyboard(&self) -> bool {
-        !self.keys.is_empty()
+        self.wants_keyboard || !self.keys.is_empty()
     }
 
     pub fn wants_mouse(&self) -> bool {
@@ -1898,6 +1904,7 @@ impl<'a> Ui<'a> {
         // handle input
         let is_active = self.is_active(id);
         if is_active {
+            self.ui_inputs.wants_keyboard = true;
             state.caret_timer.update(self.delta_time.0);
             state.cursor_debounce.update(self.delta_time.0);
             if state.cursor_debounce.just_finished() {
@@ -2692,7 +2699,7 @@ fn begin_frame(
     ui.scissors.push(b);
     ui.scissor_idx = 0;
     ui.layer = 0;
-    inputs.keys.clear();
+    inputs.clear();
 }
 
 // preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
