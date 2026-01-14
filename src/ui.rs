@@ -1781,15 +1781,15 @@ impl<'a> Ui<'a> {
         }
 
         let history = std::mem::take(&mut self.ui.rect_history);
-        let [_p_left, p_right, _p_top, p_bot] = self
+        let [p_left, p_right, p_top, p_bot] = self
             .theme
             .padding
             .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
         self.ui.bounds = UiRect {
-            min_x: state.pos.x,
-            min_y: state.pos.y,
-            max_x: state.pos.x + state.size.x + p_right,
-            max_y: state.pos.y + state.size.y + p_bot,
+            min_x: state.pos.x + p_left,
+            min_y: state.pos.y + p_top,
+            max_x: state.pos.x + state.size.x - p_right,
+            max_y: state.pos.y + state.size.y - p_bot,
         };
         let last_scissor = self.ui.scissor_idx;
         let layer = self.ui.layer;
@@ -1798,16 +1798,22 @@ impl<'a> Ui<'a> {
             // widget.
             // Only do this for the dragged widget, otherwise a lot of redundant scissors are
             // created.
-            self.push_scissor(self.ui.bounds);
+            let mut scissor = self.ui.bounds;
+            // undo padding
+            scissor.min_x -= p_left;
+            scissor.max_x += p_right;
+            scissor.min_y -= p_top;
+            scissor.max_y += p_bot;
+            self.push_scissor(scissor);
             self.ui.layer = DRAG_LAYER;
         }
         self.ui.layer += 1;
-        self.ui.id_stack.push(0);
         ///////////////////////
-        contents(self, &state);
+        self.children_content(|ui| {
+            contents(ui, &state);
+        });
         ///////////////////////
         self.ui.layer = layer;
-        self.ui.id_stack.pop();
         self.ui.bounds = old_bounds;
         let child_history = std::mem::replace(&mut self.ui.rect_history, history);
         let mut content_bounds = bounding_rect(&child_history);
@@ -1825,6 +1831,10 @@ impl<'a> Ui<'a> {
         }
         self.ui.scissor_idx = last_scissor;
 
+        content_bounds.min_x -= p_left;
+        content_bounds.max_x += p_right + p_left;
+        content_bounds.min_y -= p_top;
+        content_bounds.max_y += p_bot + p_top;
         self.submit_rect(id, content_bounds);
         state.size = IVec2::new(content_bounds.width(), content_bounds.height());
 
