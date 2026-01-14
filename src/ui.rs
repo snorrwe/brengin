@@ -2434,7 +2434,7 @@ impl<'a> Ui<'a> {
         &mut self,
         width: UiCoord,
         height: UiCoord,
-        mut contents: impl FnMut(&mut Self),
+        contents: impl FnMut(&mut Self),
     ) {
         let id = self.begin_widget();
         let bounds = self.ui.bounds;
@@ -2451,7 +2451,7 @@ impl<'a> Ui<'a> {
 
         let history_start = self.ui.rect_history.len();
 
-        contents(self);
+        self.children_content(contents);
 
         self.ui.bounds = bounds;
 
@@ -2460,7 +2460,7 @@ impl<'a> Ui<'a> {
     }
 
     /// Add a margin around the inner contents
-    pub fn margin(&mut self, m: Padding, mut contents: impl FnMut(&mut Self)) {
+    pub fn margin(&mut self, m: Padding, contents: impl FnMut(&mut Self)) {
         let id = self.begin_widget();
         let bounds = self.ui.bounds;
 
@@ -2480,7 +2480,7 @@ impl<'a> Ui<'a> {
 
         let history_start = self.ui.rect_history.len();
 
-        contents(self);
+        self.children_content(contents);
 
         self.ui.bounds = bounds;
 
@@ -2493,16 +2493,12 @@ impl<'a> Ui<'a> {
     }
 
     /// Add background to the widget. If background is None, then the Theme background is used
-    pub fn background(
-        &mut self,
-        background: Option<ThemeEntry>,
-        mut contents: impl FnMut(&mut Self),
-    ) {
+    pub fn background(&mut self, background: Option<ThemeEntry>, contents: impl FnMut(&mut Self)) {
         let id = self.begin_widget();
         let history_start = self.ui.rect_history.len();
         let layer = self.push_layer();
 
-        contents(self);
+        self.children_content(contents);
 
         self.ui.layer = layer;
 
@@ -2516,6 +2512,12 @@ impl<'a> Ui<'a> {
             background.unwrap_or_else(|| self.theme.background.clone()),
         );
         self.submit_rect(id, bounds);
+    }
+
+    fn children_content(&mut self, mut contents: impl FnMut(&mut Self)) {
+        self.ui.id_stack.push(0);
+        contents(self);
+        self.ui.id_stack.pop();
     }
 }
 
