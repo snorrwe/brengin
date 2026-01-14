@@ -1342,7 +1342,7 @@ impl<'a> Ui<'a> {
                 let line_width = pic.width() as i32;
                 let line_height = pic.height() as i32;
                 w = w.max(line_width);
-                h += line_height;
+                h += line_height + 1;
 
                 let mut delta = 0;
                 if !active {
@@ -2173,8 +2173,11 @@ impl<'a> Ui<'a> {
 
     pub fn with_outline(
         &mut self,
-        outline_color: Color,
-        outline_radius: u32,
+        OutlineDescriptor {
+            fill_color,
+            outline_color,
+            outline_radius,
+        }: OutlineDescriptor,
         mut content: impl FnMut(&mut Self),
     ) {
         let id = self.begin_widget();
@@ -2203,7 +2206,7 @@ impl<'a> Ui<'a> {
         // a lot of transparent pixels
         self.color_rect_from_rect_with_outline(
             rect,
-            Color::TRANSPARENT,
+            fill_color,
             layer,
             outline_color,
             outline_radius,
@@ -3415,4 +3418,21 @@ pub fn align_rect(
 struct InputStringDescriptor<'a> {
     content: &'a mut String,
     password: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct OutlineDescriptor {
+    pub fill_color: Color,
+    pub outline_color: Color,
+    pub outline_radius: u32,
+}
+
+impl Default for OutlineDescriptor {
+    fn default() -> Self {
+        Self {
+            fill_color: Color::TRANSPARENT,
+            outline_color: Color::BLACK,
+            outline_radius: 1,
+        }
+    }
 }
