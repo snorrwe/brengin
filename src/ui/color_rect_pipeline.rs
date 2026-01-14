@@ -45,6 +45,8 @@ pub struct DrawColorRect {
     pub layer: u16,
     pub color: u32,
     pub scissor: u32,
+    pub outline_radius: u32,
+    pub outline_color: u32,
 }
 
 /// XY is the center, WH are half-extents
@@ -57,6 +59,9 @@ pub struct DrawRectInstance {
     pub h: f32,
     pub color: u32,
     pub layer: f32,
+    pub outline_x: f32,
+    pub outline_y: f32,
+    pub outline_color: u32,
 }
 
 impl DrawRectInstance {
@@ -79,6 +84,20 @@ impl DrawRectInstance {
                     offset: (size_of::<[f32; 4]>() + size_of::<u32>()) as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float32,
+                },
+                wgpu::VertexAttribute {
+                    offset: (size_of::<[f32; 4]>() + size_of::<u32>() + size_of::<f32>())
+                        as wgpu::BufferAddress,
+                    shader_location: 3,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: (size_of::<[f32; 4]>()
+                        + size_of::<u32>()
+                        + size_of::<f32>()
+                        + size_of::<[f32; 2]>()) as wgpu::BufferAddress,
+                    shader_location: 4,
+                    format: wgpu::VertexFormat::Uint32,
                 },
             ],
         }
@@ -215,14 +234,20 @@ fn update_instances(
             // switch order of layers, lower layers are in the front
             // remap to 0..1
             let layer = (0xFFFF - rect.layer) as f32 / (0xFFFF as f32);
+            let outline_radius = rect.outline_radius as f32;
+            let outline_x = outline_radius / rect.w as f32;
+            let outline_y = outline_radius / rect.h as f32;
             DrawRectInstance {
                 x: (rect.x as f32 + ww) / w,
                 y: (y - hh) / h,
                 // w: ww / w,
-                w: rect.w as f32 / w,
-                h: rect.h as f32 / h,
+                w: (rect.w as f32 + outline_radius * 2.0) / w,
+                h: (rect.h as f32 + outline_radius * 2.0) / h,
                 layer,
                 color: rect.color,
+                outline_x,
+                outline_y,
+                outline_color: rect.outline_color,
             }
         }));
 

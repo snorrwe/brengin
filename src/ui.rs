@@ -959,6 +959,26 @@ impl<'a> Ui<'a> {
         );
     }
 
+    pub fn color_rect_from_rect_with_outline(
+        &mut self,
+        rect: UiRect,
+        color: Color,
+        layer: u16,
+        outline_color: Color,
+        outline_radius: u32,
+    ) {
+        self.color_rect_with_outline(
+            rect.min_x,
+            rect.min_y,
+            rect.width(),
+            rect.height(),
+            color,
+            outline_radius,
+            outline_color,
+            layer,
+        );
+    }
+
     pub fn color_rect(
         &mut self,
         x: i32,
@@ -984,6 +1004,39 @@ impl<'a> Ui<'a> {
             color: color.0,
             layer,
             scissor,
+            ..Default::default()
+        })
+    }
+
+    pub fn color_rect_with_outline(
+        &mut self,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        color: Color,
+        outline_radius: u32,
+        outline_color: Color,
+        layer: u16,
+    ) {
+        self.ui.rect_history.push(UiRect {
+            min_x: x,
+            min_y: y,
+            max_x: x + width,
+            max_y: y + height,
+        });
+        assert!(!self.ui.scissors.is_empty());
+        let scissor = self.ui.scissor_idx;
+        self.ui.color_rects.push(DrawColorRect {
+            x,
+            y,
+            w: width,
+            h: height,
+            color: color.0,
+            layer,
+            scissor,
+            outline_color: outline_color.0,
+            outline_radius,
         })
     }
 
@@ -2079,8 +2132,6 @@ impl<'a> Ui<'a> {
         }
         if is_active && state.show_caret {
             // draw caret
-            //
-            // TODO: better position
             let t = state.cursor as f64 / desc.content.len() as f64;
             let cx = line_width as f64 * t;
             self.color_rect(
@@ -2120,6 +2171,48 @@ impl<'a> Ui<'a> {
             rect,
             id,
         }
+    }
+
+    pub fn with_outline(
+        &mut self,
+        outline_color: Color,
+        outline_radius: u32,
+        mut content: impl FnMut(&mut Self),
+    ) {
+        let id = self.begin_widget();
+        let last_layer = self.push_layer();
+        let layer = self.push_layer();
+        let history_start = self.ui.rect_history.len();
+
+        let [p_left, p_right, p_top, p_bot] = self
+            .theme
+            .padding
+            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+
+        let r = outline_radius as i32;
+        self.ui.bounds.min_x += p_left + r;
+        self.ui.bounds.min_y += p_top + r;
+        //////////////////
+        content(self);
+        //////////////////
+
+        let mut rect = self.history_bounding_rect(history_start);
+        rect.min_x -= p_left + r;
+        rect.max_x += p_right + r;
+        rect.min_y -= p_top + r;
+        rect.max_y += p_bot + r;
+        // TODO: would be nice to support this drawing mode in the renderer, currently it will draw
+        // a lot of transparent pixels
+        self.color_rect_from_rect_with_outline(
+            rect,
+            Color::TRANSPARENT,
+            layer,
+            outline_color,
+            outline_radius,
+        );
+
+        self.submit_rect(id, rect);
+        self.ui.layer = last_layer;
     }
 
     fn theme_rect(
