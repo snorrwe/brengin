@@ -1286,116 +1286,119 @@ impl<'a> Ui<'a> {
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
-        let id = self.begin_widget();
-        let layer = self.ui.layer;
-        let label = label.into();
+        fn _button(this: &mut Ui, label: String) -> ButtonResponse {
+            let id = this.begin_widget();
+            let layer = this.ui.layer;
 
-        let mut pressed = false;
-        let contains_mouse = self.contains_mouse(id);
-        let mut bg_color = self.theme.button_default.clone();
-        let active = self.is_active(id);
-        if active {
-            bg_color = self
-                .theme
-                .button_pressed
-                .as_ref()
-                .unwrap_or(&self.theme.button_default)
-                .clone();
-            if self.mouse_up() {
-                if self.is_hovered(id) {
-                    pressed = true;
+            let mut pressed = false;
+            let contains_mouse = this.contains_mouse(id);
+            let mut bg_color = this.theme.button_default.clone();
+            let active = this.is_active(id);
+            if active {
+                bg_color = this
+                    .theme
+                    .button_pressed
+                    .as_ref()
+                    .unwrap_or(&this.theme.button_default)
+                    .clone();
+                if this.mouse_up() {
+                    if this.is_hovered(id) {
+                        pressed = true;
+                    }
+                    this.set_not_active(id);
                 }
-                self.set_not_active(id);
+            } else if this.is_hovered(id) {
+                bg_color = this
+                    .theme
+                    .button_hovered
+                    .as_ref()
+                    .unwrap_or(&this.theme.button_default)
+                    .clone();
+                if !contains_mouse {
+                    this.set_not_hovered(id);
+                } else if this.mouse_down() {
+                    this.set_active(id);
+                }
             }
-        } else if self.is_hovered(id) {
-            bg_color = self
+            if contains_mouse {
+                this.set_hovered(id);
+            }
+
+            // shape the text
+            let mut w = 0;
+            let mut h = 0;
+            let x = this.ui.bounds.min_x;
+            let y = this.ui.bounds.min_y;
+            let [p_left, p_right, p_top, p_bot] = this
                 .theme
-                .button_hovered
-                .as_ref()
-                .unwrap_or(&self.theme.button_default)
-                .clone();
-            if !contains_mouse {
-                self.set_not_hovered(id);
-            } else if self.mouse_down() {
-                self.set_active(id);
-            }
-        }
-        if contains_mouse {
-            self.set_hovered(id);
-        }
+                .padding
+                .as_abs(this.ui.bounds.width(), this.ui.bounds.height());
+            let [x, y] = [x + p_left, y + p_top];
+            let text_padding = this.theme.text_padding as i32;
+            let mut text_y = y + text_padding;
+            let text_color = this
+                .theme
+                .button_text_color
+                .unwrap_or(this.theme.primary_color);
+            for line in label.split('\n').filter(|l| !l.is_empty()) {
+                let (handle, e) =
+                    this.shape_and_draw_line(line.to_owned(), this.theme.font_size as u32);
+                let pic = &e.texture;
+                let line_width = pic.width() as i32;
+                let line_height = pic.height() as i32;
+                w = w.max(line_width);
+                h += line_height;
 
-        // shape the text
-        let mut w = 0;
-        let mut h = 0;
-        let x = self.ui.bounds.min_x;
-        let y = self.ui.bounds.min_y;
-        let [p_left, p_right, p_top, p_bot] = self
-            .theme
-            .padding
-            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
-        let [x, y] = [x + p_left, y + p_top];
-        let text_padding = self.theme.text_padding as i32;
-        let mut text_y = y + text_padding;
-        let text_color = self
-            .theme
-            .button_text_color
-            .unwrap_or(self.theme.primary_color);
-        for line in label.split('\n').filter(|l| !l.is_empty()) {
-            let (handle, e) =
-                self.shape_and_draw_line(line.to_owned(), self.theme.font_size as u32);
-            let pic = &e.texture;
-            let line_width = pic.width() as i32;
-            let line_height = pic.height() as i32;
-            w = w.max(line_width);
-            h += line_height;
-
-            let mut delta = 0;
-            if !active {
-                // add a shadow
-                self.text_rect(
-                    x + text_padding,
-                    text_y + 1,
+                let mut delta = 0;
+                if !active {
+                    // add a shadow
+                    this.text_rect(
+                        x + text_padding,
+                        text_y + 1,
+                        line_width,
+                        line_height,
+                        Color::BLACK,
+                        layer + 1,
+                        handle.clone(),
+                    );
+                } else {
+                    // if active, then move the text into the shadow's position
+                    // so it appears to have lowered
+                    delta = 1
+                }
+                this.text_rect(
+                    x + text_padding + delta,
+                    text_y + delta,
                     line_width,
                     line_height,
-                    Color::BLACK,
-                    layer + 1,
-                    handle.clone(),
+                    text_color,
+                    layer + 2,
+                    handle,
                 );
-            } else {
-                // if active, then move the text into the shadow's position
-                // so it appears to have lowered
-                delta = 1
+                text_y += line_height + text_padding;
             }
-            self.text_rect(
-                x + text_padding + delta,
-                text_y + delta,
-                line_width,
-                line_height,
-                text_color,
-                layer + 2,
-                handle,
-            );
-            text_y += line_height + text_padding;
-        }
-        // background
-        let w = w + 2 * text_padding;
-        let h = h + 2 * text_padding;
-        self.theme_rect(x, y, w, h, layer, bg_color);
+            // background
+            let w = w + 2 * text_padding;
+            let h = h + 2 * text_padding;
+            this.theme_rect(x, y, w, h, layer, bg_color);
 
-        let rect = UiRect {
-            min_x: x,
-            min_y: y,
-            max_x: x + w + p_right,
-            max_y: y + h + p_bot,
-        };
-        self.submit_rect(id, rect);
-        ButtonResponse {
-            id,
-            hovered: self.is_hovered(id),
-            active,
-            inner: ButtonState { pressed },
-            rect,
+            let rect = UiRect {
+                min_x: x,
+                min_y: y,
+                max_x: x + w + p_right,
+                max_y: y + h + p_bot,
+            };
+            this.submit_rect(id, rect);
+            ButtonResponse {
+                id,
+                hovered: this.is_hovered(id),
+                active,
+                inner: ButtonState { pressed },
+                rect,
+            }
         }
+
+        _button(self, label.into())
     }
 
     pub fn theme(&self) -> &Theme {
@@ -2470,8 +2473,12 @@ impl<'a> Ui<'a> {
         self.ui.bounds.min_y += top;
         self.ui.bounds.max_y -= bottom;
 
-        let max_x = self.ui.bounds.max_x;
-        let max_y = self.ui.bounds.max_y;
+        let UiRect {
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+        } = self.ui.bounds;
 
         let history_start = self.ui.rect_history.len();
 
@@ -2480,6 +2487,8 @@ impl<'a> Ui<'a> {
         self.ui.bounds = bounds;
 
         let mut bounds = self.history_bounding_rect(history_start);
+        bounds.min_x = min_x.max(bounds.min_x + left).min(bounds.max_x);
+        bounds.min_y = min_y.max(bounds.min_y + top).min(bounds.max_y);
         bounds.max_x = max_x.min(bounds.max_x - right).max(bounds.min_x);
         bounds.max_y = max_y.min(bounds.max_y - bottom).max(bounds.min_y);
         self.submit_rect(id, bounds);
