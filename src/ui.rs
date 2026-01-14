@@ -1329,11 +1329,6 @@ impl<'a> Ui<'a> {
             let mut h = 0;
             let x = this.ui.bounds.min_x;
             let y = this.ui.bounds.min_y;
-            let [p_left, p_right, p_top, p_bot] = this
-                .theme
-                .padding
-                .as_abs(this.ui.bounds.width(), this.ui.bounds.height());
-            let [x, y] = [x + p_left, y + p_top];
             let text_padding = this.theme.text_padding as i32;
             let mut text_y = y + text_padding;
             let text_color = this
@@ -1385,8 +1380,8 @@ impl<'a> Ui<'a> {
             let rect = UiRect {
                 min_x: x,
                 min_y: y,
-                max_x: x + w + p_right,
-                max_y: y + h + p_bot,
+                max_x: x + w,
+                max_y: y + h,
             };
             this.submit_rect(id, rect);
             ButtonResponse {
@@ -2487,10 +2482,10 @@ impl<'a> Ui<'a> {
         self.ui.bounds = bounds;
 
         let mut bounds = self.history_bounding_rect(history_start);
-        bounds.min_x = min_x.max(bounds.min_x + left).min(bounds.max_x);
-        bounds.min_y = min_y.max(bounds.min_y + top).min(bounds.max_y);
-        bounds.max_x = max_x.min(bounds.max_x - right).max(bounds.min_x);
-        bounds.max_y = max_y.min(bounds.max_y - bottom).max(bounds.min_y);
+        bounds.min_x = min_x.max(bounds.min_x - left).min(bounds.max_x);
+        bounds.min_y = min_y.max(bounds.min_y - top).min(bounds.max_y);
+        bounds.max_x = max_x.min(bounds.max_x + right).max(bounds.min_x);
+        bounds.max_y = max_y.min(bounds.max_y + bottom).max(bounds.min_y);
         self.submit_rect(id, bounds);
     }
 
