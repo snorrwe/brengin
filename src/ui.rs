@@ -2290,11 +2290,11 @@ impl<'a> Ui<'a> {
                 max_y: bounds.max_y + p_vertical + outline_size,
             });
 
-            self.ui.id_stack.push(0);
             ///////////////////////
-            context_menu(self, &mut state);
+            self.children_content(|ui| {
+                context_menu(ui, &mut state);
+            });
             ///////////////////////
-            self.ui.id_stack.pop();
             self.ui.bounds = new_bounds;
 
             let context_bounds = self.history_bounding_rect(history_start);
@@ -2305,8 +2305,8 @@ impl<'a> Ui<'a> {
                 context_bounds.min_y - p_top - outline_size,
             );
             bounds = bounds.grow_over_point(
-                context_bounds.max_x + p_left + outline_size,
-                context_bounds.max_y + p_top + outline_size,
+                context_bounds.max_x + p_right + outline_size,
+                context_bounds.max_y + p_bot + outline_size,
             );
             self.submit_rect(id, bounds);
             if self.contains_mouse(id) {
@@ -2387,7 +2387,7 @@ impl<'a> Ui<'a> {
 
     pub fn context_menu<'b>(
         &'b mut self,
-        mut contents: impl FnMut(&mut Self) + 'b,
+        contents: impl FnMut(&mut Self) + 'b,
         context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
         let id = self.begin_widget();
@@ -2396,18 +2396,16 @@ impl<'a> Ui<'a> {
         // TODO: ??
         self.begin_widget();
         let history_start = self.ui.rect_history.len();
-        self.ui.id_stack.push(0);
         ///////////////////////
-        contents(self);
+        self.children_content(contents);
         ///////////////////////
-        self.ui.id_stack.pop();
         let content_bounds = self.submit_rect_group(id, history_start);
 
         self.ui.layer = old_layer;
 
         let resp = Response {
             hovered: self.is_hovered(id),
-            active: self.is_active(id),
+            active: false, // the root element is never active
             rect: content_bounds,
             inner: (),
             id,
