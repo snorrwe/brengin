@@ -416,7 +416,7 @@ impl SpritePipeline {
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Sprite Vertex Buffer"),
-                contents: bytemuck::cast_slice(VERTICES),
+                contents: bytemuck::cast_slice(SQUARE_VERTICES),
                 usage: wgpu::BufferUsages::VERTEX,
             });
 
@@ -424,10 +424,10 @@ impl SpritePipeline {
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Sprite Index Buffer"),
-                contents: bytemuck::cast_slice(INDICES),
+                contents: bytemuck::cast_slice(SQUARE_INDICES),
                 usage: wgpu::BufferUsages::INDEX,
             });
-        let num_indices = INDICES.len() as u32;
+        let num_indices = SQUARE_INDICES.len() as u32;
 
         SpritePipeline {
             sheets: Default::default(),
@@ -513,7 +513,7 @@ impl SpriteInstanceRaw {
     }
 }
 
-const VERTICES: &[Vertex] = &[
+const SQUARE_VERTICES: &[Vertex] = &[
     // A
     Vertex {
         pos: [-0.5, 0.5, 0.0],
@@ -536,7 +536,7 @@ const VERTICES: &[Vertex] = &[
     },
 ];
 
-const INDICES: &[u16] = &[3, 2, 1, 3, 1, 0];
+const SQUARE_INDICES: &[u16] = &[3, 2, 1, 3, 1, 0];
 
 fn setup(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
     let sprite_pipeline = SpritePipeline::new(&graphics_state);
