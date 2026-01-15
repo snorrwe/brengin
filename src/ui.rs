@@ -2523,9 +2523,11 @@ impl<'a> Ui<'a> {
     }
 
     fn children_content(&mut self, mut contents: impl FnMut(&mut Self)) {
+        let layer = self.push_layer();
         self.ui.id_stack.push(0);
         contents(self);
         self.ui.id_stack.pop();
+        self.ui.layer = layer;
     }
 }
 
@@ -3109,7 +3111,7 @@ impl<'a> UiRoot<'a> {
         self.0.ui.window_allocator = allocator;
     }
 
-    pub fn panel(&mut self, desc: PanelDescriptor, mut contents: impl FnMut(&mut Ui)) {
+    pub fn panel(&mut self, desc: PanelDescriptor, contents: impl FnMut(&mut Ui)) {
         let width = desc.width.as_abolute(self.0.ui.bounds.width());
         let height = desc.height.as_abolute(self.0.ui.bounds.height());
 
@@ -3149,7 +3151,6 @@ impl<'a> UiRoot<'a> {
         self.0.ui.bounds = bounds;
         let scissor = self.0.push_scissor(bounds);
 
-        let layer = self.0.push_layer();
         self.0.theme_rect(
             bounds.min_x,
             bounds.min_y,
@@ -3159,13 +3160,9 @@ impl<'a> UiRoot<'a> {
             self.0.theme.background.clone(),
         );
 
-        self.0.ui.layer += 1;
-        self.0.ui.id_stack.push(0);
         ///////////////////////
-        contents(&mut self.0);
+        self.0.children_content(contents);
         ///////////////////////
-        self.0.ui.layer = layer;
-        self.0.ui.id_stack.pop();
         self.0.ui.bounds = old_bounds;
         self.0.ui.scissor_idx = scissor;
     }
