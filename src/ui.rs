@@ -3151,6 +3151,7 @@ impl<'a> UiRoot<'a> {
         self.0.ui.bounds = bounds;
         let scissor = self.0.push_scissor(bounds);
 
+        let old_layer = self.0.push_layer();
         self.0.theme_rect(
             bounds.min_x,
             bounds.min_y,
@@ -3163,6 +3164,7 @@ impl<'a> UiRoot<'a> {
         ///////////////////////
         self.0.children_content(contents);
         ///////////////////////
+        self.0.ui.layer = old_layer;
         self.0.ui.bounds = old_bounds;
         self.0.ui.scissor_idx = scissor;
     }
