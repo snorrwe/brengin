@@ -1,6 +1,7 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
 use brengin::ui::{
-    Color, HorizontalAlignment, ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment,
+    Color, HorizontalAlignment, OutlineDescriptor, ScrollDescriptor, UiCoord, UiRoot,
+    VerticalAlignment,
 };
 use brengin::{prelude::*, transform, CloseRequest};
 use brengin::{App, DefaultPlugins};
@@ -146,10 +147,17 @@ fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>, mut dnd: ResMut<Dnd>, ui_state
                         }
                         if ui
                             .drag_source(|ui, _| {
-                                ui.with_outline(Color::BLACK, 5, |ui| {
-                                    ui.label(format!("item {n}"));
-                                    ui.image(ui_state.boid.clone(), 32.into(), 32.into());
-                                });
+                                ui.with_outline(
+                                    OutlineDescriptor {
+                                        outline_color: Color::BLACK,
+                                        outline_radius: 5,
+                                        ..Default::default()
+                                    },
+                                    |ui| {
+                                        ui.label(format!("item {n}"));
+                                        ui.image(ui_state.boid.clone(), 32.into(), 32.into());
+                                    },
+                                );
                             })
                             .is_being_dragged
                         {
