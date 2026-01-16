@@ -2,6 +2,11 @@
 //!
 //! Entities are grouped together by their meshes and spritesheets.
 //!
+//! For arbitrary meshes, it's assumed that the mesh fills a 1by1 AABB.
+//! This fact is used by the visibility calculation
+//!
+//! TODO: support arbitrary sized meshes in visibility
+//!
 use image::DynamicImage;
 use std::collections::{BTreeMap, HashMap};
 use tracing::trace;
