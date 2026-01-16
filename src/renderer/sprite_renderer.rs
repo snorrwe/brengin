@@ -520,7 +520,7 @@ impl<'a> RenderCommand<'a> for SpriteRenderCommand {
 }
 
 #[repr(C)]
-#[derive(Default, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Default, Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct SpriteInstanceRaw {
     pos_scale: [f32; 4],
     scale_y: f32,
