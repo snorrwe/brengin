@@ -55,11 +55,12 @@ fn update_visible(
     cameras: Query<&ViewFrustum>,
     visible: Query<(EntityId, &CullSize, &GlobalTransform), With<Visible>>,
 ) {
-    for fr in cameras.iter() {
-        for (id, size, tr) in visible.iter() {
-            if !is_visible(tr.0.pos, &fr.planes, size.0) {
-                cmd.entity(id).remove::<Visible>();
-            }
+    for (id, size, tr) in visible.iter() {
+        if cameras
+            .iter()
+            .all(|fr| !is_visible(tr.0.pos, &fr.planes, size.0))
+        {
+            cmd.entity(id).remove::<Visible>();
         }
     }
 }
@@ -69,10 +70,11 @@ fn update_invisible(
     cameras: Query<&ViewFrustum>,
     invisible: Query<(EntityId, &CullSize, &GlobalTransform), WithOut<Visible>>,
 ) {
-    for fr in cameras.iter() {
-        for (id, size, tr) in invisible.iter() {
+    for (id, size, tr) in invisible.iter() {
+        for fr in cameras.iter() {
             if is_visible(tr.0.pos, &fr.planes, size.0) {
                 cmd.entity(id).insert(Visible);
+                break;
             }
         }
     }
