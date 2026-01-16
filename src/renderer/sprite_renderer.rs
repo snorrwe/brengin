@@ -1,5 +1,10 @@
+//! Performs instanced rendering of spritesheets.
+//!
+//! Entities are grouped together by their meshes and spritesheets.
+//!
 use image::DynamicImage;
 use std::collections::{BTreeMap, HashMap};
+use tracing::trace;
 
 use cecs::prelude::*;
 use glam::Vec2;
@@ -161,7 +166,7 @@ fn unload_sheets(
         .collect::<Vec<_>>();
     for id in unloaded {
         pipeline.unload_sheet(id);
-        instances.0.remove(&id);
+        instances.0.retain(|k, _| k.sprite_sheet != id);
         handles.0.remove(&id);
     }
 }
@@ -189,7 +194,13 @@ fn compute_sprite_instances(
 }
 
 #[derive(Default)]
-struct SpritePipelineInstances(BTreeMap<AssetId, Vec<SpriteInstanceRaw>>);
+struct SpritePipelineInstances(BTreeMap<InstanceKey, Vec<SpriteInstanceRaw>>);
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct InstanceKey {
+    pub sprite_sheet: AssetId,
+    pub mesh: MeshKey,
+}
 
 fn clear_pipeline_instances(mut instances: ResMut<SpritePipelineInstances>) {
     for i in instances.0.values_mut() {
@@ -198,52 +209,71 @@ fn clear_pipeline_instances(mut instances: ResMut<SpritePipelineInstances>) {
 }
 
 impl Extract for SpriteInstanceRaw {
-    type QueryItem = (&'static Handle<SpriteSheet>, &'static SpriteInstanceRaw);
+    type QueryItem = (
+        &'static Handle<SpriteSheet>,
+        &'static SpriteInstanceRaw,
+        Option<&'static Handle<SpriteMesh>>,
+    );
 
     type Filter = With<Visible>;
 
-    type Out = (WeakHandle<SpriteSheet>, SpriteInstanceRaw, Visible);
+    type Out = (
+        WeakHandle<SpriteSheet>,
+        SpriteInstanceRaw,
+        Visible,
+        MeshHandle,
+    );
 
     fn extract<'a>(
-        (handle, instance): <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
+        (handle, instance, mesh): <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
     ) -> Option<Self::Out> {
-        Some((handle.downgrade(), *instance, Visible))
+        Some((
+            handle.downgrade(),
+            *instance,
+            Visible,
+            mesh.map(|h| MeshHandle::Mesh(h.downgrade()))
+                .unwrap_or_default(),
+        ))
     }
 }
 
 fn update_sprite_pipelines(
     renderer: Res<GraphicsState>,
-    q: Query<(&WeakHandle<SpriteSheet>, &SpriteInstanceRaw)>,
+    q: Query<(&WeakHandle<SpriteSheet>, &SpriteInstanceRaw, &MeshHandle)>,
     mut pipeline: ResMut<SpritePipeline>,
     mut instances: ResMut<SpritePipelineInstances>,
 ) {
-    for (handle, raw) in q.iter() {
-        instances.0.entry(handle.id()).or_default().push(*raw);
+    for (handle, raw, mesh) in q.iter() {
+        let k = InstanceKey {
+            sprite_sheet: handle.id(),
+            mesh: mesh.into(),
+        };
+        instances.0.entry(k).or_default().push(*raw);
     }
 
     for (id, cpu) in instances.0.iter() {
-        let Some(sprite_rendering_data) = pipeline.sheets.get_mut(&id) else {
+        let Some(instances) = pipeline.instances.get_mut(id) else {
             continue;
         };
 
         let instance_data_bytes = bytemuck::cast_slice::<_, u8>(&cpu);
         let size = instance_data_bytes.len() as u64;
-        if sprite_rendering_data.instance_gpu.size() < size {
+        if instances.instance_gpu.size() < size {
             // resize the buffer
-            sprite_rendering_data.instance_gpu =
-                renderer.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some(&format!("Sprite Instance Buffer - {}", id)),
-                    size: size * 2,
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
+            instances.instance_gpu = renderer.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(&format!(
+                    "Sprite Instance Buffer - {} {:?}",
+                    id.sprite_sheet, id.mesh
+                )),
+                size: size * 2,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
         }
-        renderer.queue.write_buffer(
-            &sprite_rendering_data.instance_gpu,
-            0,
-            bytemuck::cast_slice(&cpu),
-        );
-        sprite_rendering_data.count = cpu.len();
+        renderer
+            .queue
+            .write_buffer(&instances.instance_gpu, 0, bytemuck::cast_slice(&cpu));
+        instances.count = cpu.len();
     }
 }
 
@@ -252,20 +282,22 @@ struct RenderSpritesheetHandles(pub HashMap<AssetId, WeakHandle<SpriteSheet>>);
 
 // per spritesheet
 pub struct SpriteRenderingData {
-    pub count: usize,
-    pub instance_gpu: wgpu::Buffer,
     pub spritesheet_gpu: wgpu::BindGroup,
     pub spritesheet_bind_group: wgpu::BindGroup,
     pub texture: Texture,
 }
 
+struct SpriteInstances {
+    pub count: usize,
+    pub instance_gpu: wgpu::Buffer,
+}
+
 pub struct SpritePipeline {
+    instances: HashMap<InstanceKey, SpriteInstances>,
     sheets: HashMap<AssetId, SpriteRenderingData>,
+    meshes: BTreeMap<MeshKey, SpriteMeshGpu>,
     // shared
     render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    num_indices: u32,
     sprite_sheet_layout: wgpu::BindGroupLayout,
 }
 
@@ -314,13 +346,6 @@ impl SpritePipeline {
         self.sheets.insert(
             id,
             SpriteRenderingData {
-                count: 0,
-                instance_gpu: renderer.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Sprite Instance Buffer"),
-                    mapped_at_creation: false,
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                    size: 0,
-                }),
                 spritesheet_gpu,
                 spritesheet_bind_group,
                 texture,
@@ -431,13 +456,22 @@ impl SpritePipeline {
             });
         let num_indices = SQUARE_INDICES.len() as u32;
 
+        let mut meshes: BTreeMap<MeshKey, SpriteMeshGpu> = Default::default();
+        meshes.insert(
+            MeshKey::DefaultSquare,
+            SpriteMeshGpu {
+                vertex_buffer,
+                index_buffer,
+                num_indices,
+            },
+        );
+
         SpritePipeline {
             sheets: Default::default(),
+            meshes,
             sprite_sheet_layout,
             render_pipeline,
-            vertex_buffer,
-            index_buffer,
-            num_indices,
+            instances: Default::default(),
         }
     }
 
@@ -449,15 +483,23 @@ impl SpritePipeline {
         }: &mut RenderCommandInput,
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
-        for (_, sheet) in self.sheets.iter().filter(|(_, s)| s.count > 0) {
+        for (k, instances) in self.instances.iter().filter(|(_, s)| s.count > 0) {
+            let Some(mesh) = self.meshes.get(&k.mesh) else {
+                continue;
+            };
+            let Some(sheet) = self.sheets.get(&k.sprite_sheet) else {
+                continue;
+            };
+            trace!(mesh=?k.mesh, sprite_sheet=k.sprite_sheet, "Rendering {} instances", instances.count);
+
             render_pass.set_bind_group(0, *camera, &[]);
             render_pass.set_bind_group(1, &sheet.spritesheet_bind_group, &[]);
             render_pass.set_bind_group(2, &sheet.spritesheet_gpu, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, sheet.instance_gpu.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, instances.instance_gpu.slice(..));
+            render_pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..sheet.count as u32);
+            render_pass.draw_indexed(0..mesh.num_indices, 0, 0..instances.count as u32);
         }
     }
 }
@@ -550,7 +592,9 @@ pub struct SpriteRendererPlugin;
 impl Plugin for SpriteRendererPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(AssetsPlugin::<SpriteSheet>::default());
+        app.add_plugin(AssetsPlugin::<SpriteMesh>::default());
         app.add_plugin(ExtractionPlugin::<SpriteInstanceRaw>::default());
+        app.add_plugin(ExtractionPlugin::<SpriteMeshExtract>::default());
         app.with_stage(Stage::Update, |s| {
             // putting this system in update means that the last frame's data will be presented
             s.add_system(compute_sprite_instances)
@@ -563,18 +607,163 @@ impl Plugin for SpriteRendererPlugin {
             RenderPass::Transparent,
         ));
         app.extract_stage.add_system(add_missing_sheets);
+        app.extract_stage.add_system(add_missing_meshes);
+        app.extract_stage.add_system(add_missing_instances);
 
         if let Some(ref mut app) = app.render_app {
             app.add_startup_system(setup);
             app.insert_resource(SpritePipelineInstances::default());
             app.insert_resource(RenderSpritesheetHandles::default());
+            app.insert_resource(SpriteMeshHandles::default());
             app.with_stage(Stage::PreUpdate, |s| {
                 s.add_system(clear_pipeline_instances);
+                s.add_system(add_missing_instances);
             });
             app.with_stage(Stage::Update, |s| {
                 s.add_system(unload_sheets)
-                    .add_system(update_sprite_pipelines);
+                    .add_system(update_sprite_pipelines)
+                    .add_system(unload_meshes);
             });
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SpriteMesh {
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u16>,
+}
+
+pub struct SpriteMeshGpu {
+    pub vertex_buffer: wgpu::Buffer,
+    pub index_buffer: wgpu::Buffer,
+    pub num_indices: u32,
+}
+
+struct SpriteMeshExtract;
+impl Extract for SpriteMeshExtract {
+    type QueryItem = &'static Handle<SpriteMesh>;
+
+    type Filter = ();
+
+    type Out = (WeakHandle<SpriteMesh>,);
+
+    fn extract<'a>(
+        handle: <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
+    ) -> Option<Self::Out> {
+        Some((handle.downgrade(),))
+    }
+}
+
+#[derive(Default)]
+struct SpriteMeshHandles(pub BTreeMap<AssetId, WeakHandle<SpriteMesh>>);
+
+fn unload_meshes(mut handles: ResMut<SpriteMeshHandles>) {
+    handles.0.retain(|_, h| h.upgrade().is_some());
+}
+
+#[derive(Debug, Default)]
+enum MeshHandle {
+    Mesh(WeakHandle<SpriteMesh>),
+    #[default]
+    DefaultSquare,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum MeshKey {
+    Mesh(AssetId),
+    #[default]
+    DefaultSquare,
+}
+
+impl From<MeshHandle> for MeshKey {
+    fn from(value: MeshHandle) -> Self {
+        MeshKey::from(&value)
+    }
+}
+
+impl<'a> From<&'a MeshHandle> for MeshKey {
+    fn from(value: &'a MeshHandle) -> Self {
+        match value {
+            MeshHandle::Mesh(weak_handle) => MeshKey::Mesh(weak_handle.id()),
+            MeshHandle::DefaultSquare => MeshKey::DefaultSquare,
+        }
+    }
+}
+
+fn add_missing_meshes(
+    renderer: Res<GraphicsState>,
+    game_world: Res<GameWorld>,
+    mut pipeline: ResMut<SpritePipeline>,
+) {
+    game_world
+        .world()
+        .run_view_system(|meshes: Res<crate::assets::Assets<SpriteMesh>>| {
+            for (id, sheet) in meshes.iter() {
+                let key = MeshKey::Mesh(id);
+                if !pipeline.meshes.contains_key(&key) {
+                    let vertex_buffer =
+                        renderer
+                            .device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Sprite Vertex Buffer"),
+                                contents: bytemuck::cast_slice(sheet.vertices.as_slice()),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
+
+                    let index_buffer =
+                        renderer
+                            .device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Sprite Index Buffer"),
+                                contents: bytemuck::cast_slice(sheet.indices.as_slice()),
+                                usage: wgpu::BufferUsages::INDEX,
+                            });
+                    let num_indices = sheet.indices.len() as u32;
+
+                    pipeline.meshes.insert(
+                        key,
+                        SpriteMeshGpu {
+                            vertex_buffer,
+                            index_buffer,
+                            num_indices,
+                        },
+                    );
+                }
+            }
+        });
+}
+
+fn add_missing_instances(
+    renderer: Res<GraphicsState>,
+    mut pipeline: ResMut<SpritePipeline>,
+    q: Query<(&MeshHandle, &WeakHandle<SpriteSheet>), With<Visible>>,
+) {
+    let mut instances = q
+        .iter()
+        .map(|(mesh, sheet)| InstanceKey {
+            sprite_sheet: sheet.id(),
+            mesh: mesh.into(),
+        })
+        .collect::<Vec<_>>();
+
+    instances.sort_unstable();
+    for g in instances.chunk_by_mut(|a, b| a == b) {
+        let k = g[0];
+        pipeline
+            .instances
+            .entry(k)
+            .or_insert_with(|| SpriteInstances {
+                count: g.len(),
+                instance_gpu: renderer.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some(&format!(
+                        "Sprite Instance Buffer - {} {:?}",
+                        k.sprite_sheet, k.mesh
+                    )),
+                    size: 0,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                }),
+            });
     }
 }
