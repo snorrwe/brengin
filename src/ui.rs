@@ -3215,6 +3215,7 @@ impl<'a> UiRoot<'a> {
             VerticalAlignment::Center => {}
         }
         self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[
+            0,
             bounds.min_x,
             bounds.min_y,
             width,
@@ -3273,8 +3274,19 @@ impl<'a> UiRoot<'a> {
         theme.apply(&mut self.0.theme);
     }
 
-    pub fn tooltip(&mut self, desc: TooltipDescriptor) {
-        self.0.tooltip(desc);
+    /// key should be a unique index for each empty call in an application
+    pub fn empty(&mut self, key: i32, contents: impl FnMut(&mut Ui)) {
+        let old_bounds = self.0.ui.bounds;
+        self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[1, key]));
+        let scissor = self.0.push_scissor(old_bounds);
+        let old_layer = self.0.push_layer();
+
+        ///////////////////////
+        self.0.children_content(contents);
+        ///////////////////////
+        self.0.ui.layer = old_layer;
+        self.0.ui.bounds = old_bounds;
+        self.0.ui.scissor_idx = scissor;
     }
 }
 
