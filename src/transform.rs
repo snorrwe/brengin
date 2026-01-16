@@ -127,6 +127,21 @@ impl Transform {
             ..Default::default()
         }
     }
+
+    pub fn with_scale(mut self, scale: Vec3) -> Self {
+        self.scale = scale;
+        self
+    }
+
+    pub fn with_position(mut self, pos: Vec3) -> Self {
+        self.pos = pos;
+        self
+    }
+
+    pub fn with_rotation(mut self, rot: Quat) -> Self {
+        self.rot = rot;
+        self
+    }
 }
 
 impl<'a> std::ops::Mul<&'a Self> for Transform {
