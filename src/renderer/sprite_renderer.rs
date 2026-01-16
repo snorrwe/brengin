@@ -599,7 +599,6 @@ impl Plugin for SpriteRendererPlugin {
         app.add_plugin(AssetsPlugin::<SpriteSheet>::default());
         app.add_plugin(AssetsPlugin::<SpriteMesh>::default());
         app.add_plugin(ExtractionPlugin::<SpriteInstanceRaw>::default());
-        app.add_plugin(ExtractionPlugin::<SpriteMeshExtract>::default());
         app.with_stage(Stage::Update, |s| {
             // putting this system in update means that the last frame's data will be presented
             s.add_system(compute_sprite_instances)
@@ -643,21 +642,6 @@ struct SpriteMeshGpu {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_indices: u32,
-}
-
-struct SpriteMeshExtract;
-impl Extract for SpriteMeshExtract {
-    type QueryItem = &'static Handle<SpriteMesh>;
-
-    type Filter = ();
-
-    type Out = (WeakHandle<SpriteMesh>,);
-
-    fn extract<'a>(
-        handle: <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
-    ) -> Option<Self::Out> {
-        Some((handle.downgrade(),))
-    }
 }
 
 #[derive(Default)]
