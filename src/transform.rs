@@ -144,11 +144,11 @@ impl<'a> std::ops::Mul for &'a Transform {
     type Output = Transform;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let mut result = *self;
-        result.pos = self.pos + self.rot.mul_vec3(rhs.pos) * rhs.scale;
-        result.scale *= rhs.scale;
-        result.rot = self.rot.mul_quat(rhs.rot);
-        result
+        Transform {
+            pos: self.transform_point(rhs.pos),
+            scale: self.scale * rhs.scale,
+            rot: self.rot.mul_quat(rhs.rot),
+        }
     }
 }
 
