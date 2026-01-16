@@ -639,7 +639,7 @@ pub struct SpriteMesh {
     pub indices: Vec<u16>,
 }
 
-pub struct SpriteMeshGpu {
+struct SpriteMeshGpu {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_indices: u32,
