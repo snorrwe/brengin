@@ -2529,6 +2529,81 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.pop();
         self.ui.layer = layer;
     }
+
+    pub fn tooltip(&mut self, desc: TooltipDescriptor) {
+        self.begin_widget();
+        let bounds = self.ui.scissors[0];
+        let old_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
+        let old_scissor = std::mem::replace(&mut self.ui.scissor_idx, 0);
+        let history = self.ui.rect_history.len();
+        let old_layer = std::mem::replace(&mut self.ui.layer, CONTEXT_LAYER);
+
+        let x = desc.x + self.ui.bounds.center_x();
+        self.ui.bounds.move_to_x(x);
+        let y = desc.y + self.ui.bounds.center_y();
+        self.ui.bounds.move_to_y(y);
+
+        ///////////////
+        self.with_outline(
+            OutlineDescriptor {
+                fill_color: match self.theme().context_background {
+                    ThemeEntry::Color(color) => color,
+                    ThemeEntry::Image(_) => self.theme().secondary_color,
+                },
+                outline_color: Color::BLACK,
+                outline_radius: 1,
+            },
+            |ui| {
+                ui.label(desc.label);
+            },
+        );
+        ///////////////
+
+        self.ui.bounds = old_bounds;
+        self.ui.scissor_idx = old_scissor;
+        self.ui.rect_history.resize_with(history, || unreachable!());
+        self.ui.layer = old_layer;
+    }
+
+    pub fn with_tooltip(&mut self, contents: impl FnMut(&mut Self), label: &str) {
+        let id = self.begin_widget();
+        let history_start = self.ui.rect_history.len();
+        self.children_content(contents);
+        let bounds = self.history_bounding_rect(history_start);
+
+        self.submit_rect(id, bounds);
+
+        let mut state = std::mem::take(self.get_memory_or_default::<TooltipState>(id));
+
+        if self.contains_mouse(id) {
+            state.hovered_seconds += self.delta_time.0.as_secs_f32();
+            if state.hovered_seconds > 1.2 {
+                let mouse = self.mouse.cursor_position;
+                self.children_content(|ui| {
+                    ui.tooltip(TooltipDescriptor {
+                        x: mouse.x as i32,
+                        y: mouse.y as i32 + 10,
+                        label,
+                    });
+                });
+            }
+        } else {
+            state.hovered_seconds = 0.0;
+        }
+
+        self.insert_memory(id, state);
+    }
+}
+
+pub struct TooltipDescriptor<'a> {
+    pub x: i32,
+    pub y: i32,
+    pub label: &'a str,
+}
+
+#[derive(Debug, Default)]
+pub struct TooltipState {
+    pub hovered_seconds: f32,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
