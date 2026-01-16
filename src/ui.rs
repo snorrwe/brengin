@@ -3275,6 +3275,10 @@ impl<'a> UiRoot<'a> {
 
         theme.apply(&mut self.0.theme);
     }
+
+    pub fn tooltip(&mut self, desc: TooltipDescriptor) {
+        self.0.tooltip(desc);
+    }
 }
 
 unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
