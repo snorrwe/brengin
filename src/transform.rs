@@ -104,9 +104,7 @@ impl Transform {
     }
 
     pub fn transform_point(&self, pos: Vec3) -> Vec3 {
-        let pos = self.rot * pos;
-        let pos = pos / self.scale;
-        self.pos + pos
+        self.pos + self.rot * (pos * self.scale)
     }
 
     pub fn from_scale(scale: Vec3) -> Self {
