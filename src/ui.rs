@@ -2531,17 +2531,14 @@ impl<'a> Ui<'a> {
     }
 
     pub fn tooltip(&mut self, desc: TooltipDescriptor) {
-        self.begin_widget();
         let bounds = self.ui.scissors[0];
         let old_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
         let old_scissor = std::mem::replace(&mut self.ui.scissor_idx, 0);
         let history = self.ui.rect_history.len();
         let old_layer = std::mem::replace(&mut self.ui.layer, CONTEXT_LAYER);
 
-        let x = desc.x + self.ui.bounds.center_x();
-        self.ui.bounds.move_to_x(x);
-        let y = desc.y + self.ui.bounds.center_y();
-        self.ui.bounds.move_to_y(y);
+        self.ui.bounds.min_x = desc.x;
+        self.ui.bounds.min_y = desc.y;
 
         ///////////////
         self.with_outline(
