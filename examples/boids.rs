@@ -8,7 +8,8 @@ use brengin::{
     renderer::{
         background_renderer::BackgroundImage,
         camera_bundle,
-        sprite_renderer::{self, SpriteSheet},
+        sprite_renderer::{self, SpriteMesh, SpriteSheet},
+        Vertex,
     },
     transform::{self, transform_bundle, Transform},
     App, DefaultPlugins, DeltaTime, Plugin, Stage,
@@ -94,7 +95,11 @@ fn setup_background(mut cmd: Commands, mut assets: ResMut<Assets<DynamicImage>>)
     cmd.insert_resource(BackgroundImage(handle));
 }
 
-fn setup_boids(mut cmd: Commands, mut assets: ResMut<assets::Assets<SpriteSheet>>) {
+fn setup_boids(
+    mut cmd: Commands,
+    mut assets: ResMut<assets::Assets<SpriteSheet>>,
+    mut meshes: ResMut<assets::Assets<SpriteMesh>>,
+) {
     //camera
     cmd.spawn()
         .insert(WindowCamera)
@@ -116,6 +121,24 @@ fn setup_boids(mut cmd: Commands, mut assets: ResMut<assets::Assets<SpriteSheet>
         &mut assets,
     );
 
+    let triangle = meshes.insert(SpriteMesh {
+        vertices: vec![
+            Vertex {
+                pos: [0.0, 0.0, 0.0],
+                uv: [0.0, 0.0],
+            },
+            Vertex {
+                pos: [0.0, 1.0, 0.0],
+                uv: [0.0, 1.0],
+            },
+            Vertex {
+                pos: [1.0, 1.0, 0.0],
+                uv: [1.0, 1.0],
+            },
+        ],
+        indices: vec![0, 1, 2],
+    });
+
     println!("Spawning {N} boids");
     for _ in 0..N {
         // TODO: scale by map size
@@ -124,7 +147,9 @@ fn setup_boids(mut cmd: Commands, mut assets: ResMut<assets::Assets<SpriteSheet>
 
         let vx = fastrand::f32();
         let vy = fastrand::f32();
-        cmd.spawn()
+
+        let cmd = cmd
+            .spawn()
             .insert_bundle(transform_bundle(transform::Transform::from_position(
                 Vec3::new(x, y, 0.0),
             )))
@@ -136,6 +161,10 @@ fn setup_boids(mut cmd: Commands, mut assets: ResMut<assets::Assets<SpriteSheet>
                 LastVelocity(Vec2::ZERO),
                 Velocity(Vec2::new(vx, vy)),
             ));
+
+        if fastrand::bool() {
+            cmd.insert(triangle.clone());
+        }
     }
 }
 
