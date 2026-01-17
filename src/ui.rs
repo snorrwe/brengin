@@ -871,17 +871,14 @@ impl<'a> Ui<'a> {
         self.submit_rect_group(id, history_start);
     }
 
-    pub fn vertical(&mut self, mut contents: impl FnMut(&mut Self)) {
+    pub fn vertical(&mut self, contents: impl FnMut(&mut Self)) {
         let id = self.begin_widget();
-        let layout = self.ui.layout_dir;
         let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
-        self.ui.layout_dir = LayoutDirection::TopDown;
-        self.ui.id_stack.push(0);
+        let layout = std::mem::replace(&mut self.ui.layout_dir, LayoutDirection::TopDown);
         ///////////////////////
-        contents(self);
+        self.children_content(contents);
         ///////////////////////
-        self.ui.id_stack.pop();
         self.ui.layout_dir = layout;
         self.ui.bounds = bounds;
         self.submit_rect_group(id, history_start);
@@ -1269,12 +1266,10 @@ impl<'a> Ui<'a> {
     fn submit_rect(&mut self, id: UiId, rect: UiRect) {
         match self.ui.layout_dir {
             LayoutDirection::TopDown => {
-                let dy = rect.height();
-                self.ui.bounds.min_y += dy;
+                self.ui.bounds.min_y = rect.max_y;
             }
             LayoutDirection::LeftRight => {
-                let dx = rect.width();
-                self.ui.bounds.min_x += dx;
+                self.ui.bounds.min_x = rect.max_x;
             }
         }
         self.ui.bounding_boxes.insert(id, rect);
@@ -2173,8 +2168,8 @@ impl<'a> Ui<'a> {
         self.ui.layer = last_layer;
         self.insert_memory(id, state);
         Response {
-            hovered: self.ids.hovered == id,
-            active: self.ids.active == id,
+            hovered: self.is_hovered(id),
+            active: self.is_active(id),
             inner: InputResponse { changed },
             rect,
             id,
