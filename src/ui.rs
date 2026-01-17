@@ -636,7 +636,7 @@ impl ThemeOverride {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LayoutDirection {
+pub enum LayoutDirection {
     TopDown,
     LeftRight,
 }
@@ -855,17 +855,13 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub fn horizontal(&mut self, mut contents: impl FnMut(&mut Self)) {
+    pub fn horizontal(&mut self, contents: impl FnMut(&mut Self)) {
         let id = self.begin_widget();
         let layout = self.ui.layout_dir;
         let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
         self.ui.layout_dir = LayoutDirection::LeftRight;
-        self.ui.id_stack.push(0);
-        ///////////////////////
-        contents(self);
-        ///////////////////////
-        self.ui.id_stack.pop();
+        self.children_content(contents);
         self.ui.layout_dir = layout;
         self.ui.bounds = bounds;
         self.submit_rect_group(id, history_start);
@@ -1151,25 +1147,19 @@ impl<'a> Ui<'a> {
     ) -> Response<()> {
         let id = self.begin_widget();
         let layer = self.ui.layer;
-        let [p_left, p_right, p_top, p_bot] = self
-            .theme
-            .padding
-            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
-        let p_horizontal = p_left + p_right;
-        let p_vertical = p_bot + p_top;
 
         let width = width.as_abolute(self.ui.bounds.width());
         let height = height.as_abolute(self.ui.bounds.height());
 
-        let x = self.ui.bounds.min_x;
-        let y = self.ui.bounds.min_y;
-        self.image_rect(x + p_left, y + p_top, width, height, image, layer);
-        let rect = UiRect {
-            min_x: x,
-            min_y: y,
-            max_x: x + width + p_horizontal,
-            max_y: y + height + p_vertical,
-        };
+        let rect = layout_rect(RectLayoutDescriptor {
+            width,
+            height,
+            padding: Some(self.theme.padding),
+            dir: self.ui.layout_dir,
+            bounds: self.ui.bounds,
+        });
+
+        self.image_rect(rect.min_x, rect.min_y, width, height, image, layer);
         self.submit_rect(id, rect);
 
         Response {
@@ -1187,17 +1177,12 @@ impl<'a> Ui<'a> {
         let label = label.into();
 
         // shape the text
+        // shape it at the origin and translate later, when the full rect is layouted
         let mut w = 0;
         let mut h = 0;
-        let x = self.ui.bounds.min_x;
-        let y = self.ui.bounds.min_y;
-        let [p_left, p_right, p_top, p_bot] = self
-            .theme
-            .padding
-            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
-        let [x, y] = [x + p_left, y + p_top];
-        let mut text_y = y;
+        let mut text_y = 0;
         let mut line_height = 0;
+        let text_rects = self.ui.text_rects.len();
         for line in label.split('\n') {
             if line.is_empty() {
                 text_y += line_height;
@@ -1212,7 +1197,7 @@ impl<'a> Ui<'a> {
             h += line_height;
 
             self.text_rect(
-                x,
+                0,
                 text_y,
                 line_width,
                 line_height,
@@ -1222,13 +1207,32 @@ impl<'a> Ui<'a> {
             );
             text_y += line_height;
         }
-        let rect = UiRect {
-            min_x: x,
-            min_y: y,
-            max_x: x + w + p_right,
-            max_y: y + h + p_bot,
-        };
+
+        let text_padding = self.theme().text_padding as i32;
+
+        let rect = layout_rect(RectLayoutDescriptor {
+            padding: Some(self.theme.padding),
+            width: w + 2 * text_padding,
+            height: h + 2 * text_padding,
+            dir: self.ui.layout_dir,
+            bounds: self.ui.bounds,
+        });
+
         self.submit_rect(id, rect);
+
+        let offset = layout_rect(RectLayoutDescriptor {
+            padding: Some(Padding::splat(text_padding)),
+            width: w,
+            height: h,
+            dir: self.ui.layout_dir,
+            bounds: rect,
+        });
+
+        for r in &mut self.ui.text_rects[text_rects..] {
+            r.x += offset.min_x;
+            r.y += offset.min_y;
+        }
+
         Response {
             id,
             hovered: self.ids.hovered == id,
@@ -1299,28 +1303,27 @@ impl<'a> Ui<'a> {
             // shape the text
             let mut w = 0;
             let mut h = 0;
-            let x = this.ui.bounds.min_x;
-            let y = this.ui.bounds.min_y;
-            let text_padding = this.theme.text_padding as i32;
-            let mut text_y = y + text_padding;
+            let mut text_y = 0;
             let text_color = this
                 .theme
                 .button_text_color
                 .unwrap_or(this.theme.primary_color);
+
+            let text_rect_idx = this.ui.text_rects.len();
+
             for line in label.split('\n').filter(|l| !l.is_empty()) {
                 let (handle, e) =
                     this.shape_and_draw_line(line.to_owned(), this.theme.font_size as u32);
                 let pic = &e.texture;
                 let line_width = pic.width() as i32;
                 let line_height = pic.height() as i32;
-                w = w.max(line_width);
                 h += line_height + 1;
 
                 let mut delta = 0;
                 if !active {
                     // add a shadow
                     this.text_rect(
-                        x + text_padding,
+                        0,
                         text_y + 1,
                         line_width,
                         line_height,
@@ -1333,8 +1336,9 @@ impl<'a> Ui<'a> {
                     // so it appears to have lowered
                     delta = 1
                 }
+                w = w.max(line_width + delta);
                 this.text_rect(
-                    x + text_padding + delta,
+                    delta,
                     text_y + delta,
                     line_width,
                     line_height,
@@ -1342,20 +1346,44 @@ impl<'a> Ui<'a> {
                     layer + 2,
                     handle,
                 );
-                text_y += line_height + text_padding;
+                text_y += line_height;
             }
             // background
-            let w = w + 2 * text_padding;
-            let h = h + 2 * text_padding;
-            this.theme_rect(x, y, w, h, layer, bg_color);
+            let text_padding = this.theme().text_padding as i32;
 
-            let rect = UiRect {
-                min_x: x,
-                min_y: y,
-                max_x: x + w,
-                max_y: y + h,
-            };
+            let rect = layout_rect(RectLayoutDescriptor {
+                padding: Some(this.theme.padding),
+                width: w + 2 * text_padding,
+                height: h + 2 * text_padding,
+                dir: this.ui.layout_dir,
+                bounds: this.ui.bounds,
+            });
+
             this.submit_rect(id, rect);
+
+            this.theme_rect(
+                rect.min_x,
+                rect.min_y,
+                rect.width(),
+                rect.height(),
+                layer,
+                bg_color,
+            );
+
+            let offset = layout_rect(RectLayoutDescriptor {
+                padding: Some(Padding::splat(text_padding)),
+                width: w,
+                height: h,
+                // TODO: Use center layout
+                dir: LayoutDirection::LeftRight,
+                bounds: rect,
+            });
+
+            for r in &mut this.ui.text_rects[text_rect_idx..] {
+                r.x += offset.min_x;
+                r.y += offset.min_y;
+            }
+
             ButtonResponse {
                 id,
                 hovered: this.is_hovered(id),
@@ -1597,10 +1625,13 @@ impl<'a> Ui<'a> {
         self.insert_memory(id, state);
 
         let old_bounds = self.ui.bounds;
-        let mut scissor_bounds = old_bounds;
-        scissor_bounds.resize_w(width);
-        scissor_bounds.resize_h(height);
-        let scissor_bounds = scissor_bounds;
+        let scissor_bounds = layout_rect(RectLayoutDescriptor {
+            width,
+            height,
+            padding: Some(self.theme.padding),
+            dir: self.ui.layout_dir,
+            bounds: old_bounds,
+        });
 
         let mut bounds = scissor_bounds;
         bounds.offset_x(-offset_x as i32);
@@ -1837,9 +1868,7 @@ impl<'a> Ui<'a> {
     pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self, DropState)) -> DropResponse {
         let id = self.begin_widget();
         let old_bounds = self.ui.bounds;
-        let og_layer = self.push_layer();
         let bg_layer = self.push_layer();
-        self.ui.id_stack.push(0);
         let mut state = DropState::default();
         state.id = id;
         state.dragged = self.ids.dragged;
@@ -1861,10 +1890,10 @@ impl<'a> Ui<'a> {
 
         let history_start = self.ui.rect_history.len();
         ///////////////////////
-        contents(self, state);
+        self.children_content(|ui| {
+            contents(ui, state);
+        });
         ///////////////////////
-        self.ui.layer = og_layer;
-        self.ui.id_stack.pop();
         self.ui.bounds = old_bounds;
 
         let content_bounds = self.history_bounding_rect(history_start);
@@ -2156,7 +2185,7 @@ impl<'a> Ui<'a> {
             outline_color,
             outline_radius,
         }: OutlineDescriptor,
-        mut content: impl FnMut(&mut Self),
+        content: impl FnMut(&mut Self),
     ) {
         let id = self.begin_widget();
         let last_layer = self.push_layer();
@@ -2172,7 +2201,7 @@ impl<'a> Ui<'a> {
         self.ui.bounds.min_x += p_left + r;
         self.ui.bounds.min_y += p_top + r;
         //////////////////
-        content(self);
+        self.children_content(content);
         //////////////////
 
         let mut rect = self.history_bounding_rect(history_start);
@@ -2552,6 +2581,40 @@ impl<'a> Ui<'a> {
 
         self.insert_memory(id, state);
     }
+}
+
+fn layout_rect(desc: RectLayoutDescriptor) -> UiRect {
+    let base = desc.bounds;
+    let mut rect = UiRect {
+        min_x: base.min_x,
+        min_y: base.min_y,
+        max_x: base.min_x + desc.width,
+        max_y: base.min_y + desc.height,
+    };
+    let [p_left, p_right, p_top, p_bot] = desc
+        .padding
+        .map(|p| p.as_abs(base.width(), base.height()))
+        .unwrap_or_default();
+    match desc.dir {
+        LayoutDirection::TopDown => {
+            rect.min_y = base.min_y + p_top;
+            rect.max_y = (rect.min_y + desc.height).min(base.max_y - p_bot)
+        }
+        LayoutDirection::LeftRight => {
+            rect.min_x = base.min_x + p_left;
+            rect.max_x = (rect.min_x + desc.width).min(base.max_x - p_right)
+        }
+    }
+
+    rect
+}
+
+pub struct RectLayoutDescriptor {
+    pub width: i32,
+    pub height: i32,
+    pub padding: Option<Padding>,
+    pub dir: LayoutDirection,
+    pub bounds: UiRect,
 }
 
 pub struct TooltipDescriptor<'a> {
