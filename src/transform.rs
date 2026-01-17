@@ -82,6 +82,18 @@ impl std::ops::Deref for Children {
 #[derive(Default, Debug, Clone, Copy)]
 pub struct GlobalTransform(pub Transform);
 
+impl AsRef<Transform> for GlobalTransform {
+    fn as_ref(&self) -> &Transform {
+        &self.0
+    }
+}
+
+impl AsMut<Transform> for GlobalTransform {
+    fn as_mut(&mut self) -> &mut Transform {
+        &mut self.0
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Transform {
     pub pos: Vec3,
