@@ -985,12 +985,6 @@ impl<'a> Ui<'a> {
         color: Color,
         layer: u16,
     ) {
-        self.ui.rect_history.push(UiRect {
-            min_x: x,
-            min_y: y,
-            max_x: x + width,
-            max_y: y + height,
-        });
         assert!(!self.ui.scissors.is_empty());
         let scissor = self.ui.scissor_idx;
         self.ui.color_rects.push(DrawColorRect {
@@ -1016,12 +1010,6 @@ impl<'a> Ui<'a> {
         outline_color: Color,
         layer: u16,
     ) {
-        self.ui.rect_history.push(UiRect {
-            min_x: x,
-            min_y: y,
-            max_x: x + width,
-            max_y: y + height,
-        });
         assert!(!self.ui.scissors.is_empty());
         let scissor = self.ui.scissor_idx;
         self.ui.color_rects.push(DrawColorRect {
@@ -1047,12 +1035,6 @@ impl<'a> Ui<'a> {
         image: Handle<DynamicImage>,
         layer: u16,
     ) {
-        self.ui.rect_history.push(UiRect {
-            min_x: x,
-            min_y: y,
-            max_x: x + width,
-            max_y: y + height,
-        });
         assert!(!self.ui.scissors.is_empty());
         let scissor = self.ui.scissor_idx;
         self.ui.texture_rects.push(DrawTextureRect {
@@ -1076,12 +1058,6 @@ impl<'a> Ui<'a> {
         layer: u16,
         shaping: Handle<ShapingResult>,
     ) {
-        self.ui.rect_history.push(UiRect {
-            min_x: x,
-            min_y: y,
-            max_x: x + width,
-            max_y: y + height,
-        });
         assert!(!self.ui.scissors.is_empty());
         let scissor = self.ui.scissor_idx;
         self.ui.text_rects.push(DrawTextRect {
@@ -1273,6 +1249,7 @@ impl<'a> Ui<'a> {
             }
         }
         self.ui.bounding_boxes.insert(id, rect);
+        self.ui.rect_history.push(rect);
     }
 
     pub fn begin_widget(&mut self) -> UiId {
@@ -1713,7 +1690,6 @@ impl<'a> Ui<'a> {
 
         let id = self.begin_widget();
         self.submit_rect(id, bounds);
-        self.ui.rect_history.push(bounds);
         Response {
             id,
             hovered: self.is_hovered(id),
@@ -1815,10 +1791,8 @@ impl<'a> Ui<'a> {
 
         if is_being_dragged {
             self.color_rect_from_rect(content_bounds, self.theme.primary_color, layer);
-            self.ui.rect_history.pop();
             content_bounds.move_to_x(state.drag_anchor.x + state.size.x / 2);
             content_bounds.move_to_y(state.drag_anchor.y + state.size.y / 2);
-            self.ui.rect_history.push(content_bounds);
         } else {
             self.ui.rect_history.extend_from_slice(&child_history);
             state.drag_anchor = IVec2::new(content_bounds.min_x, content_bounds.min_y);
@@ -1912,7 +1886,6 @@ impl<'a> Ui<'a> {
                 .unwrap_or(&self.theme.drop_target_default)
                 .clone(),
         );
-        self.ui.rect_history.pop();
 
         DropResponse {
             dropped: state.dropped,
@@ -2327,10 +2300,6 @@ impl<'a> Ui<'a> {
                 self.theme.context_background.clone(),
             );
 
-            self.ui
-                .rect_history
-                .resize_with(history_start, || unreachable!());
-
             if !self.mouse.pressed.is_empty() && !self.contains_mouse(id) {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("Closing context menu over {parent_id:?}");
@@ -2529,7 +2498,6 @@ impl<'a> Ui<'a> {
         let bounds = self.ui.scissors[0];
         let old_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
         let old_scissor = std::mem::replace(&mut self.ui.scissor_idx, 0);
-        let history = self.ui.rect_history.len();
         let old_layer = std::mem::replace(&mut self.ui.layer, CONTEXT_LAYER);
 
         self.ui.bounds.min_x = desc.x;
@@ -2553,7 +2521,6 @@ impl<'a> Ui<'a> {
 
         self.ui.bounds = old_bounds;
         self.ui.scissor_idx = old_scissor;
-        self.ui.rect_history.resize_with(history, || unreachable!());
         self.ui.layer = old_layer;
     }
 
