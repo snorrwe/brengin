@@ -1,5 +1,5 @@
 use cecs::prelude::*;
-use glam::{Mat4, Vec3, Vec4};
+use glam::{IVec2, Mat4, Vec3, Vec4};
 
 use crate::{
     renderer::{ExtractionPlugin, GraphicsState, WindowSize},
@@ -10,6 +10,12 @@ use crate::{
 #[derive(Default)]
 pub struct ViewFrustum {
     pub planes: [Vec4; 6],
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CameraSize {
+    pub width: u32,
+    pub height: u32,
 }
 
 pub struct PerspectiveCamera {
@@ -42,12 +48,14 @@ pub struct WindowCamera;
 
 fn update_camera_aspect(
     gs: Res<WindowSize>,
-    mut q: Query<&mut PerspectiveCamera, With<WindowCamera>>,
+    mut q: Query<(&mut PerspectiveCamera, &mut CameraSize), With<WindowCamera>>,
 ) {
     let size = *gs;
     let aspect = size.width as f32 / size.height as f32;
-    for cam in q.iter_mut() {
+    for (cam, size) in q.iter_mut() {
         cam.aspect = aspect;
+        size.width = gs.width;
+        size.height = gs.height;
     }
 }
 
@@ -217,5 +225,10 @@ impl Plugin for CameraPlugin {
 }
 
 pub fn camera_bundle(camera: PerspectiveCamera) -> impl cecs::bundle::Bundle {
-    (camera, CameraUniform::default(), ViewFrustum::default())
+    (
+        camera,
+        CameraUniform::default(),
+        ViewFrustum::default(),
+        CameraSize::default(),
+    )
 }
