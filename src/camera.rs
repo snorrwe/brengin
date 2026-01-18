@@ -31,9 +31,9 @@ pub struct PerspectiveCamera {
 impl Default for PerspectiveCamera {
     fn default() -> Self {
         PerspectiveCamera {
-            eye: Vec3::new(0.0, 0.0, 100.0),
+            eye: Vec3::Z * -100.0,
             target: Vec3::ZERO,
-            up: Vec3::Y,
+            up: Vec3::NEG_Y,
             aspect: 16.0 / 9.0,
             fovy: std::f32::consts::TAU / 6.0,
             znear: 5.0,
@@ -61,8 +61,8 @@ fn update_camera_aspect(
 
 impl PerspectiveCamera {
     pub fn view_projection(&self) -> Mat4 {
-        let view = Mat4::look_at_lh(self.eye, self.target, self.up);
-        let proj = Mat4::perspective_lh(self.fovy, self.aspect, self.znear, self.zfar);
+        let view = Mat4::look_at_rh(self.eye, self.target, self.up);
+        let proj = Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar);
 
         proj * view
     }
