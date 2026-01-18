@@ -1841,12 +1841,15 @@ impl<'a> Ui<'a> {
             .theme
             .padding
             .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
-        self.ui.bounds = UiRect {
-            min_x: state.pos.x + p_left,
-            min_y: state.pos.y + p_top,
-            max_x: state.pos.x + state.size.x - p_right,
-            max_y: state.pos.y + state.size.y - p_bot,
-        };
+        self.ui.bounds = layout_rect(RectLayoutDescriptor {
+            width: state.size.x,
+            height: state.size.y,
+            padding: Some(self.theme.padding),
+            dir: self.ui.layout_dir,
+            bounds: self.ui.bounds,
+        });
+        self.ui.bounds.move_to_x(state.pos.x + state.size.x / 2);
+        self.ui.bounds.move_to_y(state.pos.y + state.size.y / 2);
         let last_scissor = self.ui.scissor_idx;
         let layer = self.ui.layer;
         if is_being_dragged {
@@ -2526,12 +2529,13 @@ impl<'a> Ui<'a> {
         self.ui.bounds.min_y += top;
         self.ui.bounds.max_y -= bottom;
 
-        let UiRect {
-            min_x,
-            min_y,
-            max_x,
-            max_y,
-        } = self.ui.bounds;
+        self.ui.bounds = layout_rect(RectLayoutDescriptor {
+            width: self.ui.bounds.width(),
+            height: self.ui.bounds.height(),
+            padding: Some(m),
+            dir: self.ui.layout_dir,
+            bounds,
+        });
 
         let history_start = self.ui.rect_history.len();
 
@@ -2539,12 +2543,8 @@ impl<'a> Ui<'a> {
 
         self.ui.bounds = bounds;
 
-        let mut bounds = self.history_bounding_rect(history_start);
-        bounds.min_x = min_x.max(bounds.min_x - left).min(bounds.max_x);
-        bounds.min_y = min_y.max(bounds.min_y - top).min(bounds.max_y);
-        bounds.max_x = max_x.min(bounds.max_x + right).max(bounds.min_x);
-        bounds.max_y = max_y.min(bounds.max_y + bottom).max(bounds.min_y);
-        self.submit_rect(id, bounds, self.theme.padding);
+        let bounds = self.history_bounding_rect(history_start);
+        self.submit_rect(id, bounds, m);
     }
 
     /// Add background to the widget. If background is None, then the Theme background is used
