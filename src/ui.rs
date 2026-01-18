@@ -951,7 +951,7 @@ impl<'a> Ui<'a> {
         self.ui.rect_history[history_start + 1..]
             .iter()
             .for_each(|r| rect = rect.grow_over(*r));
-        self.submit_rect(id, rect);
+        self.submit_rect(id, rect, self.theme.padding);
         rect
     }
 
@@ -1203,7 +1203,7 @@ impl<'a> Ui<'a> {
         });
 
         self.image_rect(rect.min_x, rect.min_y, width, height, image, layer);
-        self.submit_rect(id, rect);
+        self.submit_rect(id, rect, self.theme.padding);
 
         Response {
             id,
@@ -1261,7 +1261,7 @@ impl<'a> Ui<'a> {
             bounds: self.ui.bounds,
         });
 
-        self.submit_rect(id, rect);
+        self.submit_rect(id, rect, self.theme.padding);
 
         let offset = layout_rect(RectLayoutDescriptor {
             padding: Some(Padding::splat(text_padding)),
@@ -1286,19 +1286,24 @@ impl<'a> Ui<'a> {
     }
 
     /// When a widget has been completed, submit its bounding rectangle
-    fn submit_rect(&mut self, id: UiId, rect: UiRect) {
+    fn submit_rect(&mut self, id: UiId, rect: UiRect, padding: impl Into<Option<Padding>>) {
+        let [p_left, p_right, p_top, p_bot] = padding
+            .into()
+            .map(|p| p.as_abs(self.ui.bounds.width(), self.ui.bounds.height()))
+            .unwrap_or_default();
+
         match self.ui.layout_dir {
             LayoutDirection::TopDown(_) => {
-                self.ui.bounds.min_y = rect.max_y;
+                self.ui.bounds.min_y = rect.max_y + p_bot;
             }
             LayoutDirection::LeftRight(_) => {
-                self.ui.bounds.min_x = rect.max_x;
+                self.ui.bounds.min_x = rect.max_x + p_right;
             }
             LayoutDirection::BottomUp(_) => {
-                self.ui.bounds.max_y = rect.min_y;
+                self.ui.bounds.max_y = rect.min_y - p_top;
             }
             LayoutDirection::RightLeft(_) => {
-                self.ui.bounds.max_x = rect.min_x;
+                self.ui.bounds.max_x = rect.min_x - p_left;
             }
             LayoutDirection::Center => { /*noop*/ }
         }
@@ -1409,7 +1414,7 @@ impl<'a> Ui<'a> {
                 bounds: this.ui.bounds,
             });
 
-            this.submit_rect(id, rect);
+            this.submit_rect(id, rect, this.theme.padding);
 
             this.theme_rect(
                 rect.min_x,
@@ -1752,7 +1757,7 @@ impl<'a> Ui<'a> {
         self.ui.id_stack.pop();
         self.insert_memory(id, state);
         self.ui.bounds = old_bounds;
-        self.submit_rect(id, scissor_bounds);
+        self.submit_rect(id, scissor_bounds, self.theme.padding);
 
         self.ui.layer = layer;
         self.ui.scissor_idx = scissor_idx;
@@ -1769,7 +1774,7 @@ impl<'a> Ui<'a> {
         // TODO: layout
 
         let id = self.begin_widget();
-        self.submit_rect(id, bounds);
+        self.submit_rect(id, bounds, self.theme.padding);
         Response {
             id,
             hovered: self.is_hovered(id),
@@ -1884,7 +1889,7 @@ impl<'a> Ui<'a> {
         content_bounds.max_x += p_right + p_left;
         content_bounds.min_y -= p_top;
         content_bounds.max_y += p_bot + p_top;
-        self.submit_rect(id, content_bounds);
+        self.submit_rect(id, content_bounds, self.theme.padding);
         state.size = IVec2::new(content_bounds.width(), content_bounds.height());
 
         self.insert_memory(id, state);
@@ -1946,7 +1951,7 @@ impl<'a> Ui<'a> {
         self.ui.bounds = old_bounds;
 
         let content_bounds = self.history_bounding_rect(history_start);
-        self.submit_rect(id, content_bounds);
+        self.submit_rect(id, content_bounds, self.theme.padding);
 
         let background;
         if state.hovered {
@@ -2215,7 +2220,7 @@ impl<'a> Ui<'a> {
         rect.min_y -= p_top;
         rect.max_x += p_right;
         rect.max_y += p_bot;
-        self.submit_rect(id, rect);
+        self.submit_rect(id, rect, self.theme.padding);
         self.ui.layer = last_layer;
         self.insert_memory(id, state);
         Response {
@@ -2268,7 +2273,7 @@ impl<'a> Ui<'a> {
             outline_radius,
         );
 
-        self.submit_rect(id, rect);
+        self.submit_rect(id, rect, self.theme.padding);
         self.ui.layer = last_layer;
     }
 
@@ -2354,7 +2359,7 @@ impl<'a> Ui<'a> {
                 context_bounds.max_x + p_right + outline_size,
                 context_bounds.max_y + p_bot + outline_size,
             );
-            self.submit_rect(id, bounds);
+            self.submit_rect(id, bounds, self.theme.padding);
             if self.contains_mouse(id) {
                 self.next_ids
                     .push(id, CONTEXT_LAYER)
@@ -2506,7 +2511,7 @@ impl<'a> Ui<'a> {
         self.ui.bounds = bounds;
 
         let bounds = self.history_bounding_rect(history_start);
-        self.submit_rect(id, bounds);
+        self.submit_rect(id, bounds, self.theme.padding);
     }
 
     /// Add a margin around the inner contents
@@ -2539,7 +2544,7 @@ impl<'a> Ui<'a> {
         bounds.min_y = min_y.max(bounds.min_y - top).min(bounds.max_y);
         bounds.max_x = max_x.min(bounds.max_x + right).max(bounds.min_x);
         bounds.max_y = max_y.min(bounds.max_y + bottom).max(bounds.min_y);
-        self.submit_rect(id, bounds);
+        self.submit_rect(id, bounds, self.theme.padding);
     }
 
     /// Add background to the widget. If background is None, then the Theme background is used
@@ -2561,7 +2566,7 @@ impl<'a> Ui<'a> {
             layer,
             background.unwrap_or_else(|| self.theme.background.clone()),
         );
-        self.submit_rect(id, bounds);
+        self.submit_rect(id, bounds, self.theme.padding);
     }
 
     fn children_content(&mut self, mut contents: impl FnMut(&mut Self)) {
@@ -2608,7 +2613,7 @@ impl<'a> Ui<'a> {
         self.children_content(contents);
         let bounds = self.history_bounding_rect(history_start);
 
-        self.submit_rect(id, bounds);
+        self.submit_rect(id, bounds, self.theme.padding);
 
         let mut state = std::mem::take(self.get_memory_or_default::<TooltipState>(id));
 
@@ -3261,7 +3266,8 @@ impl<'a> UiRoot<'a> {
                     self.0.set_active(title_id);
                 }
             }
-            self.0.submit_rect(title_id, title_bounds);
+            self.0
+                .submit_rect(title_id, title_bounds, self.0.theme.padding);
             self.0
                 .color_rect_from_rect(title_bounds, Color::from_rgb(0x00ffff), WINDOW_LAYER);
         }
