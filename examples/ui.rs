@@ -317,6 +317,22 @@ fn layout_ui(mut ctx: UiRoot) {
             });
         },
     );
+    ctx.panel(
+        brengin::ui::PanelDescriptor {
+            width: 300.into(),
+            height: 300.into(),
+            horizonal: HorizontalAlignment::Center,
+            vertical: VerticalAlignment::Center,
+        },
+        |ui| {
+            ui.vertical_rev(HorizontalAlignment::Center, |ui| {
+                for _ in 0..2 {
+                    ui.label("bottom center");
+                    ui.button("bottom center");
+                }
+            });
+        },
+    );
 }
 
 fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormState>) {

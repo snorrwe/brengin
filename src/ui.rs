@@ -637,6 +637,7 @@ impl ThemeOverride {
 
 #[derive(Debug, Clone, Copy)]
 pub enum LayoutDirection {
+    Center,
     TopDown(HorizontalAlignment),
     BottomUp(HorizontalAlignment),
     LeftRight(VerticalAlignment),
@@ -1299,6 +1300,7 @@ impl<'a> Ui<'a> {
             LayoutDirection::RightLeft(_) => {
                 self.ui.bounds.max_x = rect.min_x;
             }
+            LayoutDirection::Center => { /*noop*/ }
         }
         self.ui.bounding_boxes.insert(id, rect);
         self.ui.rect_history.push(rect);
@@ -2663,6 +2665,10 @@ fn layout_rect(desc: RectLayoutDescriptor) -> UiRect {
             rect.max_x = bounds.max_x - p_right;
             rect.min_x = (rect.max_x - desc.width).max(bounds.min_x + p_left);
             rect = aling_vertical(ver, rect, bounds);
+        }
+        LayoutDirection::Center => {
+            rect = aling_vertical(VerticalAlignment::Center, rect, bounds);
+            rect = aling_horizontal(HorizontalAlignment::Center, rect, bounds);
         }
     }
 
