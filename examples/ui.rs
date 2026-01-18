@@ -94,7 +94,7 @@ fn back(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
             vertical: VerticalAlignment::Top,
         },
         |ui| {
-            ui.horizontal_rev(|ui| {
+            ui.horizontal_rev(None, |ui| {
                 if ui.button("Back").inner.pressed {
                     *state = MenuState::Main;
                 }
@@ -113,22 +113,24 @@ fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>, cr: Res<CloseRequest>) {
             vertical: VerticalAlignment::Center,
         },
         |ui| {
-            ui.label("Choose example");
-            if ui.button("Drag and drop").inner.pressed {
-                *state = MenuState::DragNDrop;
-            }
-            if ui.button("Buttons").inner.pressed {
-                *state = MenuState::Buttons;
-            }
-            if ui.button("ImageGrid").inner.pressed {
-                *state = MenuState::ImageGrid;
-            }
-            if ui.button("Layout").inner.pressed {
-                *state = MenuState::Layout;
-            }
-            if ui.button("Exit").inner.pressed {
-                cr.request_close();
-            }
+            ui.vertical(HorizontalAlignment::Center, |ui| {
+                ui.label("Choose example");
+                if ui.button("Drag and drop").inner.pressed {
+                    *state = MenuState::DragNDrop;
+                }
+                if ui.button("Buttons").inner.pressed {
+                    *state = MenuState::Buttons;
+                }
+                if ui.button("ImageGrid").inner.pressed {
+                    *state = MenuState::ImageGrid;
+                }
+                if ui.button("Layout").inner.pressed {
+                    *state = MenuState::Layout;
+                }
+                if ui.button("Exit").inner.pressed {
+                    cr.request_close();
+                }
+            });
         },
     );
 }
@@ -275,7 +277,7 @@ fn layout_ui(mut ctx: UiRoot) {
             vertical: VerticalAlignment::Top,
         },
         |ui| {
-            ui.vertical(|ui| {
+            ui.vertical(None, |ui| {
                 for _ in 0..2 {
                     ui.label("top left");
                     ui.button("top left");
@@ -291,10 +293,26 @@ fn layout_ui(mut ctx: UiRoot) {
             vertical: VerticalAlignment::Bottom,
         },
         |ui| {
-            ui.vertical_rev(|ui| {
+            ui.vertical_rev(None, |ui| {
                 for _ in 0..2 {
                     ui.label("bottom left");
                     ui.button("bottom left");
+                }
+            });
+        },
+    );
+    ctx.panel(
+        brengin::ui::PanelDescriptor {
+            width: 300.into(),
+            height: 300.into(),
+            horizonal: HorizontalAlignment::Right,
+            vertical: VerticalAlignment::Bottom,
+        },
+        |ui| {
+            ui.vertical_rev(HorizontalAlignment::Right, |ui| {
+                for _ in 0..2 {
+                    ui.label("bottom right");
+                    ui.button("bottom right");
                 }
             });
         },
@@ -350,20 +368,20 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
                     ui.label("My panel is centered!!");
                 },
             );
-            ui.horizontal(|ui| {
+            ui.horizontal(None, |ui| {
                 ui.label("Selected: ");
-                ui.vertical(|ui| {
+                ui.vertical(None, |ui| {
                     ui.label("This right here");
                     ui.label("|");
                     ui.label("|");
                     ui.label("v");
                     ui.label(&label.0);
 
-                    ui.horizontal(|ui| {
+                    ui.horizontal(None, |ui| {
                         ui.label("username: ");
                         ui.input_string(&mut form.data);
                     });
-                    ui.horizontal(|ui| {
+                    ui.horizontal(None, |ui| {
                         ui.label("password: ");
                         ui.input_password(&mut form.pw);
                     });
@@ -375,7 +393,7 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
                     ui.open_context_menu(resp.id, None);
                 }
                 resp.context_menu(ui, |ui, s| {
-                    ui.vertical(|ui| {
+                    ui.vertical(None, |ui| {
                         ui.label("hello");
                         if ui.button("close").inner.pressed {
                             s.open = false;

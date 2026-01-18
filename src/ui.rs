@@ -561,7 +561,7 @@ impl UiState {
             bounding_boxes: Default::default(),
             rect_history: Default::default(),
             root_hash: 0,
-            layout_dir: LayoutDirection::TopDown,
+            layout_dir: LayoutDirection::TopDown(HorizontalAlignment::Left),
             windows: Default::default(),
             fallback_font: text::parse_font(
                 include_bytes!("./ui/Roboto-Regular.ttf")
@@ -635,12 +635,12 @@ impl ThemeOverride {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub enum LayoutDirection {
-    TopDown,
-    BottomUp,
-    LeftRight,
-    RightLeft,
+    TopDown(HorizontalAlignment),
+    BottomUp(HorizontalAlignment),
+    LeftRight(VerticalAlignment),
+    RightLeft(VerticalAlignment),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -857,20 +857,56 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub fn horizontal(&mut self, contents: impl FnMut(&mut Self)) {
-        self.__with_layout(contents, LayoutDirection::LeftRight);
+    pub fn horizontal(
+        &mut self,
+        vertical_alignment: impl Into<Option<VerticalAlignment>>,
+        contents: impl FnMut(&mut Self),
+    ) {
+        self.__with_layout(
+            contents,
+            LayoutDirection::LeftRight(vertical_alignment.into().unwrap_or(VerticalAlignment::Top)),
+        );
     }
 
-    pub fn horizontal_rev(&mut self, contents: impl FnMut(&mut Self)) {
-        self.__with_layout(contents, LayoutDirection::RightLeft);
+    pub fn horizontal_rev(
+        &mut self,
+        vertical_alignment: impl Into<Option<VerticalAlignment>>,
+        contents: impl FnMut(&mut Self),
+    ) {
+        self.__with_layout(
+            contents,
+            LayoutDirection::RightLeft(vertical_alignment.into().unwrap_or(VerticalAlignment::Top)),
+        );
     }
 
-    pub fn vertical(&mut self, contents: impl FnMut(&mut Self)) {
-        self.__with_layout(contents, LayoutDirection::TopDown);
+    pub fn vertical(
+        &mut self,
+        horizontal_alignment: impl Into<Option<HorizontalAlignment>>,
+        contents: impl FnMut(&mut Self),
+    ) {
+        self.__with_layout(
+            contents,
+            LayoutDirection::TopDown(
+                horizontal_alignment
+                    .into()
+                    .unwrap_or(HorizontalAlignment::Left),
+            ),
+        );
     }
 
-    pub fn vertical_rev(&mut self, contents: impl FnMut(&mut Self)) {
-        self.__with_layout(contents, LayoutDirection::BottomUp);
+    pub fn vertical_rev(
+        &mut self,
+        horizontal_alignment: impl Into<Option<HorizontalAlignment>>,
+        contents: impl FnMut(&mut Self),
+    ) {
+        self.__with_layout(
+            contents,
+            LayoutDirection::BottomUp(
+                horizontal_alignment
+                    .into()
+                    .unwrap_or(HorizontalAlignment::Left),
+            ),
+        );
     }
 
     fn __with_layout(&mut self, contents: impl FnMut(&mut Self), layout: LayoutDirection) {
@@ -1251,16 +1287,16 @@ impl<'a> Ui<'a> {
     /// When a widget has been completed, submit its bounding rectangle
     fn submit_rect(&mut self, id: UiId, rect: UiRect) {
         match self.ui.layout_dir {
-            LayoutDirection::TopDown => {
+            LayoutDirection::TopDown(_) => {
                 self.ui.bounds.min_y = rect.max_y;
             }
-            LayoutDirection::LeftRight => {
+            LayoutDirection::LeftRight(_) => {
                 self.ui.bounds.min_x = rect.max_x;
             }
-            LayoutDirection::BottomUp => {
+            LayoutDirection::BottomUp(_) => {
                 self.ui.bounds.max_y = rect.min_y;
             }
-            LayoutDirection::RightLeft => {
+            LayoutDirection::RightLeft(_) => {
                 self.ui.bounds.max_x = rect.min_x;
             }
         }
@@ -1386,8 +1422,7 @@ impl<'a> Ui<'a> {
                 padding: Some(Padding::splat(text_padding)),
                 width: w,
                 height: h,
-                // TODO: Use center layout
-                dir: LayoutDirection::LeftRight,
+                dir: LayoutDirection::TopDown(HorizontalAlignment::Center),
                 bounds: rect,
             });
 
@@ -2596,36 +2631,61 @@ impl<'a> Ui<'a> {
 }
 
 fn layout_rect(desc: RectLayoutDescriptor) -> UiRect {
-    let base = desc.bounds;
+    let bounds = desc.bounds;
     let mut rect = UiRect {
-        min_x: base.min_x,
-        min_y: base.min_y,
-        max_x: base.min_x + desc.width,
-        max_y: base.min_y + desc.height,
+        min_x: bounds.min_x,
+        min_y: bounds.min_y,
+        max_x: bounds.min_x + desc.width,
+        max_y: bounds.min_y + desc.height,
     };
     let [p_left, p_right, p_top, p_bot] = desc
         .padding
-        .map(|p| p.as_abs(base.width(), base.height()))
+        .map(|p| p.as_abs(bounds.width(), bounds.height()))
         .unwrap_or_default();
+
     match desc.dir {
-        LayoutDirection::TopDown => {
-            rect.min_y = base.min_y + p_top;
-            rect.max_y = (rect.min_y + desc.height).min(base.max_y - p_bot)
+        LayoutDirection::TopDown(hor) => {
+            rect.min_y = bounds.min_y + p_top;
+            rect.max_y = (rect.min_y + desc.height).min(bounds.max_y - p_bot);
+            rect = aling_horizontal(hor, rect, bounds);
         }
-        LayoutDirection::LeftRight => {
-            rect.min_x = base.min_x + p_left;
-            rect.max_x = (rect.min_x + desc.width).min(base.max_x - p_right)
+        LayoutDirection::BottomUp(hor) => {
+            rect.max_y = bounds.max_y - p_bot;
+            rect.min_y = (rect.max_y - desc.height).max(bounds.min_y + p_top);
+            rect = aling_horizontal(hor, rect, bounds);
         }
-        LayoutDirection::BottomUp => {
-            rect.max_y = base.max_y - p_bot;
-            rect.min_y = (rect.max_y - desc.height).max(base.min_y + p_top)
+        LayoutDirection::LeftRight(ver) => {
+            rect.min_x = bounds.min_x + p_left;
+            rect.max_x = (rect.min_x + desc.width).min(bounds.max_x - p_right);
+            rect = aling_vertical(ver, rect, bounds);
         }
-        LayoutDirection::RightLeft => {
-            rect.max_x = base.max_x - p_right;
-            rect.min_x = (rect.max_x - desc.width).max(base.min_x + p_left)
+        LayoutDirection::RightLeft(ver) => {
+            rect.max_x = bounds.max_x - p_right;
+            rect.min_x = (rect.max_x - desc.width).max(bounds.min_x + p_left);
+            rect = aling_vertical(ver, rect, bounds);
         }
     }
 
+    rect
+}
+
+fn aling_horizontal(alignment: HorizontalAlignment, mut rect: UiRect, bounds: UiRect) -> UiRect {
+    let delta = match alignment {
+        HorizontalAlignment::Left => bounds.min_x - rect.min_x,
+        HorizontalAlignment::Right => bounds.max_x - rect.max_x,
+        HorizontalAlignment::Center => bounds.center_x() - rect.center_x(),
+    };
+    rect.offset_x(delta);
+    rect
+}
+
+fn aling_vertical(alignment: VerticalAlignment, mut rect: UiRect, bounds: UiRect) -> UiRect {
+    let delta = match alignment {
+        VerticalAlignment::Top => bounds.min_y - rect.min_y,
+        VerticalAlignment::Center => bounds.max_y - rect.max_y,
+        VerticalAlignment::Bottom => bounds.center_y() - rect.center_y(),
+    };
+    rect.offset_y(delta);
     rect
 }
 
@@ -2911,7 +2971,7 @@ fn begin_frame(
     window_size: Res<crate::renderer::WindowSize>,
     mut inputs: ResMut<UiInputs>,
 ) {
-    ui.layout_dir = LayoutDirection::TopDown;
+    ui.layout_dir = LayoutDirection::TopDown(HorizontalAlignment::Left);
     ui.root_hash = 0;
     ui.rect_history.clear();
     ui.color_rects.clear();
