@@ -640,6 +640,7 @@ pub enum LayoutDirection {
     TopDown,
     BottomUp,
     LeftRight,
+    RightLeft,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -858,6 +859,10 @@ impl<'a> Ui<'a> {
 
     pub fn horizontal(&mut self, contents: impl FnMut(&mut Self)) {
         self.__with_layout(contents, LayoutDirection::LeftRight);
+    }
+
+    pub fn horizontal_rev(&mut self, contents: impl FnMut(&mut Self)) {
+        self.__with_layout(contents, LayoutDirection::RightLeft);
     }
 
     pub fn vertical(&mut self, contents: impl FnMut(&mut Self)) {
@@ -1254,6 +1259,9 @@ impl<'a> Ui<'a> {
             }
             LayoutDirection::BottomUp => {
                 self.ui.bounds.max_y = rect.min_y;
+            }
+            LayoutDirection::RightLeft => {
+                self.ui.bounds.max_x = rect.min_x;
             }
         }
         self.ui.bounding_boxes.insert(id, rect);
@@ -2611,6 +2619,10 @@ fn layout_rect(desc: RectLayoutDescriptor) -> UiRect {
         LayoutDirection::BottomUp => {
             rect.max_y = base.max_y - p_bot;
             rect.min_y = (rect.max_y - desc.height).max(base.min_y + p_top)
+        }
+        LayoutDirection::RightLeft => {
+            rect.max_x = base.max_x - p_right;
+            rect.min_x = (rect.max_x - desc.width).max(base.min_x + p_left)
         }
     }
 

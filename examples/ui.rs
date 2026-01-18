@@ -88,15 +88,17 @@ fn back(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
     };
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoord::Absolute(100),
-            height: UiCoord::Absolute(50),
+            width: UiCoord::Absolute(60),
+            height: UiCoord::Absolute(40),
             horizonal: HorizontalAlignment::Right,
             vertical: VerticalAlignment::Top,
         },
         |ui| {
-            if ui.button("Back").inner.pressed {
-                *state = MenuState::Main;
-            }
+            ui.horizontal_rev(|ui| {
+                if ui.button("Back").inner.pressed {
+                    *state = MenuState::Main;
+                }
+            });
         },
     );
 }
@@ -274,8 +276,9 @@ fn layout_ui(mut ctx: UiRoot) {
         },
         |ui| {
             ui.vertical(|ui| {
-                for i in 0..5 {
+                for _ in 0..2 {
                     ui.label("top left");
+                    ui.button("top left");
                 }
             });
         },
@@ -289,8 +292,9 @@ fn layout_ui(mut ctx: UiRoot) {
         },
         |ui| {
             ui.vertical_rev(|ui| {
-                for i in 0..5 {
+                for _ in 0..2 {
                     ui.label("bottom left");
+                    ui.button("bottom left");
                 }
             });
         },
