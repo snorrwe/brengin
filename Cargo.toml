@@ -32,6 +32,8 @@ crossbeam = { version = "0.8.4", features = ["crossbeam-channel", "nightly"] }
 thiserror = "2.0.17"
 
 [dev-dependencies]
+clap = "4.5.54"
+clap_derive = "4.5.49"
 tracing-subscriber = "0.3.22"
 
 [[example]]

@@ -5,6 +5,7 @@ use brengin::ui::{
 };
 use brengin::{prelude::*, transform, CloseRequest};
 use brengin::{App, DefaultPlugins};
+use clap::Parser;
 use image::DynamicImage;
 
 struct Label(String);
@@ -14,12 +15,19 @@ struct UiState {
     boid: Handle<DynamicImage>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, clap_derive::ValueEnum)]
 enum MenuState {
+    #[default]
     Main,
     DragNDrop,
     Buttons,
     ImageGrid,
+}
+
+#[derive(clap_derive::Parser)]
+struct Args {
+    #[arg(long, short, default_value = "main")]
+    state: MenuState,
 }
 
 fn load_image(mut state: ResMut<UiState>, mut images: ResMut<Assets<DynamicImage>>) {
@@ -396,10 +404,10 @@ fn setup(mut cmd: Commands) {
         .insert_bundle(transform_bundle(transform::Transform::default()));
 }
 
-async fn game() {
+async fn game(args: Args) {
     let mut app = App::default();
     app.insert_resource(Label(Default::default()));
-    app.insert_resource(MenuState::Main);
+    app.insert_resource(args.state);
     app.insert_resource(UiState::default());
     app.insert_resource(Dnd {
         lists: vec![
@@ -429,6 +437,7 @@ async fn game() {
 }
 
 fn main() {
+    let args = Args::parse();
     tracing_subscriber::fmt::init();
-    pollster::block_on(game());
+    pollster::block_on(game(args));
 }
