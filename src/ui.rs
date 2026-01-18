@@ -638,6 +638,7 @@ impl ThemeOverride {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LayoutDirection {
     TopDown,
+    BottomUp,
     LeftRight,
 }
 
@@ -856,22 +857,22 @@ impl<'a> Ui<'a> {
     }
 
     pub fn horizontal(&mut self, contents: impl FnMut(&mut Self)) {
-        let id = self.begin_widget();
-        let layout = self.ui.layout_dir;
-        let history_start = self.ui.rect_history.len();
-        let bounds = self.ui.bounds;
-        self.ui.layout_dir = LayoutDirection::LeftRight;
-        self.children_content(contents);
-        self.ui.layout_dir = layout;
-        self.ui.bounds = bounds;
-        self.submit_rect_group(id, history_start);
+        self.__with_layout(contents, LayoutDirection::LeftRight);
     }
 
     pub fn vertical(&mut self, contents: impl FnMut(&mut Self)) {
+        self.__with_layout(contents, LayoutDirection::TopDown);
+    }
+
+    pub fn vertical_rev(&mut self, contents: impl FnMut(&mut Self)) {
+        self.__with_layout(contents, LayoutDirection::BottomUp);
+    }
+
+    fn __with_layout(&mut self, contents: impl FnMut(&mut Self), layout: LayoutDirection) {
         let id = self.begin_widget();
         let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
-        let layout = std::mem::replace(&mut self.ui.layout_dir, LayoutDirection::TopDown);
+        let layout = std::mem::replace(&mut self.ui.layout_dir, layout);
         ///////////////////////
         self.children_content(contents);
         ///////////////////////
@@ -1250,6 +1251,9 @@ impl<'a> Ui<'a> {
             }
             LayoutDirection::LeftRight => {
                 self.ui.bounds.min_x = rect.max_x;
+            }
+            LayoutDirection::BottomUp => {
+                self.ui.bounds.max_y = rect.min_y;
             }
         }
         self.ui.bounding_boxes.insert(id, rect);
@@ -2603,6 +2607,10 @@ fn layout_rect(desc: RectLayoutDescriptor) -> UiRect {
         LayoutDirection::LeftRight => {
             rect.min_x = base.min_x + p_left;
             rect.max_x = (rect.min_x + desc.width).min(base.max_x - p_right)
+        }
+        LayoutDirection::BottomUp => {
+            rect.max_y = base.max_y - p_bot;
+            rect.min_y = (rect.max_y - desc.height).max(base.min_y + p_top)
         }
     }
 

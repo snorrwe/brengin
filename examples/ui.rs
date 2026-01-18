@@ -22,6 +22,7 @@ enum MenuState {
     DragNDrop,
     Buttons,
     ImageGrid,
+    Layout,
 }
 
 #[derive(clap_derive::Parser)]
@@ -119,6 +120,9 @@ fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>, cr: Res<CloseRequest>) {
             }
             if ui.button("ImageGrid").inner.pressed {
                 *state = MenuState::ImageGrid;
+            }
+            if ui.button("Layout").inner.pressed {
+                *state = MenuState::Layout;
             }
             if ui.button("Exit").inner.pressed {
                 cr.request_close();
@@ -259,6 +263,39 @@ Aliquam eu ultricies orci.
 Mauris ut pharetra orci.
 Maecenas ac convallis ligula, id interdum turpis.
 "#;
+
+fn layout_ui(mut ctx: UiRoot) {
+    ctx.panel(
+        brengin::ui::PanelDescriptor {
+            width: 300.into(),
+            height: 300.into(),
+            horizonal: HorizontalAlignment::Left,
+            vertical: VerticalAlignment::Top,
+        },
+        |ui| {
+            ui.vertical(|ui| {
+                for i in 0..5 {
+                    ui.label("top left");
+                }
+            });
+        },
+    );
+    ctx.panel(
+        brengin::ui::PanelDescriptor {
+            width: 300.into(),
+            height: 300.into(),
+            horizonal: HorizontalAlignment::Left,
+            vertical: VerticalAlignment::Bottom,
+        },
+        |ui| {
+            ui.vertical_rev(|ui| {
+                for i in 0..5 {
+                    ui.label("bottom left");
+                }
+            });
+        },
+    );
+}
 
 fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormState>) {
     ctx.panel(
@@ -427,6 +464,11 @@ async fn game(args: Args) {
             SystemStage::new("buttons-ui")
                 .with_should_run(|state: Res<MenuState>| MenuState::Buttons == *state)
                 .with_system(buttons_ui),
+        );
+        s.add_nested_stage(
+            SystemStage::new("buttons-ui")
+                .with_should_run(|state: Res<MenuState>| MenuState::Layout == *state)
+                .with_system(layout_ui),
         );
         s.add_system(menu);
         s.add_system(dnd_ui);
