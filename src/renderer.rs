@@ -318,6 +318,7 @@ impl Plugin for RendererPlugin {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RenderPass {
     Background = 1,
+    Opaque = 3,
     Transparent = 4,
     Ui = 5,
 }
@@ -333,6 +334,7 @@ impl RenderPass {
             RenderPass::Background => self.begin_background(view, encoder),
             RenderPass::Transparent => self.begin_transparent(view, encoder, state),
             RenderPass::Ui => self.begin_ui(view, encoder, state),
+            RenderPass::Opaque => self.begin_opaque(view, encoder, state),
         }
     }
 
@@ -364,6 +366,35 @@ impl RenderPass {
             timestamp_writes: None,
             occlusion_query_set: None,
             multiview_mask: None,
+        })
+    }
+
+    fn begin_opaque<'a>(
+        self,
+        view: &wgpu::TextureView,
+        encoder: &'a mut wgpu::CommandEncoder,
+        state: &GraphicsState,
+    ) -> wgpu::RenderPass<'a> {
+        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Opaque Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &state.depth_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            ..Default::default()
         })
     }
 
