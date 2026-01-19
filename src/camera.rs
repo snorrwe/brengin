@@ -1,5 +1,5 @@
 use cecs::prelude::*;
-use glam::{IVec2, Mat4, Vec3, Vec4};
+use glam::{Mat4, Vec3, Vec4};
 
 use crate::{
     renderer::{ExtractionPlugin, GraphicsState, WindowSize},
