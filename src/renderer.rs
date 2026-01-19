@@ -484,6 +484,17 @@ fn render_system(mut world: WorldAccess) {
                             store: wgpu::StoreOp::Store,
                         },
                     })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &state.depth_texture.view,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0),
+                            store: StoreOp::Store,
+                        }),
+                        stencil_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(0),
+                            store: StoreOp::Store,
+                        }),
+                    }),
                     ..Default::default()
                 });
             }
