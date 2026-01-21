@@ -3578,7 +3578,7 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
             Color::from_rgba(0x0000008F),
             2,
             Color::BLACK,
-            9999,
+            CONTEXT_LAYER + 100,
         );
         ui.text_rect(
             rect.min_x,
@@ -3586,8 +3586,18 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
             line_width,
             line_height,
             Color::WHITE,
-            10000,
+            CONTEXT_LAYER + 101,
             handle,
+        );
+        ui.color_rect_with_outline(
+            rect.min_x,
+            rect.min_y,
+            rect.width(),
+            rect.height(),
+            Color::from_rgba(0x00000000),
+            2,
+            Color::BLACK,
+            CONTEXT_LAYER + 99,
         );
     }
 }
