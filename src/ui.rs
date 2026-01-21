@@ -1952,12 +1952,11 @@ impl<'a> Ui<'a> {
         let content_bounds = self.history_bounding_rect(history_start);
         self.submit_rect(id, content_bounds, self.theme.padding);
 
-        let background;
-        if state.hovered {
-            background = self.theme.drop_target_hovered.as_ref();
+        let background = if state.hovered {
+            self.theme.drop_target_hovered.as_ref()
         } else {
-            background = Some(&self.theme.drop_target_default);
-        }
+            Some(&self.theme.drop_target_default)
+        };
         self.theme_rect(
             content_bounds.min_x,
             content_bounds.min_y,
