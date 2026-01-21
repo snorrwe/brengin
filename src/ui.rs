@@ -1618,7 +1618,7 @@ impl<'a> Ui<'a> {
         self.ui.bounding_boxes.insert(id, control_box);
     }
 
-    pub fn scroll_area(&mut self, desc: ScrollDescriptor, mut contents: impl FnMut(&mut Self)) {
+    pub fn scroll_area(&mut self, desc: ScrollDescriptor, contents: impl FnMut(&mut Self)) {
         let id = self.begin_widget();
         let width = desc
             .width
@@ -1710,12 +1710,10 @@ impl<'a> Ui<'a> {
             self.theme.background.clone(),
         );
         self.push_layer();
-        self.ui.id_stack.push(0);
         let history_start = self.ui.rect_history.len();
         ///////////////////////
-        contents(self);
+        self.children_content(contents);
         ///////////////////////
-        let last_id = self.ui.id_stack.pop().unwrap();
         let children_bounds = self.history_bounding_rect(history_start);
 
         let scroll_bar_size = self.theme.scroll_bar_size as i32;
@@ -1732,7 +1730,6 @@ impl<'a> Ui<'a> {
             .saturating_sub(height.saturating_sub(line_height as i32 + scroll_bar_size));
         let mut state = *state;
 
-        self.ui.id_stack.push(last_id);
         if desc.width.is_some() {
             let mut scissor_bounds = scissor_bounds;
             if desc.height.is_some() {
@@ -1754,7 +1751,6 @@ impl<'a> Ui<'a> {
                 &mut state,
             );
         }
-        self.ui.id_stack.pop();
         self.insert_memory(id, state);
         self.ui.bounds = old_bounds;
         self.submit_rect(id, scissor_bounds, self.theme.padding);
@@ -2307,7 +2303,6 @@ impl<'a> Ui<'a> {
         let parent_id = resp.id;
         let contains_mouse = self.contains_mouse(parent_id);
 
-        self.ui.id_stack.push(0);
         let id = self.begin_widget();
 
         let mut state = self
@@ -2392,6 +2387,10 @@ impl<'a> Ui<'a> {
                 state.open = false;
             }
 
+            // do not count the context menu in parent widgets, when calculating bounds
+            self.ui
+                .rect_history
+                .resize_with(history_start, || unreachable!());
             self.ui.scissor_idx = scissor;
             self.ui.layer = old_layer;
             self.ui.bounds = old_bounds;
@@ -2409,7 +2408,6 @@ impl<'a> Ui<'a> {
                 );
             }
         }
-        self.ui.id_stack.pop();
 
         let open = state.open;
         let is_currently_open = self.has_context_menu(parent_id);
@@ -2441,17 +2439,12 @@ impl<'a> Ui<'a> {
         context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
         let id = self.begin_widget();
-        let old_layer = self.push_layer();
 
-        // TODO: ??
-        self.begin_widget();
         let history_start = self.ui.rect_history.len();
         ///////////////////////
         self.children_content(contents);
         ///////////////////////
         let content_bounds = self.submit_rect_group(id, history_start);
-
-        self.ui.layer = old_layer;
 
         let resp = Response {
             hovered: self.is_hovered(id),
