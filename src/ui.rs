@@ -754,6 +754,13 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
+    fn set_context_menu(&mut self, id: UiId) {
+        self.next_ids
+            .push(id, self.ui.layer)
+            .add_flag(InteractionFlag::ContextMenu);
+    }
+
+    #[inline]
     fn set_active(&mut self, id: UiId) {
         self.next_ids
             .push(id, self.ui.layer)
@@ -2437,6 +2444,145 @@ impl<'a> Ui<'a> {
         resp
     }
 
+    pub fn select<'b, T: Eq + AsRef<str> + 'b>(
+        &mut self,
+        label: &str,
+        current: T,
+        options: &'b [T],
+    ) -> SelectResponse {
+        let resp = self.button(format!("{label}: {}", current.as_ref()));
+
+        let parent_id = resp.id;
+
+        let id = self.begin_widget();
+
+        let mut state = self
+            .remove_memory::<ContextMenuState>(parent_id)
+            .map(|x| *x)
+            .unwrap_or_default();
+
+        if resp.pressed() {
+            self.set_context_menu(resp.id);
+        }
+        state.offset = IVec2::new(resp.rect.min_x, resp.rect.max_y);
+
+        state.open = self.has_context_menu(parent_id);
+        let mut selected = None;
+        if state.open {
+            let history_start = self.ui.rect_history.len();
+            let old_layer = std::mem::replace(&mut self.ui.layer, CONTEXT_LAYER + 2);
+            let old_bounds = self.ui.bounds;
+
+            let outline_size = 2;
+            let [p_left, p_right, p_top, p_bot] = self
+                .theme
+                .padding
+                .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+            let p_horizontal = p_left + p_right;
+            let p_vertical = p_bot + p_top;
+
+            let mut bounds = resp.rect;
+            bounds.move_to_x(state.offset.x + bounds.width() / 2);
+            bounds.move_to_y(state.offset.y + bounds.height() / 2);
+            bounds.max_x = self.ui.scissors[0].max_x - p_horizontal - outline_size;
+            bounds.max_y = self.ui.scissors[0].max_y - p_vertical - outline_size;
+
+            let new_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
+
+            let scissor = self.push_scissor(UiRect {
+                min_x: bounds.min_x - p_horizontal - outline_size,
+                min_y: bounds.min_y - p_vertical - outline_size,
+                max_x: bounds.max_x + p_horizontal + outline_size,
+                max_y: bounds.max_y + p_vertical + outline_size,
+            });
+
+            ///////////////////////
+            self.children_content(|ui| {
+                ui.vertical(None, |ui| {
+                    // TODO: highlight if matches current
+                    for (i, t) in options.iter().enumerate() {
+                        if ui.button(t.as_ref()).pressed() {
+                            selected = Some(i);
+                            state.open = false;
+                        }
+                    }
+                });
+            });
+            ///////////////////////
+            self.ui.bounds = new_bounds;
+
+            let context_bounds = self.history_bounding_rect(history_start);
+
+            let mut bounds = context_bounds;
+            bounds = bounds.grow_over_point(
+                context_bounds.min_x - p_left - outline_size,
+                context_bounds.min_y - p_top - outline_size,
+            );
+            bounds = bounds.grow_over_point(
+                context_bounds.max_x + p_right + outline_size,
+                context_bounds.max_y + p_bot + outline_size,
+            );
+            self.submit_rect(id, bounds, self.theme.padding);
+            if self.contains_mouse(id) {
+                self.next_ids
+                    .push(id, CONTEXT_LAYER)
+                    .add_flag(InteractionFlag::Hovered);
+            }
+
+            self.color_rect(
+                bounds.min_x,
+                bounds.min_y,
+                bounds.width(),
+                bounds.height(),
+                Color::BLACK,
+                CONTEXT_LAYER,
+            );
+            self.theme_rect(
+                context_bounds.min_x - p_left,
+                context_bounds.min_y - p_top,
+                context_bounds.width() + p_horizontal,
+                context_bounds.height() + p_vertical,
+                CONTEXT_LAYER + 1,
+                self.theme.context_background.clone(),
+            );
+
+            if !self.mouse.pressed.is_empty() && !self.contains_mouse(id) {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Closing context menu over {parent_id:?}");
+                state.open = false;
+            }
+
+            // do not count the context menu in parent widgets, when calculating bounds
+            self.ui
+                .rect_history
+                .resize_with(history_start, || unreachable!());
+            self.ui.scissor_idx = scissor;
+            self.ui.layer = old_layer;
+            self.ui.bounds = old_bounds;
+        }
+
+        let open = state.open;
+        let is_currently_open = self.has_context_menu(parent_id);
+        if is_currently_open {
+            if !open {
+                self.next_ids
+                    .push(parent_id, self.ui.layer)
+                    .remove_flag(InteractionFlag::ContextMenu);
+            }
+        } else if open {
+            self.next_ids
+                .push(parent_id, self.ui.layer)
+                .add_flag(InteractionFlag::ContextMenu);
+        }
+        self.insert_memory(parent_id, state);
+        let resp = SelectResponse {
+            inner: resp.map_unit(),
+            selected,
+        };
+
+        resp
+    }
+
     pub fn context_menu<'b>(
         &'b mut self,
         contents: impl FnMut(&mut Self) + 'b,
@@ -3693,4 +3839,10 @@ impl Default for OutlineDescriptor {
             outline_radius: 1,
         }
     }
+}
+
+#[derive(Debug)]
+pub struct SelectResponse {
+    pub inner: Response<()>,
+    pub selected: Option<usize>,
 }
