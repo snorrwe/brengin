@@ -876,7 +876,7 @@ impl<'a> Ui<'a> {
         vertical_alignment: impl Into<Option<VerticalAlignment>>,
         contents: impl FnMut(&mut Self),
     ) {
-        self.__with_layout(
+        self._with_layout(
             contents,
             LayoutDirection::LeftRight(vertical_alignment.into().unwrap_or(VerticalAlignment::Top)),
         );
@@ -887,7 +887,7 @@ impl<'a> Ui<'a> {
         vertical_alignment: impl Into<Option<VerticalAlignment>>,
         contents: impl FnMut(&mut Self),
     ) {
-        self.__with_layout(
+        self._with_layout(
             contents,
             LayoutDirection::RightLeft(vertical_alignment.into().unwrap_or(VerticalAlignment::Top)),
         );
@@ -898,7 +898,7 @@ impl<'a> Ui<'a> {
         horizontal_alignment: impl Into<Option<HorizontalAlignment>>,
         contents: impl FnMut(&mut Self),
     ) {
-        self.__with_layout(
+        self._with_layout(
             contents,
             LayoutDirection::TopDown(
                 horizontal_alignment
@@ -913,7 +913,7 @@ impl<'a> Ui<'a> {
         horizontal_alignment: impl Into<Option<HorizontalAlignment>>,
         contents: impl FnMut(&mut Self),
     ) {
-        self.__with_layout(
+        self._with_layout(
             contents,
             LayoutDirection::BottomUp(
                 horizontal_alignment
@@ -923,7 +923,7 @@ impl<'a> Ui<'a> {
         );
     }
 
-    fn __with_layout(&mut self, contents: impl FnMut(&mut Self), layout: LayoutDirection) {
+    fn _with_layout(&mut self, contents: impl FnMut(&mut Self), layout: LayoutDirection) {
         let id = self.begin_widget();
         let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
