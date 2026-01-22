@@ -1753,7 +1753,8 @@ impl<'a> Ui<'a> {
             self.horizontal_scroll_bar(
                 &scissor_bounds,
                 scroll_bar_size,
-                self.ui.layer + 2,
+                CONTEXT_LAYER - 1,
+             
                 &mut state,
             );
         }
@@ -1761,7 +1762,7 @@ impl<'a> Ui<'a> {
             self.vertical_scroll_bar(
                 &scissor_bounds,
                 scroll_bar_size,
-                self.ui.layer + 2,
+                CONTEXT_LAYER - 1,
                 &mut state,
             );
         }
