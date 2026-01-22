@@ -15,6 +15,7 @@ mod tests;
 use std::{
     any::TypeId,
     collections::{HashMap, HashSet},
+    i32,
     ptr::NonNull,
     str::FromStr,
     time::Duration,
@@ -1704,10 +1705,10 @@ impl<'a> Ui<'a> {
         bounds.offset_x(-offset_x as i32);
         bounds.offset_y(-offset_y as i32);
         if desc.width.is_some() {
-            bounds.shrink_x(self.theme.scroll_bar_size as i32);
+            bounds.max_x = i32::MAX / 2;
         }
         if desc.height.is_some() {
-            bounds.shrink_y(self.theme.scroll_bar_size as i32);
+            bounds.max_y = i32::MAX / 2;
         }
 
         self.ui.bounds = bounds;
