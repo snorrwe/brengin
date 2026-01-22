@@ -1715,20 +1715,19 @@ impl<'a> Ui<'a> {
         let scissor_idx = self.push_scissor(scissor_bounds);
 
         let layer = self.push_layer();
-        self.theme_rect(
-            bounds.min_x,
-            bounds.min_y,
-            width,
-            height,
-            self.ui.layer,
-            self.theme.background.clone(),
-        );
-        self.push_layer();
         let history_start = self.ui.rect_history.len();
         ///////////////////////
         self.children_content(contents);
         ///////////////////////
         let children_bounds = self.history_bounding_rect(history_start);
+        self.theme_rect(
+            children_bounds.min_x,
+            children_bounds.min_y,
+            children_bounds.width().max(bounds.width()),
+            children_bounds.height().max(bounds.height()),
+            layer,
+            self.theme.background.clone(),
+        );
 
         let scroll_bar_size = self.theme.scroll_bar_size as i32;
 
@@ -1754,7 +1753,6 @@ impl<'a> Ui<'a> {
                 &scissor_bounds,
                 scroll_bar_size,
                 CONTEXT_LAYER - 1,
-             
                 &mut state,
             );
         }
