@@ -1904,7 +1904,7 @@ impl<'a> Ui<'a> {
                     .push(id, DRAG_LAYER)
                     .remove_flag(InteractionFlag::Dragged);
             } else {
-                let drag_anchor = state.drag_anchor;
+                let drag_anchor = state.drag_anchor();
                 let drag_start = state.drag_start;
 
                 let offset = IVec2::new(
@@ -1941,8 +1941,8 @@ impl<'a> Ui<'a> {
             .padding
             .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
         self.ui.bounds = layout_rect(RectLayoutDescriptor {
-            width: state.size.x,
-            height: state.size.y,
+            width: state.content_rect.width(),
+            height: state.content_rect.height(),
             padding: Some(self.theme.padding),
             dir: self.ui.layout_dir,
             bounds: self.ui.bounds,
@@ -1980,15 +1980,11 @@ impl<'a> Ui<'a> {
             self.color_rect_from_rect(content_bounds, self.theme.primary_color, layer);
             // move the content_bounds back to their origin, so they're submitted in their original
             // position, so the layout stays the same while dragging
-            content_bounds.resize_w(state.size.x);
-            content_bounds.resize_h(state.size.y);
-            content_bounds.move_to_x(state.drag_anchor.x);
-            content_bounds.move_to_y(state.drag_anchor.y);
+            content_bounds = state.content_rect;
         } else {
             self.ui.rect_history.extend_from_slice(&child_history);
-            state.drag_anchor = IVec2::new(content_bounds.min_x, content_bounds.min_y);
-            state.pos = state.drag_anchor;
-            state.size = IVec2::new(content_bounds.width(), content_bounds.height());
+            state.content_rect = content_bounds;
+            state.pos = IVec2::new(content_bounds.min_x, content_bounds.min_y);
         }
         self.ui.scissor_idx = last_scissor;
 
@@ -3039,10 +3035,15 @@ pub struct ContextMenuState {
 #[derive(Debug, Default)]
 pub struct DragState {
     pub drag_start: PhysicalPosition<f64>,
-    pub drag_anchor: IVec2,
+    pub content_rect: UiRect,
     pub pos: IVec2,
-    pub size: IVec2,
     pub dragged: bool,
+}
+
+impl DragState {
+    pub fn drag_anchor(&self) -> IVec2 {
+        IVec2::new(self.content_rect.min_x, self.content_rect.min_y)
+    }
 }
 
 #[derive(Debug)]
