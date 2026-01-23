@@ -100,14 +100,16 @@ impl UiRect {
         self.max_y += d;
     }
 
+    /// moves min_x to x
     pub fn move_to_x(&mut self, x: i32) {
-        let delta = x - self.center_x();
+        let delta = x - self.min_x;
         self.min_x += delta;
         self.max_x += delta;
     }
 
+    /// moves min_y to y
     pub fn move_to_y(&mut self, y: i32) {
-        let delta = y - self.center_y();
+        let delta = y - self.min_y;
         self.min_y += delta;
         self.max_y += delta;
     }

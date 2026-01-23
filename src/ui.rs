@@ -1947,8 +1947,8 @@ impl<'a> Ui<'a> {
             dir: self.ui.layout_dir,
             bounds: self.ui.bounds,
         });
-        self.ui.bounds.move_to_x(state.pos.x + state.size.x / 2);
-        self.ui.bounds.move_to_y(state.pos.y + state.size.y / 2);
+        self.ui.bounds.move_to_x(state.pos.x);
+        self.ui.bounds.move_to_y(state.pos.y);
         let last_scissor = self.ui.scissor_idx;
         let layer = self.ui.layer;
         if is_being_dragged {
@@ -1982,8 +1982,8 @@ impl<'a> Ui<'a> {
             // position, so the layout stays the same while dragging
             content_bounds.resize_w(state.size.x);
             content_bounds.resize_h(state.size.y);
-            content_bounds.offset_x(state.drag_anchor.x - content_bounds.min_x);
-            content_bounds.offset_y(state.drag_anchor.y - content_bounds.min_y);
+            content_bounds.move_to_x(state.drag_anchor.x);
+            content_bounds.move_to_y(state.drag_anchor.y);
         } else {
             self.ui.rect_history.extend_from_slice(&child_history);
             state.drag_anchor = IVec2::new(content_bounds.min_x, content_bounds.min_y);
@@ -2427,8 +2427,8 @@ impl<'a> Ui<'a> {
             let p_vertical = p_bot + p_top;
 
             let mut bounds = resp.rect;
-            bounds.move_to_x(state.offset.x + bounds.width() / 2);
-            bounds.move_to_y(state.offset.y + bounds.height() / 2);
+            bounds.move_to_x(state.offset.x);
+            bounds.move_to_y(state.offset.y);
             bounds.max_x = self.ui.scissors[0].max_x - p_horizontal - outline_size;
             bounds.max_y = self.ui.scissors[0].max_y - p_vertical - outline_size;
 
@@ -2573,8 +2573,8 @@ impl<'a> Ui<'a> {
             let p_vertical = p_bot + p_top;
 
             let mut bounds = resp.rect;
-            bounds.move_to_x(state.offset.x + bounds.width() / 2);
-            bounds.move_to_y(state.offset.y + bounds.height() / 2);
+            bounds.move_to_x(state.offset.x);
+            bounds.move_to_y(state.offset.y);
             bounds.max_x = self.ui.scissors[0].max_x - p_horizontal - outline_size;
             bounds.max_y = self.ui.scissors[0].max_y - p_vertical - outline_size;
 
