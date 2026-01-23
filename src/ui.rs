@@ -284,7 +284,8 @@ fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
     ids.sort_by_key(|x| x.layer);
     for mut idset in ids.drain(..) {
         if idset.has_added_flag(InteractionFlag::Hovered) {
-            lhs.hovered = idset.id;
+            lhs.hovered.insert(idset.id);
+            lhs.top_hovered = idset.id;
         }
         if idset.has_added_flag(InteractionFlag::Active) {
             lhs.active = idset.id;
@@ -302,8 +303,11 @@ fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
                 idset.remove_flag(InteractionFlag::Active);
             }
         }
-        if lhs.hovered == idset.id && idset.has_removed_flag(InteractionFlag::Hovered) {
-            lhs.hovered = UiId::SENTINEL;
+        if idset.has_removed_flag(InteractionFlag::Hovered) {
+            lhs.hovered.remove(&idset.id);
+            if lhs.top_hovered == idset.id {
+                lhs.top_hovered = UiId::SENTINEL;
+            }
         }
         if lhs.active == idset.id && idset.has_removed_flag(InteractionFlag::Active) {
             lhs.active = UiId::SENTINEL;
@@ -314,9 +318,11 @@ fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone)]
 pub struct UiIds {
-    hovered: UiId,
+    hovered: HashSet<UiId>,
+    /// Topmost hovered widget
+    top_hovered: UiId,
     active: UiId,
     dragged: UiId,
     context_menu: UiId,
@@ -804,7 +810,12 @@ impl<'a> Ui<'a> {
 
     #[inline]
     pub fn is_hovered(&self, id: UiId) -> bool {
-        self.ids.hovered == id
+        self.ids.hovered.contains(&id)
+    }
+
+    #[inline]
+    pub fn is_top_hovered(&self, id: UiId) -> bool {
+        self.ids.top_hovered == id
     }
 
     #[inline]
@@ -850,11 +861,9 @@ impl<'a> Ui<'a> {
 
     #[inline]
     fn set_not_hovered(&mut self, id: UiId) {
-        if self.ids.hovered == id {
-            self.next_ids
-                .push(id, self.ui.layer)
-                .remove_flag(InteractionFlag::Hovered);
-        }
+        self.next_ids
+            .push(id, self.ui.layer)
+            .remove_flag(InteractionFlag::Hovered);
     }
 
     pub fn horizontal(
@@ -1206,8 +1215,8 @@ impl<'a> Ui<'a> {
 
         Response {
             id,
-            hovered: self.ids.hovered == id,
-            active: self.ids.active == id,
+            hovered: self.is_hovered(id),
+            active: self.is_active(id),
             inner: (),
             rect,
         }
@@ -1277,8 +1286,8 @@ impl<'a> Ui<'a> {
 
         Response {
             id,
-            hovered: self.ids.hovered == id,
-            active: self.ids.active == id,
+            hovered: self.is_hovered(id),
+            active: self.is_active(id),
             inner: (),
             rect,
         }
@@ -1949,7 +1958,7 @@ impl<'a> Ui<'a> {
         state.dragged = self.ids.dragged;
 
         if self.is_anything_dragged() {
-            state.hovered = self.is_hovered(id);
+            state.hovered = self.is_top_hovered(id);
             if state.hovered {
                 if self.mouse_up() {
                     state.dropped = true;
