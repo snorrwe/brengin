@@ -1620,7 +1620,7 @@ impl<'a> Ui<'a> {
                 parent_state.ty = (y - scissor_bounds.min_y) as f32
                     / (scissor_bounds.height() - scroll_bar_width) as f32;
             }
-        } else if self.is_hovered(id) {
+        } else if self.is_top_hovered(id) {
             if !contains_mouse {
                 self.set_not_hovered(id);
             } else if self.mouse_down() {
@@ -1678,7 +1678,7 @@ impl<'a> Ui<'a> {
                 parent_state.tx = (x - scissor_bounds.min_x) as f32
                     / (scissor_bounds.width() - scroll_bar_height) as f32;
             }
-        } else if self.is_hovered(id) {
+        } else if self.is_top_hovered(id) {
             if !contains_mouse {
                 self.set_not_hovered(id);
             } else if self.mouse_down() {
@@ -1767,7 +1767,7 @@ impl<'a> Ui<'a> {
         let scissor_bounds = layout_rect(RectLayoutDescriptor {
             width,
             height,
-            padding: Some(self.theme.padding),
+            padding: None,
             dir: self.ui.layout_dir,
             bounds: old_bounds,
         });
