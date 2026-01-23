@@ -2741,17 +2741,9 @@ impl<'a> Ui<'a> {
     pub fn margin(&mut self, m: Padding, contents: impl FnMut(&mut Self)) {
         let id = self.begin_widget();
         let bounds = self.ui.bounds;
-
-        let [left, right, top, bottom] = m.as_abs(bounds.width(), bounds.height());
-
-        self.ui.bounds.min_x += left;
-        self.ui.bounds.max_x -= right;
-        self.ui.bounds.min_y += top;
-        self.ui.bounds.max_y -= bottom;
-
         self.ui.bounds = layout_rect(RectLayoutDescriptor {
-            width: self.ui.bounds.width(),
-            height: self.ui.bounds.height(),
+            width: bounds.width(),
+            height: bounds.height(),
             padding: Some(m),
             dir: self.ui.layout_dir,
             bounds,
