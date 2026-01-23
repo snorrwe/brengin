@@ -1418,7 +1418,7 @@ impl<'a> Ui<'a> {
                     }
                     this.set_not_active(id);
                 }
-            } else if this.is_hovered(id) {
+            } else if this.is_top_hovered(id) {
                 bg_color = this
                     .theme
                     .button_hovered
