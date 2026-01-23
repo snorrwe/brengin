@@ -1979,13 +1979,16 @@ impl<'a> Ui<'a> {
         if is_being_dragged {
             self.color_rect_from_rect(content_bounds, self.theme.primary_color, layer);
             // move the content_bounds back to their origin, so they're submitted in their original
-            // position
+            // position, so the layout stays the same while dragging
+            content_bounds.resize_w(state.size.x);
+            content_bounds.resize_h(state.size.y);
             content_bounds.offset_x(state.drag_anchor.x - content_bounds.min_x);
             content_bounds.offset_y(state.drag_anchor.y - content_bounds.min_y);
         } else {
             self.ui.rect_history.extend_from_slice(&child_history);
             state.drag_anchor = IVec2::new(content_bounds.min_x, content_bounds.min_y);
             state.pos = state.drag_anchor;
+            state.size = IVec2::new(content_bounds.width(), content_bounds.height());
         }
         self.ui.scissor_idx = last_scissor;
 
@@ -1994,7 +1997,6 @@ impl<'a> Ui<'a> {
         content_bounds.min_y -= p_top;
         content_bounds.max_y += p_bot + p_top;
         self.submit_rect(id, content_bounds, self.theme.padding);
-        state.size = IVec2::new(content_bounds.width(), content_bounds.height());
 
         self.insert_memory(id, state);
 
