@@ -1923,7 +1923,7 @@ impl<'a> Ui<'a> {
             state.pos = IVec2::new(old_bounds.min_x, old_bounds.min_y);
             if !self.is_anything_active() && self.contains_mouse(id) {
                 self.set_hovered(id);
-                if self.is_hovered(id) && self.mouse_down() {
+                if self.is_top_hovered(id) && self.mouse_down() {
                     is_being_dragged = true;
                     state.drag_start = self.mouse.cursor_position;
                     state.dragged = false;
