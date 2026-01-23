@@ -15,6 +15,7 @@ mod tests;
 use std::{
     any::TypeId,
     collections::{HashMap, HashSet},
+    hash::Hash,
     i32,
     ptr::NonNull,
     str::FromStr,
@@ -243,10 +244,6 @@ fn fnv_1a(value: &[u8]) -> u32 {
     hash
 }
 
-fn fnv_1a_u32(value: u32) -> u32 {
-    fnv_1a(bytemuck::cast_slice(&[value]))
-}
-
 #[derive(Clone)]
 pub struct ShapeKey {
     pub text: String,
@@ -427,8 +424,9 @@ impl NextUiIdSet {
 
 /// UI context object. Use this to builder your user interface
 pub struct UiState {
-    /// stack of parents in the ui tree
+    /// Stack of parents in the UI tree
     id_stack: Vec<IdxType>,
+    widget_ids: Vec<UiId>,
 
     color_rects: Vec<DrawColorRect>,
     texture_rects: Vec<DrawTextureRect>,
@@ -437,14 +435,14 @@ pub struct UiState {
     scissor_idx: u32,
     bounds: UiRect,
 
-    /// layers go from back to front
+    /// Layers go from back to front
     layer: u16,
 
     bounding_boxes: HashMap<UiId, UiRect>,
 
     rect_history: Vec<UiRect>,
 
-    /// hash of the current tree root
+    /// Hash of the current tree root
     root_hash: u32,
 
     layout_dir: LayoutDirection,
@@ -565,6 +563,7 @@ impl UiState {
     pub fn new() -> Self {
         Self {
             id_stack: Default::default(),
+            widget_ids: Default::default(),
             color_rects: Default::default(),
             text_rects: Default::default(),
             texture_rects: Default::default(),
@@ -783,35 +782,14 @@ impl<'a> Ui<'a> {
             .remove_flag(InteractionFlag::Active);
     }
 
-    #[inline]
-    pub fn parent(&self) -> IdxType {
-        if self.ui.id_stack.len() >= 2 {
-            self.ui.id_stack[self.ui.id_stack.len() - 2]
-        } else {
-            SENTINEL
-        }
-    }
-
-    #[inline]
-    pub fn current_idx(&self) -> IdxType {
-        assert!(!self.ui.id_stack.is_empty());
-        unsafe { *self.ui.id_stack.last().unwrap_unchecked() }
-    }
-
     pub fn current_id(&self) -> UiId {
-        let index = self.current_idx();
-        let hash = {
-            let mut hash = fnv_1a_u32(self.ui.root_hash);
-            for i in self.ui.id_stack.iter() {
-                hash = fnv_1a(bytemuck::cast_slice(&[hash, *i]));
-            }
-            hash
-        };
-        UiId {
-            parent: self.parent(),
-            index,
-            uid: hash,
-        }
+        self.ui
+            .id_stack
+            .last()
+            .copied()
+            .and_then(|i| self.ui.widget_ids.get(i as usize))
+            .copied()
+            .unwrap_or_default()
     }
 
     #[inline]
@@ -951,11 +929,11 @@ impl<'a> Ui<'a> {
         let history_start = self.ui.rect_history.len();
         if !hide {
             let bounds = self.ui.bounds;
-            self.ui.id_stack.push(0);
+            self.push_child();
             ///////////////////////
             contents(self);
             ///////////////////////
-            self.ui.id_stack.pop();
+            self.pop_child();
             self.ui.bounds = bounds;
         }
         self.submit_rect_group(id, history_start);
@@ -981,7 +959,7 @@ impl<'a> Ui<'a> {
         'a: 'b,
     {
         self.begin_widget();
-        self.ui.id_stack.push(0);
+        self.push_child();
         let cols = columns as i32;
         let history_start = self.ui.rect_history.len();
         let bounds = self.ui.bounds;
@@ -1000,7 +978,7 @@ impl<'a> Ui<'a> {
         contents(&mut cols);
         ///////////////////////
 
-        self.ui.id_stack.pop();
+        self.pop_child();
         self.ui.bounds = bounds;
         self.submit_rect_group(self.current_id(), history_start);
     }
@@ -1333,8 +1311,40 @@ impl<'a> Ui<'a> {
     }
 
     pub fn begin_widget(&mut self) -> UiId {
-        *self.ui.id_stack.last_mut().unwrap() += 1;
-        self.current_id()
+        let index = self.ui.widget_ids.len() as IdxType;
+
+        let parent = self
+            .ui
+            .id_stack
+            .last()
+            .and_then(|i| self.ui.widget_ids.get(*i as usize))
+            .copied()
+            .unwrap_or_else(|| {
+                let mut id = UiId::SENTINEL;
+                id.uid = self.ui.root_hash;
+                id
+            });
+
+        let hash = fnv_1a(bytemuck::cast_slice(&[parent.uid, index]));
+        let id = UiId {
+            parent: parent.index,
+            index,
+            uid: hash,
+            depth: parent.depth + 1,
+        };
+        self.ui.widget_ids.push(id);
+        if let Some(i) = self.ui.id_stack.last_mut() {
+            *i = id.index;
+        }
+        id
+    }
+
+    fn push_child(&mut self) {
+        self.ui.id_stack.push(SENTINEL);
+    }
+
+    fn pop_child(&mut self) {
+        self.ui.id_stack.pop();
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
@@ -2714,9 +2724,9 @@ impl<'a> Ui<'a> {
 
     fn children_content(&mut self, mut contents: impl FnMut(&mut Self)) {
         let layer = self.push_layer();
-        self.ui.id_stack.push(0);
+        self.push_child();
         contents(self);
-        self.ui.id_stack.pop();
+        self.pop_child();
         self.ui.layer = layer;
     }
 
@@ -2989,6 +2999,7 @@ pub struct UiId {
     parent: IdxType,
     index: IdxType,
     uid: IdxType,
+    depth: IdxType,
 }
 
 impl UiId {
@@ -2996,6 +3007,7 @@ impl UiId {
         parent: SENTINEL,
         index: SENTINEL,
         uid: SENTINEL,
+        depth: 0,
     };
 }
 
@@ -3094,10 +3106,9 @@ impl<'a> Columns<'a> {
         ctx.ui.bounds.min_x = self.dims[idx][0];
         ctx.ui.bounds.max_x = self.dims[idx][1];
         let w = ctx.ui.bounds.width();
-        *ctx.ui.id_stack.last_mut().unwrap() = i;
         let layer = ctx.ui.layer;
         ctx.ui.layer += 1;
-        ctx.ui.id_stack.push(0);
+        ctx.push_child();
         let history_start = ctx.ui.rect_history.len();
 
         ///////////////////////
@@ -3105,7 +3116,7 @@ impl<'a> Columns<'a> {
         ///////////////////////
 
         // restore state
-        ctx.ui.id_stack.pop();
+        ctx.pop_child();
         let rect = ctx.history_bounding_rect(history_start);
         ctx.ui.bounds.min_y = bounds.min_y;
         ctx.ui.bounds.max_y = bounds.max_y;
@@ -3127,6 +3138,8 @@ fn begin_frame(
 ) {
     ui.layout_dir = LayoutDirection::TopDown(HorizontalAlignment::Left);
     ui.root_hash = 0;
+    ui.id_stack.clear();
+    ui.widget_ids.clear();
     ui.rect_history.clear();
     ui.color_rects.clear();
     ui.text_rects.clear();
@@ -3375,7 +3388,7 @@ impl<'a> UiRoot<'a> {
             WINDOW_LAYER,
             self.theme().window_background.clone(),
         );
-        self.0.ui.id_stack.push(0);
+        self.0.push_child();
         ///////////////////////
         // Title
         {
@@ -3430,7 +3443,7 @@ impl<'a> UiRoot<'a> {
         }
         ///////////////////////
         self.0.ui.layer = layer;
-        self.0.ui.id_stack.pop();
+        self.0.pop_child();
         self.0.ui.bounds = old_bounds;
         self.0.ui.scissor_idx = scissor;
 
