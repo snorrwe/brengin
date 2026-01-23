@@ -1776,10 +1776,34 @@ impl<'a> Ui<'a> {
         bounds.offset_x(-offset_x as i32);
         bounds.offset_y(-offset_y as i32);
         if desc.width.is_some() {
-            bounds.max_x = i32::MAX / 2;
+            match self.ui.layout_dir {
+                LayoutDirection::LeftRight(_) => {
+                    bounds.max_x = i32::MAX / 2;
+                }
+                LayoutDirection::RightLeft(_) => {
+                    bounds.min_x = -i32::MAX / 2;
+                }
+                LayoutDirection::Center => {
+                    bounds.min_x = -i32::MAX / 2;
+                    bounds.max_x = i32::MAX / 2;
+                }
+                _ => {}
+            }
         }
         if desc.height.is_some() {
-            bounds.max_y = i32::MAX / 2;
+            match self.ui.layout_dir {
+                LayoutDirection::TopDown(_) => {
+                    bounds.max_y = i32::MAX / 2;
+                }
+                LayoutDirection::BottomUp(_) => {
+                    bounds.min_y = -i32::MAX / 2;
+                }
+                LayoutDirection::Center => {
+                    bounds.min_y = -i32::MAX / 2;
+                    bounds.max_y = i32::MAX / 2;
+                }
+                _ => {}
+            }
         }
 
         self.ui.bounds = bounds;
