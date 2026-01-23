@@ -1992,10 +1992,6 @@ impl<'a> Ui<'a> {
         }
         self.ui.scissor_idx = last_scissor;
 
-        content_bounds.min_x -= p_left;
-        content_bounds.max_x += p_right + p_left;
-        content_bounds.min_y -= p_top;
-        content_bounds.max_y += p_bot + p_top;
         self.submit_rect(id, content_bounds, self.theme.padding);
 
         self.insert_memory(id, state);
