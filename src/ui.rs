@@ -1936,14 +1936,10 @@ impl<'a> Ui<'a> {
         }
 
         let history = std::mem::take(&mut self.ui.rect_history);
-        let [p_left, p_right, p_top, p_bot] = self
-            .theme
-            .padding
-            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
         self.ui.bounds = layout_rect(RectLayoutDescriptor {
             width: state.content_rect.width(),
             height: state.content_rect.height(),
-            padding: Some(self.theme.padding),
+            padding: None,
             dir: self.ui.layout_dir,
             bounds: self.ui.bounds,
         });
@@ -1956,13 +1952,7 @@ impl<'a> Ui<'a> {
             // widget.
             // Only do this for the dragged widget, otherwise a lot of redundant scissors are
             // created.
-            let mut scissor = self.ui.bounds;
-            // undo padding
-            scissor.min_x -= p_left;
-            scissor.max_x += p_right;
-            scissor.min_y -= p_top;
-            scissor.max_y += p_bot;
-            self.push_scissor(scissor);
+            self.push_scissor(self.ui.bounds);
             self.ui.layer = DRAG_LAYER;
         }
         self.ui.layer += 1;
