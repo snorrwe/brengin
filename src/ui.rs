@@ -1775,17 +1775,20 @@ impl<'a> Ui<'a> {
         let mut bounds = scissor_bounds;
         bounds.offset_x(-offset_x as i32);
         bounds.offset_y(-offset_y as i32);
+
+        const BOUNDS_LIMIT: i32 = i32::MAX / 4;
+
         if desc.width.is_some() {
             match self.ui.layout_dir {
                 LayoutDirection::LeftRight(_) => {
-                    bounds.max_x = i32::MAX / 2;
+                    bounds.max_x = BOUNDS_LIMIT;
                 }
                 LayoutDirection::RightLeft(_) => {
-                    bounds.min_x = -i32::MAX / 2;
+                    bounds.min_x = -BOUNDS_LIMIT;
                 }
                 LayoutDirection::Center => {
-                    bounds.min_x = -i32::MAX / 2;
-                    bounds.max_x = i32::MAX / 2;
+                    bounds.min_x = -BOUNDS_LIMIT;
+                    bounds.max_x = BOUNDS_LIMIT;
                 }
                 _ => {}
             }
@@ -1793,14 +1796,14 @@ impl<'a> Ui<'a> {
         if desc.height.is_some() {
             match self.ui.layout_dir {
                 LayoutDirection::TopDown(_) => {
-                    bounds.max_y = i32::MAX / 2;
+                    bounds.max_y = BOUNDS_LIMIT;
                 }
                 LayoutDirection::BottomUp(_) => {
-                    bounds.min_y = -i32::MAX / 2;
+                    bounds.min_y = -BOUNDS_LIMIT;
                 }
                 LayoutDirection::Center => {
-                    bounds.min_y = -i32::MAX / 2;
-                    bounds.max_y = i32::MAX / 2;
+                    bounds.min_y = -BOUNDS_LIMIT;
+                    bounds.max_y = BOUNDS_LIMIT;
                 }
                 _ => {}
             }
@@ -1975,8 +1978,8 @@ impl<'a> Ui<'a> {
 
         if is_being_dragged {
             self.color_rect_from_rect(content_bounds, self.theme.primary_color, layer);
-            content_bounds.move_to_x(state.drag_anchor.x + state.size.x / 2);
-            content_bounds.move_to_y(state.drag_anchor.y + state.size.y / 2);
+            content_bounds.offset_x(state.drag_anchor.x - content_bounds.min_x);
+            content_bounds.offset_y(state.drag_anchor.y - content_bounds.min_y);
         } else {
             self.ui.rect_history.extend_from_slice(&child_history);
             state.drag_anchor = IVec2::new(content_bounds.min_x, content_bounds.min_y);
