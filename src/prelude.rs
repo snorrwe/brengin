@@ -1,4 +1,5 @@
 pub use crate::assets::*;
+pub use crate::color::Color;
 pub use crate::transform::{transform_bundle, GlobalTransform, Transform};
 pub use crate::App;
 pub use crate::DeltaTime;

@@ -1,7 +1,6 @@
 use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
 use brengin::ui::{
-    Color, HorizontalAlignment, OutlineDescriptor, ScrollDescriptor, UiCoord, UiRoot,
-    VerticalAlignment,
+    HorizontalAlignment, OutlineDescriptor, ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment,
 };
 use brengin::{prelude::*, transform, CloseRequest};
 use brengin::{App, DefaultPlugins};
