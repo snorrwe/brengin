@@ -1978,6 +1978,8 @@ impl<'a> Ui<'a> {
 
         if is_being_dragged {
             self.color_rect_from_rect(content_bounds, self.theme.primary_color, layer);
+            // move the content_bounds back to their origin, so they're submitted in their original
+            // position
             content_bounds.offset_x(state.drag_anchor.x - content_bounds.min_x);
             content_bounds.offset_y(state.drag_anchor.y - content_bounds.min_y);
         } else {
