@@ -290,6 +290,9 @@ fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
         if idset.has_added_flag(InteractionFlag::Active) {
             lhs.active = idset.id;
         }
+        if idset.has_added_flag(InteractionFlag::Scrolling) {
+            lhs.scrolling = idset.id;
+        }
         if idset.has_added_flag(InteractionFlag::Dragged) {
             lhs.active = idset.id;
             lhs.dragged = idset.id;
@@ -312,6 +315,9 @@ fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
         if lhs.active == idset.id && idset.has_removed_flag(InteractionFlag::Active) {
             lhs.active = UiId::SENTINEL;
         }
+        if lhs.scrolling == idset.id && idset.has_removed_flag(InteractionFlag::Scrolling) {
+            lhs.scrolling = UiId::SENTINEL;
+        }
         if idset.has_removed_flag(InteractionFlag::ContextMenu) {
             lhs.context_menu = UiId::SENTINEL;
         }
@@ -326,6 +332,7 @@ pub struct UiIds {
     active: UiId,
     dragged: UiId,
     context_menu: UiId,
+    scrolling: UiId,
 }
 pub struct NextUiIds(pub Vec<NextUiIdSet>);
 
@@ -351,6 +358,7 @@ pub enum InteractionFlag {
     Active = 2,
     Dragged = 4,
     ContextMenu = 8,
+    Scrolling = 16,
 }
 
 impl InteractionFlag {
@@ -380,6 +388,12 @@ impl InteractionFlag {
                 write!(f, " ")?;
             }
             write!(f, "ContextMenu")?;
+        }
+        if (flags & (Self::Scrolling as u8)) != 0 {
+            if has {
+                write!(f, " ")?;
+            }
+            write!(f, "Scrolling")?;
         }
         write!(f, " ]")
     }
@@ -766,6 +780,13 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
+    fn set_scrolling(&mut self, id: UiId) {
+        self.next_ids
+            .push(id, self.ui.layer)
+            .add_flag(InteractionFlag::Scrolling);
+    }
+
+    #[inline]
     fn set_active(&mut self, id: UiId) {
         self.next_ids
             .push(id, self.ui.layer)
@@ -775,6 +796,16 @@ impl<'a> Ui<'a> {
     #[inline]
     pub fn is_anything_dragged(&self) -> bool {
         self.ids.dragged != UiId::SENTINEL
+    }
+
+    #[inline]
+    pub fn is_scrolling(&self, id: UiId) -> bool {
+        self.ids.scrolling == id
+    }
+
+    #[inline]
+    pub fn is_anything_scrolling(&self) -> bool {
+        self.ids.scrolling != UiId::SENTINEL
     }
 
     #[inline]
@@ -856,6 +887,15 @@ impl<'a> Ui<'a> {
             self.next_ids
                 .push(id, self.ui.layer)
                 .remove_flag(InteractionFlag::Active);
+        }
+    }
+
+    #[inline]
+    fn set_not_scrolling(&mut self, id: UiId) {
+        if self.ids.scrolling == id {
+            self.next_ids
+                .push(id, self.ui.layer)
+                .remove_flag(InteractionFlag::Scrolling);
         }
     }
 
@@ -1677,6 +1717,11 @@ impl<'a> Ui<'a> {
                 self.set_hovered(id);
             }
             if self.is_hovered(id) {
+                self.set_scrolling(id);
+            } else {
+                self.set_not_scrolling(id);
+            }
+            if self.is_scrolling(id) {
                 let mut dt = 0.0;
                 for ds in self.mouse.scroll.iter() {
                     // TODO: insert mouse events into ui_inputs
