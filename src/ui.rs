@@ -3643,12 +3643,15 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
 
     let ui = &mut ui.0;
     let mut ancestry = Vec::new();
-    for (id, rect) in boxes.into_iter() {
+    'rects: for (id, rect) in boxes.into_iter() {
         {
             let mut id = id;
             ancestry.push(id);
             while id.parent != SENTINEL {
-                id = ui.ui_state.widget_ids[id.parent as usize];
+                let Some(i) = ui.ui_state.widget_ids.get(id.parent as usize) else {
+                    continue 'rects;
+                };
+                id = *i;
                 ancestry.push(id);
             }
         }
