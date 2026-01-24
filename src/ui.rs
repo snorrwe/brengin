@@ -3661,10 +3661,11 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
                 ancestry.push(id);
             }
         }
-        let label = ancestry
+        let mut label = ancestry
             .drain(..)
             .rev()
-            .fold(String::new(), |x, a| format!("{x}/{}", a.index));
+            .fold(String::new(), |x, a| format!("{x}{}/", a.index));
+        label.pop(); // pop the last /
         let (handle, e) = ui.shape_and_draw_line(label, 12);
         let pic = &e.texture;
         let line_width = pic.width() as i32;
