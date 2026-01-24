@@ -69,20 +69,20 @@ impl Plugin for UiPlugin {
         app.with_stage(crate::Stage::PreUpdate, |s| {
             s.add_system(begin_frame);
         });
-        app.with_nested_stage(
-            crate::Stage::Update,
-            SystemStage::new("debug")
-                .with_should_run(|debug: Option<Res<UiDebug>>| {
-                    debug.map(|d| d.enable).unwrap_or(false)
-                })
-                .with_system(draw_bounding_boxes),
-        );
         app.with_stage(crate::Stage::PostUpdate, |s| {
-            s.add_system(submit_frame_color_rects)
-                .add_system(submit_frame_text_rects)
-                .add_system(submit_frame_texture_rects)
-                .add_system(update_ids)
-                .add_system(shaping_gc_system);
+            s.add_nested_stage(
+                SystemStage::new("debug")
+                    .with_should_run(|debug: Option<Res<UiDebug>>| {
+                        debug.map(|d| d.enable).unwrap_or(false)
+                    })
+                    .with_system(draw_bounding_boxes),
+            )
+            .add_system(submit_frame_color_rects.after(draw_bounding_boxes))
+            .add_system(submit_frame_text_rects.after(draw_bounding_boxes))
+            .add_system(submit_frame_texture_rects)
+            .add_system(update_ids)
+            .add_system(gc_bounding_boxes.after(draw_bounding_boxes))
+            .add_system(shaping_gc_system);
         });
     }
 }
@@ -324,6 +324,11 @@ pub struct UiState {
     fallback_font: OwnedTypeFace,
 
     window_allocator: WindowAllocator,
+}
+
+fn gc_bounding_boxes(mut state: ResMut<UiState>) {
+    let ids: HashSet<_> = state.widget_ids.iter().copied().collect();
+    state.bounding_boxes.retain(|k, _| ids.contains(k));
 }
 
 #[derive(Debug, Clone, Default)]
