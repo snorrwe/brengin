@@ -2203,6 +2203,7 @@ impl<'a> Ui<'a> {
         let last_layer = self.push_layer();
         let layer = self.push_layer();
         let history_start = self.ui_state.rect_history.len();
+        let bounds = self.ui_state.bounds;
 
         let r = outline_radius as i32;
         self.ui_state.bounds.min_x += r;
@@ -2212,6 +2213,10 @@ impl<'a> Ui<'a> {
         //////////////////
 
         let mut rect = self.history_bounding_rect(history_start);
+        self.ui_state.bounds = bounds;
+        self.submit_rect(id, rect, self.theme.padding);
+        self.ui_state.layer = last_layer;
+
         rect.min_x -= r;
         rect.max_x += r;
         rect.min_y -= r;
@@ -2225,9 +2230,6 @@ impl<'a> Ui<'a> {
             outline_color,
             outline_radius,
         );
-
-        self.submit_rect(id, rect, self.theme.padding);
-        self.ui_state.layer = last_layer;
     }
 
     fn theme_rect(
