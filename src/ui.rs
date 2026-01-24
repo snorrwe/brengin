@@ -2734,33 +2734,33 @@ fn layout_rect(desc: RectLayoutDescriptor) -> UiRect {
         LayoutDirection::TopDown(hor) => {
             rect.min_y = bounds.min_y + p_top;
             rect.max_y = (rect.min_y + desc.height).min(bounds.max_y - p_bot);
-            rect = aling_horizontal(hor, rect, bounds);
+            rect = align_horizontal(hor, rect, bounds);
         }
         LayoutDirection::BottomUp(hor) => {
             rect.max_y = bounds.max_y - p_bot;
             rect.min_y = (rect.max_y - desc.height).max(bounds.min_y + p_top);
-            rect = aling_horizontal(hor, rect, bounds);
+            rect = align_horizontal(hor, rect, bounds);
         }
         LayoutDirection::LeftRight(ver) => {
             rect.min_x = bounds.min_x + p_left;
             rect.max_x = (rect.min_x + desc.width).min(bounds.max_x - p_right);
-            rect = aling_vertical(ver, rect, bounds);
+            rect = align_vertical(ver, rect, bounds);
         }
         LayoutDirection::RightLeft(ver) => {
             rect.max_x = bounds.max_x - p_right;
             rect.min_x = (rect.max_x - desc.width).max(bounds.min_x + p_left);
-            rect = aling_vertical(ver, rect, bounds);
+            rect = align_vertical(ver, rect, bounds);
         }
         LayoutDirection::Center => {
-            rect = aling_vertical(VerticalAlignment::Center, rect, bounds);
-            rect = aling_horizontal(HorizontalAlignment::Center, rect, bounds);
+            rect = align_vertical(VerticalAlignment::Center, rect, bounds);
+            rect = align_horizontal(HorizontalAlignment::Center, rect, bounds);
         }
     }
 
     rect
 }
 
-fn aling_horizontal(alignment: HorizontalAlignment, mut rect: UiRect, bounds: UiRect) -> UiRect {
+fn align_horizontal(alignment: HorizontalAlignment, mut rect: UiRect, bounds: UiRect) -> UiRect {
     let delta = match alignment {
         HorizontalAlignment::Left => bounds.min_x - rect.min_x,
         HorizontalAlignment::Right => bounds.max_x - rect.max_x,
@@ -2770,7 +2770,7 @@ fn aling_horizontal(alignment: HorizontalAlignment, mut rect: UiRect, bounds: Ui
     rect
 }
 
-fn aling_vertical(alignment: VerticalAlignment, mut rect: UiRect, bounds: UiRect) -> UiRect {
+fn align_vertical(alignment: VerticalAlignment, mut rect: UiRect, bounds: UiRect) -> UiRect {
     let delta = match alignment {
         VerticalAlignment::Top => bounds.min_y - rect.min_y,
         VerticalAlignment::Center => bounds.max_y - rect.max_y,
