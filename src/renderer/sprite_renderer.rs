@@ -608,7 +608,7 @@ impl Plugin for SpriteRendererPlugin {
         });
 
         app.add_plugin(RenderCommandPlugin::<SpriteRenderCommand>::new(
-            RenderPass::Transparent,
+            RenderPass::Opaque,
         ));
         app.extract_stage.add_system(add_missing_sheets);
         app.extract_stage.add_system(add_missing_meshes);

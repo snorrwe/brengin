@@ -92,5 +92,8 @@ fn vs_main(
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(texture, texture_sampler, in.uv);
+    if (color.a < 0.2 ) {
+        discard;
+    }
     return color;
 }
