@@ -1226,9 +1226,15 @@ impl<'a> Ui<'a> {
         let parent = self
             .ui_state
             .id_stack
-            .last()
-            .and_then(|i| self.ui_state.widget_ids.get(*i as usize))
-            .copied()
+            .len()
+            .checked_sub(2)
+            .and_then(|i| {
+                self.ui_state
+                    .id_stack
+                    .get(i)
+                    .and_then(|i| self.ui_state.widget_ids.get(*i as usize))
+                    .copied()
+            })
             .unwrap_or_else(|| {
                 let mut id = UiId::SENTINEL;
                 id.uid = self.ui_state.root_hash;
