@@ -3637,8 +3637,21 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
     boxes.sort_unstable_by_key(|(k, _)| *k);
 
     let ui = &mut ui.0;
+    let mut ancestry = Vec::new();
     for (id, rect) in boxes.into_iter() {
-        let (handle, e) = ui.shape_and_draw_line(format!("{}/{}", id.parent as i32, id.index), 12);
+        {
+            let mut id = id;
+            ancestry.push(id);
+            while id.parent != SENTINEL {
+                id = ui.ui.widget_ids[id.parent as usize];
+                ancestry.push(id);
+            }
+        }
+        let label = ancestry
+            .drain(..)
+            .rev()
+            .fold(String::new(), |x, a| format!("{x}/{}", a.index));
+        let (handle, e) = ui.shape_and_draw_line(label, 12);
         let pic = &e.texture;
         let line_width = pic.width() as i32;
         let line_height = pic.height() as i32;
