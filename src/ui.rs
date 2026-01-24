@@ -1,7 +1,7 @@
 use crate::{
     assets::{self, Assets, AssetsPlugin, Handle, WeakHandle},
     color::Color,
-    DeltaTime, KeyBoardInputs, MouseInputs, Plugin, Tick, Timer,
+    DeltaTime, KeyBoardInputs, MouseInputs, Plugin, Stage, Tick, Timer,
 };
 
 pub mod color_rect_pipeline;
@@ -66,10 +66,10 @@ impl Plugin for UiPlugin {
             app.insert_resource(Theme::default());
         }
 
-        app.with_stage(crate::Stage::PreUpdate, |s| {
+        app.with_stage(Stage::PreUpdate, |s| {
             s.add_system(begin_frame);
         });
-        app.with_stage(crate::Stage::PostUpdate, |s| {
+        app.with_stage(Stage::PostUpdate, |s| {
             s.add_nested_stage(
                 SystemStage::new("debug")
                     .with_should_run(|debug: Option<Res<UiDebug>>| {
