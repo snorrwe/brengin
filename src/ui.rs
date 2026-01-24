@@ -3670,7 +3670,8 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
             .rev()
             .fold(String::new(), |x, a| format!("{x}{}/", a.index));
         label.pop(); // pop the last /
-        let (handle, e) = ui.shape_and_draw_line(label, 12);
+        let (handle, e) =
+            ui.shape_and_draw_line(format!("{label} [{} {}]", rect.width(), rect.height()), 12);
         let pic = &e.texture;
         let line_width = pic.width() as i32;
         let line_height = pic.height() as i32;
