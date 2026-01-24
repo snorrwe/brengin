@@ -2733,22 +2733,22 @@ fn layout_rect(desc: RectLayoutDescriptor) -> UiRect {
     match desc.dir {
         LayoutDirection::TopDown(hor) => {
             rect.min_y = bounds.min_y + p_top;
-            rect.max_y = (rect.min_y + desc.height).min(bounds.max_y - p_bot);
+            rect.max_y = rect.min_y + desc.height;
             rect = align_horizontal(hor, rect, bounds);
         }
         LayoutDirection::BottomUp(hor) => {
             rect.max_y = bounds.max_y - p_bot;
-            rect.min_y = (rect.max_y - desc.height).max(bounds.min_y + p_top);
+            rect.min_y = rect.max_y - desc.height;
             rect = align_horizontal(hor, rect, bounds);
         }
         LayoutDirection::LeftRight(ver) => {
             rect.min_x = bounds.min_x + p_left;
-            rect.max_x = (rect.min_x + desc.width).min(bounds.max_x - p_right);
+            rect.max_x = rect.min_x + desc.width;
             rect = align_vertical(ver, rect, bounds);
         }
         LayoutDirection::RightLeft(ver) => {
             rect.max_x = bounds.max_x - p_right;
-            rect.min_x = (rect.max_x - desc.width).max(bounds.min_x + p_left);
+            rect.min_x = rect.max_x - desc.width;
             rect = align_vertical(ver, rect, bounds);
         }
         LayoutDirection::Center => {
