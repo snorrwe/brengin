@@ -1216,6 +1216,10 @@ impl<'a> Ui<'a> {
             }
             LayoutDirection::Center => { /*noop*/ }
         }
+
+        self.ui_state.bounds.min_x = self.ui_state.bounds.min_x.min(self.ui_state.bounds.max_x);
+        self.ui_state.bounds.min_y = self.ui_state.bounds.min_y.min(self.ui_state.bounds.max_y);
+
         self.ui_state.bounding_boxes.insert(id, rect);
         self.ui_state.rect_history.push(rect);
     }
