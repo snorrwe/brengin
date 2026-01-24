@@ -835,18 +835,12 @@ impl<'a> Ui<'a> {
     /// If `hide` is true, then the inner contents are not rendered
     /// Useful for keeping the Id stack consistent
     pub fn hidden(&mut self, hide: bool, mut contents: impl FnMut(&mut Self)) {
-        let id = self.begin_widget();
-        let history_start = self.ui_state.rect_history.len();
+        let _id = self.begin_widget();
         if !hide {
-            let bounds = self.ui_state.bounds;
             self.push_child();
-            ///////////////////////
             contents(self);
-            ///////////////////////
             self.pop_child();
-            self.ui_state.bounds = bounds;
         }
-        self.submit_rect_group(id, history_start);
     }
 
     /// submit a new rect that contains all rects submitted beginning at history_start index
