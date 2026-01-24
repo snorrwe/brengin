@@ -616,37 +616,37 @@ fn shaping_gc_system(
 impl<'a> Ui<'a> {
     /// returns the last scissor_idx
     pub fn push_scissor(&mut self, scissor_bounds: UiRect) -> u32 {
-        let res = self.ui.scissor_idx;
-        self.ui.scissor_idx = self.ui.scissors.len() as u32;
-        self.ui.scissors.push(scissor_bounds);
+        let res = self.ui_state.scissor_idx;
+        self.ui_state.scissor_idx = self.ui_state.scissors.len() as u32;
+        self.ui_state.scissors.push(scissor_bounds);
         res
     }
 
     #[inline]
     fn set_hovered(&mut self, id: UiId) {
         self.next_ids
-            .push(id, self.ui.layer)
+            .push(id, self.ui_state.layer)
             .add_flag(InteractionFlag::Hovered);
     }
 
     #[inline]
     fn set_context_menu(&mut self, id: UiId) {
         self.next_ids
-            .push(id, self.ui.layer)
+            .push(id, self.ui_state.layer)
             .add_flag(InteractionFlag::ContextMenu);
     }
 
     #[inline]
     fn set_scrolling(&mut self, id: UiId) {
         self.next_ids
-            .push(id, self.ui.layer)
+            .push(id, self.ui_state.layer)
             .add_flag(InteractionFlag::Scrolling);
     }
 
     #[inline]
     fn set_active(&mut self, id: UiId) {
         self.next_ids
-            .push(id, self.ui.layer)
+            .push(id, self.ui_state.layer)
             .add_flag(InteractionFlag::Active);
     }
 
@@ -672,16 +672,16 @@ impl<'a> Ui<'a> {
 
     pub fn clear_active(&mut self) {
         self.next_ids
-            .push(UiId::SENTINEL, self.ui.layer)
+            .push(UiId::SENTINEL, self.ui_state.layer)
             .remove_flag(InteractionFlag::Active);
     }
 
     pub fn current_id(&self) -> UiId {
-        self.ui
+        self.ui_state
             .id_stack
             .last()
             .copied()
-            .and_then(|i| self.ui.widget_ids.get(i as usize))
+            .and_then(|i| self.ui_state.widget_ids.get(i as usize))
             .copied()
             .unwrap_or_default()
     }
@@ -731,8 +731,12 @@ impl<'a> Ui<'a> {
     }
 
     pub fn widget_bounds(&self, id: UiId) -> Option<UiRect> {
-        let mut bbox = *self.ui.bounding_boxes.get(&id)?;
-        if let Some(scissor) = self.ui.scissors.get(self.ui.scissor_idx as usize) {
+        let mut bbox = *self.ui_state.bounding_boxes.get(&id)?;
+        if let Some(scissor) = self
+            .ui_state
+            .scissors
+            .get(self.ui_state.scissor_idx as usize)
+        {
             bbox = bbox.intersection(*scissor)?;
         }
         Some(bbox)
@@ -742,7 +746,7 @@ impl<'a> Ui<'a> {
     fn set_not_active(&mut self, id: UiId) {
         if self.ids.active == id {
             self.next_ids
-                .push(id, self.ui.layer)
+                .push(id, self.ui_state.layer)
                 .remove_flag(InteractionFlag::Active);
         }
     }
@@ -751,7 +755,7 @@ impl<'a> Ui<'a> {
     fn set_not_scrolling(&mut self, id: UiId) {
         if self.ids.scrolling == id {
             self.next_ids
-                .push(id, self.ui.layer)
+                .push(id, self.ui_state.layer)
                 .remove_flag(InteractionFlag::Scrolling);
         }
     }
@@ -759,7 +763,7 @@ impl<'a> Ui<'a> {
     #[inline]
     fn set_not_hovered(&mut self, id: UiId) {
         self.next_ids
-            .push(id, self.ui.layer)
+            .push(id, self.ui_state.layer)
             .remove_flag(InteractionFlag::Hovered);
     }
 
@@ -817,14 +821,14 @@ impl<'a> Ui<'a> {
 
     fn _with_layout(&mut self, contents: impl FnMut(&mut Self), layout: LayoutDirection) {
         let id = self.begin_widget();
-        let history_start = self.ui.rect_history.len();
-        let bounds = self.ui.bounds;
-        let layout = std::mem::replace(&mut self.ui.layout_dir, layout);
+        let history_start = self.ui_state.rect_history.len();
+        let bounds = self.ui_state.bounds;
+        let layout = std::mem::replace(&mut self.ui_state.layout_dir, layout);
         ///////////////////////
         self.children_content(contents);
         ///////////////////////
-        self.ui.layout_dir = layout;
-        self.ui.bounds = bounds;
+        self.ui_state.layout_dir = layout;
+        self.ui_state.bounds = bounds;
         self.submit_rect_group(id, history_start);
     }
 
@@ -832,28 +836,28 @@ impl<'a> Ui<'a> {
     /// Useful for keeping the Id stack consistent
     pub fn hidden(&mut self, hide: bool, mut contents: impl FnMut(&mut Self)) {
         let id = self.begin_widget();
-        let history_start = self.ui.rect_history.len();
+        let history_start = self.ui_state.rect_history.len();
         if !hide {
-            let bounds = self.ui.bounds;
+            let bounds = self.ui_state.bounds;
             self.push_child();
             ///////////////////////
             contents(self);
             ///////////////////////
             self.pop_child();
-            self.ui.bounds = bounds;
+            self.ui_state.bounds = bounds;
         }
         self.submit_rect_group(id, history_start);
     }
 
     /// submit a new rect that contains all rects submitted beginning at history_start index
     fn submit_rect_group(&mut self, id: UiId, history_start: usize) -> UiRect {
-        if self.ui.rect_history.len() <= history_start {
+        if self.ui_state.rect_history.len() <= history_start {
             // no rects have been submitted
             return UiRect::default();
         }
 
-        let mut rect = self.ui.rect_history[history_start];
-        self.ui.rect_history[history_start + 1..]
+        let mut rect = self.ui_state.rect_history[history_start];
+        self.ui_state.rect_history[history_start + 1..]
             .iter()
             .for_each(|r| rect = rect.grow_over(*r));
         self.submit_rect(id, rect, self.theme.padding);
@@ -867,8 +871,8 @@ impl<'a> Ui<'a> {
         self.begin_widget();
         self.push_child();
         let cols = columns as i32;
-        let history_start = self.ui.rect_history.len();
-        let bounds = self.ui.bounds;
+        let history_start = self.ui_state.rect_history.len();
+        let bounds = self.ui_state.bounds;
         let width = (bounds.width() / cols + 1) as i32;
 
         let dims = (0..cols as i32)
@@ -885,7 +889,7 @@ impl<'a> Ui<'a> {
         ///////////////////////
 
         self.pop_child();
-        self.ui.bounds = bounds;
+        self.ui_state.bounds = bounds;
         self.submit_rect_group(self.current_id(), history_start);
     }
 
@@ -929,9 +933,9 @@ impl<'a> Ui<'a> {
         color: Color,
         layer: u16,
     ) {
-        assert!(!self.ui.scissors.is_empty());
-        let scissor = self.ui.scissor_idx;
-        self.ui.color_rects.push(DrawColorRect {
+        assert!(!self.ui_state.scissors.is_empty());
+        let scissor = self.ui_state.scissor_idx;
+        self.ui_state.color_rects.push(DrawColorRect {
             x,
             y,
             w: width,
@@ -954,9 +958,9 @@ impl<'a> Ui<'a> {
         outline_color: Color,
         layer: u16,
     ) {
-        assert!(!self.ui.scissors.is_empty());
-        let scissor = self.ui.scissor_idx;
-        self.ui.color_rects.push(DrawColorRect {
+        assert!(!self.ui_state.scissors.is_empty());
+        let scissor = self.ui_state.scissor_idx;
+        self.ui_state.color_rects.push(DrawColorRect {
             x,
             y,
             w: width,
@@ -979,9 +983,9 @@ impl<'a> Ui<'a> {
         image: Handle<DynamicImage>,
         layer: u16,
     ) {
-        assert!(!self.ui.scissors.is_empty());
-        let scissor = self.ui.scissor_idx;
-        self.ui.texture_rects.push(DrawTextureRect {
+        assert!(!self.ui_state.scissors.is_empty());
+        let scissor = self.ui_state.scissor_idx;
+        self.ui_state.texture_rects.push(DrawTextureRect {
             x,
             y,
             w: width,
@@ -1002,9 +1006,9 @@ impl<'a> Ui<'a> {
         layer: u16,
         shaping: Handle<ShapingResult>,
     ) {
-        assert!(!self.ui.scissors.is_empty());
-        let scissor = self.ui.scissor_idx;
-        self.ui.text_rects.push(DrawTextRect {
+        assert!(!self.ui_state.scissors.is_empty());
+        let scissor = self.ui_state.scissor_idx;
+        self.ui_state.text_rects.push(DrawTextRect {
             x,
             y,
             w: width,
@@ -1020,7 +1024,7 @@ impl<'a> Ui<'a> {
         if self.fonts.contains(self.theme.font.id()) {
             self.fonts.get(&self.theme.font)
         } else {
-            &self.ui.fallback_font
+            &self.ui_state.fallback_font
         }
     }
 
@@ -1043,7 +1047,7 @@ impl<'a> Ui<'a> {
                 let font = if self.fonts.contains(self.theme.font.id()) {
                     self.fonts.get(&self.theme.font)
                 } else {
-                    &self.ui.fallback_font
+                    &self.ui_state.fallback_font
                 };
 
                 let glyphs = rustybuzz::shape(font.face(), &[], buffer);
@@ -1094,17 +1098,17 @@ impl<'a> Ui<'a> {
         height: UiCoord,
     ) -> Response<()> {
         let id = self.begin_widget();
-        let layer = self.ui.layer;
+        let layer = self.ui_state.layer;
 
-        let width = width.as_abolute(self.ui.bounds.width());
-        let height = height.as_abolute(self.ui.bounds.height());
+        let width = width.as_abolute(self.ui_state.bounds.width());
+        let height = height.as_abolute(self.ui_state.bounds.height());
 
         let rect = layout_rect(RectLayoutDescriptor {
             width,
             height,
             padding: Some(self.theme.padding),
-            dir: self.ui.layout_dir,
-            bounds: self.ui.bounds,
+            dir: self.ui_state.layout_dir,
+            bounds: self.ui_state.bounds,
         });
 
         self.image_rect(rect.min_x, rect.min_y, width, height, image, layer);
@@ -1121,7 +1125,7 @@ impl<'a> Ui<'a> {
 
     pub fn label(&mut self, label: impl Into<String>) -> Response<()> {
         let id = self.begin_widget();
-        let layer = self.ui.layer;
+        let layer = self.ui_state.layer;
         let label = label.into();
 
         // shape the text
@@ -1130,7 +1134,7 @@ impl<'a> Ui<'a> {
         let mut h = 0;
         let mut text_y = 0;
         let mut line_height = 0;
-        let text_rects = self.ui.text_rects.len();
+        let text_rects = self.ui_state.text_rects.len();
         for line in label.split('\n') {
             if line.is_empty() {
                 text_y += line_height;
@@ -1162,8 +1166,8 @@ impl<'a> Ui<'a> {
             padding: Some(self.theme.padding),
             width: w + 2 * text_padding,
             height: h + 2 * text_padding,
-            dir: self.ui.layout_dir,
-            bounds: self.ui.bounds,
+            dir: self.ui_state.layout_dir,
+            bounds: self.ui_state.bounds,
         });
 
         self.submit_rect(id, rect, self.theme.padding);
@@ -1172,11 +1176,11 @@ impl<'a> Ui<'a> {
             padding: Some(Padding::splat(text_padding)),
             width: w,
             height: h,
-            dir: self.ui.layout_dir,
+            dir: self.ui_state.layout_dir,
             bounds: rect,
         });
 
-        for r in &mut self.ui.text_rects[text_rects..] {
+        for r in &mut self.ui_state.text_rects[text_rects..] {
             r.x += offset.min_x;
             r.y += offset.min_y;
         }
@@ -1194,40 +1198,40 @@ impl<'a> Ui<'a> {
     fn submit_rect(&mut self, id: UiId, rect: UiRect, padding: impl Into<Option<Padding>>) {
         let [p_left, p_right, p_top, p_bot] = padding
             .into()
-            .map(|p| p.as_abs(self.ui.bounds.width(), self.ui.bounds.height()))
+            .map(|p| p.as_abs(self.ui_state.bounds.width(), self.ui_state.bounds.height()))
             .unwrap_or_default();
 
-        match self.ui.layout_dir {
+        match self.ui_state.layout_dir {
             LayoutDirection::TopDown(_) => {
-                self.ui.bounds.min_y = rect.max_y + p_bot;
+                self.ui_state.bounds.min_y = rect.max_y + p_bot;
             }
             LayoutDirection::LeftRight(_) => {
-                self.ui.bounds.min_x = rect.max_x + p_right;
+                self.ui_state.bounds.min_x = rect.max_x + p_right;
             }
             LayoutDirection::BottomUp(_) => {
-                self.ui.bounds.max_y = rect.min_y - p_top;
+                self.ui_state.bounds.max_y = rect.min_y - p_top;
             }
             LayoutDirection::RightLeft(_) => {
-                self.ui.bounds.max_x = rect.min_x - p_left;
+                self.ui_state.bounds.max_x = rect.min_x - p_left;
             }
             LayoutDirection::Center => { /*noop*/ }
         }
-        self.ui.bounding_boxes.insert(id, rect);
-        self.ui.rect_history.push(rect);
+        self.ui_state.bounding_boxes.insert(id, rect);
+        self.ui_state.rect_history.push(rect);
     }
 
     pub fn begin_widget(&mut self) -> UiId {
-        let index = self.ui.widget_ids.len() as IdxType;
+        let index = self.ui_state.widget_ids.len() as IdxType;
 
         let parent = self
-            .ui
+            .ui_state
             .id_stack
             .last()
-            .and_then(|i| self.ui.widget_ids.get(*i as usize))
+            .and_then(|i| self.ui_state.widget_ids.get(*i as usize))
             .copied()
             .unwrap_or_else(|| {
                 let mut id = UiId::SENTINEL;
-                id.uid = self.ui.root_hash;
+                id.uid = self.ui_state.root_hash;
                 id
             });
 
@@ -1238,25 +1242,25 @@ impl<'a> Ui<'a> {
             uid: hash,
             depth: parent.depth + 1,
         };
-        self.ui.widget_ids.push(id);
-        if let Some(i) = self.ui.id_stack.last_mut() {
+        self.ui_state.widget_ids.push(id);
+        if let Some(i) = self.ui_state.id_stack.last_mut() {
             *i = id.index;
         }
         id
     }
 
     fn push_child(&mut self) {
-        self.ui.id_stack.push(SENTINEL);
+        self.ui_state.id_stack.push(SENTINEL);
     }
 
     fn pop_child(&mut self) {
-        self.ui.id_stack.pop();
+        self.ui_state.id_stack.pop();
     }
 
     pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
         fn _button(this: &mut Ui, label: String) -> ButtonResponse {
             let id = this.begin_widget();
-            let layer = this.ui.layer;
+            let layer = this.ui_state.layer;
 
             let mut pressed = false;
             let contains_mouse = this.contains_mouse(id);
@@ -1301,7 +1305,7 @@ impl<'a> Ui<'a> {
                 .button_text_color
                 .unwrap_or(this.theme.primary_color);
 
-            let text_rect_idx = this.ui.text_rects.len();
+            let text_rect_idx = this.ui_state.text_rects.len();
 
             for line in label.split('\n').filter(|l| !l.is_empty()) {
                 let (handle, e) =
@@ -1347,8 +1351,8 @@ impl<'a> Ui<'a> {
                 padding: Some(this.theme.padding),
                 width: w + 2 * text_padding,
                 height: h + 2 * text_padding,
-                dir: this.ui.layout_dir,
-                bounds: this.ui.bounds,
+                dir: this.ui_state.layout_dir,
+                bounds: this.ui_state.bounds,
             });
 
             this.submit_rect(id, rect, this.theme.padding);
@@ -1370,7 +1374,7 @@ impl<'a> Ui<'a> {
                 bounds: rect,
             });
 
-            for r in &mut this.ui.text_rects[text_rect_idx..] {
+            for r in &mut this.ui_state.text_rects[text_rect_idx..] {
                 r.x += offset.min_x;
                 r.y += offset.min_y;
             }
@@ -1456,7 +1460,7 @@ impl<'a> Ui<'a> {
             max_y: scissor_bounds.max_y,
         };
         self.color_rect_from_rect(bounds, 0xFF0000FF.into(), layer);
-        self.ui.bounding_boxes.insert(id, bounds);
+        self.ui_state.bounding_boxes.insert(id, bounds);
 
         // pip
         let t = parent_state.ty;
@@ -1495,7 +1499,7 @@ impl<'a> Ui<'a> {
             max_y: y + scroll_bar_width,
         };
         self.color_rect_from_rect(control_box, 0xFF0AA0FF.into(), layer + 1);
-        self.ui.bounding_boxes.insert(id, control_box);
+        self.ui_state.bounding_boxes.insert(id, control_box);
     }
 
     fn horizontal_scroll_bar(
@@ -1515,7 +1519,7 @@ impl<'a> Ui<'a> {
             max_y: scissor_bounds.max_y,
         };
         self.color_rect_from_rect(bounds, 0xaaFF00FF.into(), layer);
-        self.ui.bounding_boxes.insert(id, bounds);
+        self.ui_state.bounding_boxes.insert(id, bounds);
 
         // pip
         let t = parent_state.tx;
@@ -1552,7 +1556,7 @@ impl<'a> Ui<'a> {
             max_y: scissor_bounds.max_y,
         };
         self.color_rect_from_rect(control_box, 0xFF0AA0FF.into(), layer + 1);
-        self.ui.bounding_boxes.insert(id, control_box);
+        self.ui_state.bounding_boxes.insert(id, control_box);
     }
 
     pub fn scroll_area(&mut self, desc: ScrollDescriptor, contents: impl FnMut(&mut Self)) {
@@ -1560,11 +1564,11 @@ impl<'a> Ui<'a> {
         let width = desc
             .width
             .unwrap_or(UiCoord::Percent(100))
-            .as_abolute(self.ui.bounds.width());
+            .as_abolute(self.ui_state.bounds.width());
         let height = desc
             .height
             .unwrap_or(UiCoord::Percent(100))
-            .as_abolute(self.ui.bounds.height());
+            .as_abolute(self.ui_state.bounds.height());
         let mut state = *self.get_memory_or_default::<ScrollState>(id);
 
         let line_height = self.theme.font_size + self.theme.text_padding;
@@ -1620,12 +1624,12 @@ impl<'a> Ui<'a> {
         let offset_y = state.ty * state.scroll_height as f32;
         self.insert_memory(id, state);
 
-        let old_bounds = self.ui.bounds;
+        let old_bounds = self.ui_state.bounds;
         let scissor_bounds = layout_rect(RectLayoutDescriptor {
             width,
             height,
             padding: None,
-            dir: self.ui.layout_dir,
+            dir: self.ui_state.layout_dir,
             bounds: old_bounds,
         });
 
@@ -1636,7 +1640,7 @@ impl<'a> Ui<'a> {
         const BOUNDS_LIMIT: i32 = i32::MAX / 4;
 
         if desc.width.is_some() {
-            match self.ui.layout_dir {
+            match self.ui_state.layout_dir {
                 LayoutDirection::LeftRight(_) => {
                     bounds.max_x = BOUNDS_LIMIT;
                 }
@@ -1651,7 +1655,7 @@ impl<'a> Ui<'a> {
             }
         }
         if desc.height.is_some() {
-            match self.ui.layout_dir {
+            match self.ui_state.layout_dir {
                 LayoutDirection::TopDown(_) => {
                     bounds.max_y = BOUNDS_LIMIT;
                 }
@@ -1666,11 +1670,11 @@ impl<'a> Ui<'a> {
             }
         }
 
-        self.ui.bounds = bounds;
+        self.ui_state.bounds = bounds;
         let scissor_idx = self.push_scissor(scissor_bounds);
 
         let layer = self.push_layer();
-        let history_start = self.ui.rect_history.len();
+        let history_start = self.ui_state.rect_history.len();
         ///////////////////////
         self.children_content(contents);
         ///////////////////////
@@ -1712,19 +1716,19 @@ impl<'a> Ui<'a> {
             );
         }
         self.insert_memory(id, state);
-        self.ui.bounds = old_bounds;
+        self.ui_state.bounds = old_bounds;
         self.submit_rect(id, scissor_bounds, self.theme.padding);
 
-        self.ui.layer = layer;
-        self.ui.scissor_idx = scissor_idx;
+        self.ui_state.layer = layer;
+        self.ui_state.scissor_idx = scissor_idx;
     }
 
     fn history_bounding_rect(&self, history_start: usize) -> UiRect {
-        bounding_rect(&self.ui.rect_history[history_start..])
+        bounding_rect(&self.ui_state.rect_history[history_start..])
     }
 
     pub fn empty(&mut self, width: i32, height: i32) -> Response<()> {
-        let mut bounds = self.ui.bounds;
+        let mut bounds = self.ui_state.bounds;
         bounds.resize_w(width);
         bounds.resize_h(height);
         // TODO: layout
@@ -1742,7 +1746,7 @@ impl<'a> Ui<'a> {
 
     pub fn drag_source(&mut self, mut contents: impl FnMut(&mut Self, &DragState)) -> DragResponse {
         let id = self.begin_widget();
-        let old_bounds = self.ui.bounds;
+        let old_bounds = self.ui_state.bounds;
 
         let mut state = self
             .remove_memory::<DragState>(id)
@@ -1792,35 +1796,35 @@ impl<'a> Ui<'a> {
             }
         }
 
-        let history = std::mem::take(&mut self.ui.rect_history);
-        self.ui.bounds = layout_rect(RectLayoutDescriptor {
+        let history = std::mem::take(&mut self.ui_state.rect_history);
+        self.ui_state.bounds = layout_rect(RectLayoutDescriptor {
             width: state.content_rect.width(),
             height: state.content_rect.height(),
             padding: None,
-            dir: self.ui.layout_dir,
-            bounds: self.ui.bounds,
+            dir: self.ui_state.layout_dir,
+            bounds: self.ui_state.bounds,
         });
-        self.ui.bounds.move_to_x(state.pos.x);
-        self.ui.bounds.move_to_y(state.pos.y);
-        let last_scissor = self.ui.scissor_idx;
-        let layer = self.ui.layer;
+        self.ui_state.bounds.move_to_x(state.pos.x);
+        self.ui_state.bounds.move_to_y(state.pos.y);
+        let last_scissor = self.ui_state.scissor_idx;
+        let layer = self.ui_state.layer;
         if is_being_dragged {
             // Ensure that the widget is rendered on screen by pushing a new scissor that holds the
             // widget.
             // Only do this for the dragged widget, otherwise a lot of redundant scissors are
             // created.
-            self.push_scissor(self.ui.bounds);
-            self.ui.layer = DRAG_LAYER;
+            self.push_scissor(self.ui_state.bounds);
+            self.ui_state.layer = DRAG_LAYER;
         }
-        self.ui.layer += 1;
+        self.ui_state.layer += 1;
         ///////////////////////
         self.children_content(|ui| {
             contents(ui, &state);
         });
         ///////////////////////
-        self.ui.layer = layer;
-        self.ui.bounds = old_bounds;
-        let child_history = std::mem::replace(&mut self.ui.rect_history, history);
+        self.ui_state.layer = layer;
+        self.ui_state.bounds = old_bounds;
+        let child_history = std::mem::replace(&mut self.ui_state.rect_history, history);
         let mut content_bounds = bounding_rect(&child_history);
 
         if is_being_dragged {
@@ -1829,11 +1833,11 @@ impl<'a> Ui<'a> {
             // position, so the layout stays the same while dragging
             content_bounds = state.content_rect;
         } else {
-            self.ui.rect_history.extend_from_slice(&child_history);
+            self.ui_state.rect_history.extend_from_slice(&child_history);
             state.content_rect = content_bounds;
             state.pos = IVec2::new(content_bounds.min_x, content_bounds.min_y);
         }
-        self.ui.scissor_idx = last_scissor;
+        self.ui_state.scissor_idx = last_scissor;
 
         self.submit_rect(id, content_bounds, self.theme.padding);
 
@@ -1853,20 +1857,20 @@ impl<'a> Ui<'a> {
 
     /// return the previous layer
     fn push_layer(&mut self) -> u16 {
-        let l = self.ui.layer;
-        self.ui.layer += 1;
+        let l = self.ui_state.layer;
+        self.ui_state.layer += 1;
         l
     }
 
     pub fn on_next_layer(&mut self, mut contents: impl FnMut(&mut Self)) {
         let l = self.push_layer();
         contents(self);
-        self.ui.layer = l;
+        self.ui_state.layer = l;
     }
 
     pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self, DropState)) -> DropResponse {
         let id = self.begin_widget();
-        let old_bounds = self.ui.bounds;
+        let old_bounds = self.ui_state.bounds;
         let bg_layer = self.push_layer();
         let mut state = DropState::default();
         state.id = id;
@@ -1887,13 +1891,13 @@ impl<'a> Ui<'a> {
             }
         }
 
-        let history_start = self.ui.rect_history.len();
+        let history_start = self.ui_state.rect_history.len();
         ///////////////////////
         self.children_content(|ui| {
             contents(ui, state);
         });
         ///////////////////////
-        self.ui.bounds = old_bounds;
+        self.ui_state.bounds = old_bounds;
 
         let content_bounds = self.history_bounding_rect(history_start);
         self.submit_rect(id, content_bounds, self.theme.padding);
@@ -1943,7 +1947,7 @@ impl<'a> Ui<'a> {
     fn input_string_impl(&mut self, desc: InputStringDescriptor) -> Response<InputResponse> {
         let id = self.begin_widget();
         let last_layer = self.push_layer();
-        let layer = self.ui.layer;
+        let layer = self.ui_state.layer;
 
         let mut state = self
             .get_memory_or_insert::<TextInputState>(id, || TextInputState {
@@ -2071,12 +2075,12 @@ impl<'a> Ui<'a> {
         // shape the text
         let mut w = 0;
         let mut h = 0;
-        let x = self.ui.bounds.min_x;
-        let y = self.ui.bounds.min_y;
+        let x = self.ui_state.bounds.min_x;
+        let y = self.ui_state.bounds.min_y;
         let [p_left, p_right, p_top, p_bot] = self
             .theme
             .padding
-            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+            .as_abs(self.ui_state.bounds.width(), self.ui_state.bounds.height());
         let text_padding = self.theme.text_padding as i32;
         let [x, y] = [x + p_left + text_padding, y + p_top + text_padding];
         let mut line_width = 0;
@@ -2165,7 +2169,7 @@ impl<'a> Ui<'a> {
         rect.max_x += p_right;
         rect.max_y += p_bot;
         self.submit_rect(id, rect, self.theme.padding);
-        self.ui.layer = last_layer;
+        self.ui_state.layer = last_layer;
         self.insert_memory(id, state);
         Response {
             hovered: self.is_hovered(id),
@@ -2188,16 +2192,16 @@ impl<'a> Ui<'a> {
         let id = self.begin_widget();
         let last_layer = self.push_layer();
         let layer = self.push_layer();
-        let history_start = self.ui.rect_history.len();
+        let history_start = self.ui_state.rect_history.len();
 
         let [p_left, p_right, p_top, p_bot] = self
             .theme
             .padding
-            .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+            .as_abs(self.ui_state.bounds.width(), self.ui_state.bounds.height());
 
         let r = outline_radius as i32;
-        self.ui.bounds.min_x += p_left + r;
-        self.ui.bounds.min_y += p_top + r;
+        self.ui_state.bounds.min_x += p_left + r;
+        self.ui_state.bounds.min_y += p_top + r;
         //////////////////
         self.children_content(content);
         //////////////////
@@ -2218,7 +2222,7 @@ impl<'a> Ui<'a> {
         );
 
         self.submit_rect(id, rect, self.theme.padding);
-        self.ui.layer = last_layer;
+        self.ui_state.layer = last_layer;
     }
 
     fn theme_rect(
@@ -2257,25 +2261,25 @@ impl<'a> Ui<'a> {
 
         state.open = self.has_context_menu(parent_id);
         if state.open {
-            let history_start = self.ui.rect_history.len();
-            let old_layer = std::mem::replace(&mut self.ui.layer, CONTEXT_LAYER + 2);
-            let old_bounds = self.ui.bounds;
+            let history_start = self.ui_state.rect_history.len();
+            let old_layer = std::mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
+            let old_bounds = self.ui_state.bounds;
 
             let outline_size = 2;
             let [p_left, p_right, p_top, p_bot] = self
                 .theme
                 .padding
-                .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+                .as_abs(self.ui_state.bounds.width(), self.ui_state.bounds.height());
             let p_horizontal = p_left + p_right;
             let p_vertical = p_bot + p_top;
 
             let mut bounds = resp.rect;
             bounds.move_to_x(state.offset.x);
             bounds.move_to_y(state.offset.y);
-            bounds.max_x = self.ui.scissors[0].max_x - p_horizontal - outline_size;
-            bounds.max_y = self.ui.scissors[0].max_y - p_vertical - outline_size;
+            bounds.max_x = self.ui_state.scissors[0].max_x - p_horizontal - outline_size;
+            bounds.max_y = self.ui_state.scissors[0].max_y - p_vertical - outline_size;
 
-            let new_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
+            let new_bounds = std::mem::replace(&mut self.ui_state.bounds, bounds);
 
             let scissor = self.push_scissor(UiRect {
                 min_x: bounds.min_x - p_horizontal - outline_size,
@@ -2289,7 +2293,7 @@ impl<'a> Ui<'a> {
                 context_menu(ui, &mut state);
             });
             ///////////////////////
-            self.ui.bounds = new_bounds;
+            self.ui_state.bounds = new_bounds;
 
             let context_bounds = self.history_bounding_rect(history_start);
 
@@ -2333,12 +2337,12 @@ impl<'a> Ui<'a> {
             }
 
             // do not count the context menu in parent widgets, when calculating bounds
-            self.ui
+            self.ui_state
                 .rect_history
                 .resize_with(history_start, || unreachable!());
-            self.ui.scissor_idx = scissor;
-            self.ui.layer = old_layer;
-            self.ui.bounds = old_bounds;
+            self.ui_state.scissor_idx = scissor;
+            self.ui_state.layer = old_layer;
+            self.ui_state.bounds = old_bounds;
         } else {
             if contains_mouse
                 && self.mouse.just_released.contains(&MouseButton::Right)
@@ -2359,12 +2363,12 @@ impl<'a> Ui<'a> {
         if is_currently_open {
             if !open {
                 self.next_ids
-                    .push(parent_id, self.ui.layer)
+                    .push(parent_id, self.ui_state.layer)
                     .remove_flag(InteractionFlag::ContextMenu);
             }
         } else if open {
             self.next_ids
-                .push(parent_id, self.ui.layer)
+                .push(parent_id, self.ui_state.layer)
                 .add_flag(InteractionFlag::ContextMenu);
         }
         self.insert_memory(parent_id, state);
@@ -2403,25 +2407,25 @@ impl<'a> Ui<'a> {
         state.open = self.has_context_menu(parent_id);
         let mut selected = None;
         if state.open {
-            let history_start = self.ui.rect_history.len();
-            let old_layer = std::mem::replace(&mut self.ui.layer, CONTEXT_LAYER + 2);
-            let old_bounds = self.ui.bounds;
+            let history_start = self.ui_state.rect_history.len();
+            let old_layer = std::mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
+            let old_bounds = self.ui_state.bounds;
 
             let outline_size = 2;
             let [p_left, p_right, p_top, p_bot] = self
                 .theme
                 .padding
-                .as_abs(self.ui.bounds.width(), self.ui.bounds.height());
+                .as_abs(self.ui_state.bounds.width(), self.ui_state.bounds.height());
             let p_horizontal = p_left + p_right;
             let p_vertical = p_bot + p_top;
 
             let mut bounds = resp.rect;
             bounds.move_to_x(state.offset.x);
             bounds.move_to_y(state.offset.y);
-            bounds.max_x = self.ui.scissors[0].max_x - p_horizontal - outline_size;
-            bounds.max_y = self.ui.scissors[0].max_y - p_vertical - outline_size;
+            bounds.max_x = self.ui_state.scissors[0].max_x - p_horizontal - outline_size;
+            bounds.max_y = self.ui_state.scissors[0].max_y - p_vertical - outline_size;
 
-            let new_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
+            let new_bounds = std::mem::replace(&mut self.ui_state.bounds, bounds);
 
             let scissor = self.push_scissor(UiRect {
                 min_x: bounds.min_x - p_horizontal - outline_size,
@@ -2443,7 +2447,7 @@ impl<'a> Ui<'a> {
                 });
             });
             ///////////////////////
-            self.ui.bounds = new_bounds;
+            self.ui_state.bounds = new_bounds;
 
             let context_bounds = self.history_bounding_rect(history_start);
 
@@ -2487,12 +2491,12 @@ impl<'a> Ui<'a> {
             }
 
             // do not count the context menu in parent widgets, when calculating bounds
-            self.ui
+            self.ui_state
                 .rect_history
                 .resize_with(history_start, || unreachable!());
-            self.ui.scissor_idx = scissor;
-            self.ui.layer = old_layer;
-            self.ui.bounds = old_bounds;
+            self.ui_state.scissor_idx = scissor;
+            self.ui_state.layer = old_layer;
+            self.ui_state.bounds = old_bounds;
         }
 
         let open = state.open;
@@ -2500,12 +2504,12 @@ impl<'a> Ui<'a> {
         if is_currently_open {
             if !open {
                 self.next_ids
-                    .push(parent_id, self.ui.layer)
+                    .push(parent_id, self.ui_state.layer)
                     .remove_flag(InteractionFlag::ContextMenu);
             }
         } else if open {
             self.next_ids
-                .push(parent_id, self.ui.layer)
+                .push(parent_id, self.ui_state.layer)
                 .add_flag(InteractionFlag::ContextMenu);
         }
         self.insert_memory(parent_id, state);
@@ -2524,7 +2528,7 @@ impl<'a> Ui<'a> {
     ) -> ContextMenuResponse<'b, 'a> {
         let id = self.begin_widget();
 
-        let history_start = self.ui.rect_history.len();
+        let history_start = self.ui_state.rect_history.len();
         ///////////////////////
         self.children_content(contents);
         ///////////////////////
@@ -2560,7 +2564,7 @@ impl<'a> Ui<'a> {
         if let Some(m) = self.get_memory_mut::<ContextMenuState>(id) {
             m.open = false;
             self.next_ids
-                .push(id, self.ui.layer)
+                .push(id, self.ui_state.layer)
                 .remove_flag(InteractionFlag::ContextMenu);
         }
     }
@@ -2572,23 +2576,23 @@ impl<'a> Ui<'a> {
         contents: impl FnMut(&mut Self),
     ) {
         let id = self.begin_widget();
-        let bounds = self.ui.bounds;
+        let bounds = self.ui_state.bounds;
 
         let width = width.as_abolute(bounds.width());
         let height = height.as_abolute(bounds.height());
 
-        self.ui.bounds.resize_w(width);
-        self.ui.bounds.resize_h(height);
-        let min_x = self.ui.bounds.min_x;
-        let min_y = self.ui.bounds.min_y;
-        self.ui.bounds.offset_x(bounds.min_x - min_x);
-        self.ui.bounds.offset_y(bounds.min_y - min_y);
+        self.ui_state.bounds.resize_w(width);
+        self.ui_state.bounds.resize_h(height);
+        let min_x = self.ui_state.bounds.min_x;
+        let min_y = self.ui_state.bounds.min_y;
+        self.ui_state.bounds.offset_x(bounds.min_x - min_x);
+        self.ui_state.bounds.offset_y(bounds.min_y - min_y);
 
-        let history_start = self.ui.rect_history.len();
+        let history_start = self.ui_state.rect_history.len();
 
         self.children_content(contents);
 
-        self.ui.bounds = bounds;
+        self.ui_state.bounds = bounds;
 
         let bounds = self.history_bounding_rect(history_start);
         self.submit_rect(id, bounds, self.theme.padding);
@@ -2597,20 +2601,20 @@ impl<'a> Ui<'a> {
     /// Add a margin around the inner contents
     pub fn margin(&mut self, m: Padding, contents: impl FnMut(&mut Self)) {
         let id = self.begin_widget();
-        let bounds = self.ui.bounds;
-        self.ui.bounds = layout_rect(RectLayoutDescriptor {
+        let bounds = self.ui_state.bounds;
+        self.ui_state.bounds = layout_rect(RectLayoutDescriptor {
             width: bounds.width(),
             height: bounds.height(),
             padding: Some(m),
-            dir: self.ui.layout_dir,
+            dir: self.ui_state.layout_dir,
             bounds,
         });
 
-        let history_start = self.ui.rect_history.len();
+        let history_start = self.ui_state.rect_history.len();
 
         self.children_content(contents);
 
-        self.ui.bounds = bounds;
+        self.ui_state.bounds = bounds;
 
         let bounds = self.history_bounding_rect(history_start);
         self.submit_rect(id, bounds, m);
@@ -2619,12 +2623,12 @@ impl<'a> Ui<'a> {
     /// Add background to the widget. If background is None, then the Theme background is used
     pub fn background(&mut self, background: Option<ThemeEntry>, contents: impl FnMut(&mut Self)) {
         let id = self.begin_widget();
-        let history_start = self.ui.rect_history.len();
+        let history_start = self.ui_state.rect_history.len();
         let layer = self.push_layer();
 
         self.children_content(contents);
 
-        self.ui.layer = layer;
+        self.ui_state.layer = layer;
 
         let bounds = self.history_bounding_rect(history_start);
         self.theme_rect(
@@ -2643,17 +2647,17 @@ impl<'a> Ui<'a> {
         self.push_child();
         contents(self);
         self.pop_child();
-        self.ui.layer = layer;
+        self.ui_state.layer = layer;
     }
 
     pub fn tooltip(&mut self, desc: TooltipDescriptor) {
-        let bounds = self.ui.scissors[0];
-        let old_bounds = std::mem::replace(&mut self.ui.bounds, bounds);
-        let old_scissor = std::mem::replace(&mut self.ui.scissor_idx, 0);
-        let old_layer = std::mem::replace(&mut self.ui.layer, CONTEXT_LAYER);
+        let bounds = self.ui_state.scissors[0];
+        let old_bounds = std::mem::replace(&mut self.ui_state.bounds, bounds);
+        let old_scissor = std::mem::replace(&mut self.ui_state.scissor_idx, 0);
+        let old_layer = std::mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER);
 
-        self.ui.bounds.min_x = desc.x;
-        self.ui.bounds.min_y = desc.y;
+        self.ui_state.bounds.min_x = desc.x;
+        self.ui_state.bounds.min_y = desc.y;
 
         ///////////////
         self.with_outline(
@@ -2671,14 +2675,14 @@ impl<'a> Ui<'a> {
         );
         ///////////////
 
-        self.ui.bounds = old_bounds;
-        self.ui.scissor_idx = old_scissor;
-        self.ui.layer = old_layer;
+        self.ui_state.bounds = old_bounds;
+        self.ui_state.scissor_idx = old_scissor;
+        self.ui_state.layer = old_layer;
     }
 
     pub fn with_tooltip(&mut self, contents: impl FnMut(&mut Self), label: &str) {
         let id = self.begin_widget();
-        let history_start = self.ui.rect_history.len();
+        let history_start = self.ui_state.rect_history.len();
         self.children_content(contents);
         let bounds = self.history_bounding_rect(history_start);
 
@@ -3023,14 +3027,14 @@ impl<'a> Columns<'a> {
         // setup
         let ctx = unsafe { self.ctx.as_mut() };
         let idx = i as usize;
-        let bounds = ctx.ui.bounds;
-        ctx.ui.bounds.min_x = self.dims[idx][0];
-        ctx.ui.bounds.max_x = self.dims[idx][1];
-        let w = ctx.ui.bounds.width();
-        let layer = ctx.ui.layer;
-        ctx.ui.layer += 1;
+        let bounds = ctx.ui_state.bounds;
+        ctx.ui_state.bounds.min_x = self.dims[idx][0];
+        ctx.ui_state.bounds.max_x = self.dims[idx][1];
+        let w = ctx.ui_state.bounds.width();
+        let layer = ctx.ui_state.layer;
+        ctx.ui_state.layer += 1;
         ctx.push_child();
-        let history_start = ctx.ui.rect_history.len();
+        let history_start = ctx.ui_state.rect_history.len();
 
         ///////////////////////
         contents(ctx);
@@ -3039,8 +3043,8 @@ impl<'a> Columns<'a> {
         // restore state
         ctx.pop_child();
         let rect = ctx.history_bounding_rect(history_start);
-        ctx.ui.bounds.min_y = bounds.min_y;
-        ctx.ui.bounds.max_y = bounds.max_y;
+        ctx.ui_state.bounds.min_y = bounds.min_y;
+        ctx.ui_state.bounds.max_y = bounds.max_y;
         if rect.width() > w && i + 1 < self.cols {
             let diff = rect.width() - w;
             for d in &mut self.dims[idx + 1..] {
@@ -3048,7 +3052,7 @@ impl<'a> Columns<'a> {
                 d[1] += diff;
             }
         }
-        ctx.ui.layer = layer;
+        ctx.ui_state.layer = layer;
     }
 }
 
@@ -3187,7 +3191,7 @@ fn submit_frame_texture_rects(
 pub struct Ui<'a> {
     ids: Res<'a, UiIds>,
     next_ids: ResMut<'a, NextUiIds>,
-    ui: ResMut<'a, UiState>,
+    ui_state: ResMut<'a, UiState>,
     texture_cache: ResMut<'a, TextTextureCache>,
     shaping_results: ResMut<'a, assets::Assets<ShapingResult>>,
     theme: ResMut<'a, Theme>,
@@ -3259,11 +3263,11 @@ impl WindowAllocator {
 
 impl<'a> UiRoot<'a> {
     pub fn window(&mut self, desc: WindowDescriptor, mut contents: impl FnMut(&mut Ui)) {
-        let mut allocator = std::mem::take(&mut self.0.ui.window_allocator);
-        let old_bounds = self.0.ui.bounds;
+        let mut allocator = std::mem::take(&mut self.0.ui_state.window_allocator);
+        let old_bounds = self.0.ui_state.bounds;
         let state: &mut WindowState = self
             .0
-            .ui
+            .ui_state
             .windows
             .entry(desc.name.to_owned())
             .or_insert_with(|| {
@@ -3295,11 +3299,11 @@ impl<'a> UiRoot<'a> {
             max_y: state.pos.y + self.0.theme.window_title_height as i32,
         };
 
-        self.0.ui.root_hash = fnv_1a(desc.name.as_bytes());
-        let scissor = self.0.ui.scissor_idx;
+        self.0.ui_state.root_hash = fnv_1a(desc.name.as_bytes());
+        let scissor = self.0.ui_state.scissor_idx;
 
-        let layer = self.0.ui.layer;
-        self.0.ui.layer = WINDOW_LAYER;
+        let layer = self.0.ui_state.layer;
+        self.0.ui_state.layer = WINDOW_LAYER;
         // window background
         self.0.theme_rect(
             bounds.min_x,
@@ -3313,7 +3317,7 @@ impl<'a> UiRoot<'a> {
         ///////////////////////
         // Title
         {
-            self.0.ui.bounds = title_bounds;
+            self.0.ui_state.bounds = title_bounds;
             self.0.push_scissor(title_bounds);
             self.0.label(desc.name);
             let title_id = self.0.begin_widget();
@@ -3321,7 +3325,7 @@ impl<'a> UiRoot<'a> {
                 if self.0.mouse_up() {
                     self.0.set_not_active(title_id);
                 }
-                let state: &mut WindowState = self.0.ui.windows.get_mut(desc.name).unwrap();
+                let state: &mut WindowState = self.0.ui_state.windows.get_mut(desc.name).unwrap();
 
                 let drag_anchor = state.drag_anchor;
                 let drag_start = state.drag_start;
@@ -3337,7 +3341,8 @@ impl<'a> UiRoot<'a> {
                     && self.0.contains_mouse(title_id)
                     && self.0.mouse_down()
                 {
-                    let state: &mut WindowState = self.0.ui.windows.get_mut(desc.name).unwrap();
+                    let state: &mut WindowState =
+                        self.0.ui_state.windows.get_mut(desc.name).unwrap();
                     state.drag_start = self.0.mouse.cursor_position;
                     state.drag_anchor = state.pos;
                     self.0.set_active(title_id);
@@ -3351,37 +3356,37 @@ impl<'a> UiRoot<'a> {
         ///////////////////////
         ///////////////////////
         // Content
-        let history_start = self.0.ui.rect_history.len();
+        let history_start = self.0.ui_state.rect_history.len();
         {
             self.0.push_scissor(bounds);
             let mut bounds = bounds;
             bounds.shrink_x(padding);
             bounds.shrink_y(padding);
-            self.0.ui.bounds = bounds;
-            self.0.ui.layer = WINDOW_LAYER + 2;
+            self.0.ui_state.bounds = bounds;
+            self.0.ui_state.layer = WINDOW_LAYER + 2;
             self.0.begin_widget();
             contents(&mut self.0);
         }
         ///////////////////////
-        self.0.ui.layer = layer;
+        self.0.ui_state.layer = layer;
         self.0.pop_child();
-        self.0.ui.bounds = old_bounds;
-        self.0.ui.scissor_idx = scissor;
+        self.0.ui_state.bounds = old_bounds;
+        self.0.ui_state.scissor_idx = scissor;
 
         let r = self.0.history_bounding_rect(history_start);
 
-        let state: &mut WindowState = self.0.ui.windows.get_mut(desc.name).unwrap();
+        let state: &mut WindowState = self.0.ui_state.windows.get_mut(desc.name).unwrap();
         state.content_size = IVec2::new(r.width(), r.height());
         state.size = state.content_size + 2 * IVec2::splat(padding);
         state.size.y = (state.size.y).max(5) + self.0.theme.window_title_height as i32;
-        self.0.ui.window_allocator = allocator;
+        self.0.ui_state.window_allocator = allocator;
     }
 
     pub fn panel(&mut self, desc: PanelDescriptor, contents: impl FnMut(&mut Ui)) {
-        let width = desc.width.as_abolute(self.0.ui.bounds.width());
-        let height = desc.height.as_abolute(self.0.ui.bounds.height());
+        let width = desc.width.as_abolute(self.0.ui_state.bounds.width());
+        let height = desc.height.as_abolute(self.0.ui_state.bounds.height());
 
-        let old_bounds = self.0.ui.bounds;
+        let old_bounds = self.0.ui_state.bounds;
         let mut bounds = old_bounds;
         bounds.resize_w(width);
         bounds.resize_h(height);
@@ -3408,14 +3413,14 @@ impl<'a> UiRoot<'a> {
             }
             VerticalAlignment::Center => {}
         }
-        self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[
+        self.0.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[
             0,
             bounds.min_x,
             bounds.min_y,
             width,
             height,
         ]));
-        self.0.ui.bounds = bounds;
+        self.0.ui_state.bounds = bounds;
         let scissor = self.0.push_scissor(bounds);
 
         let old_layer = self.0.push_layer();
@@ -3424,16 +3429,16 @@ impl<'a> UiRoot<'a> {
             bounds.min_y,
             width,
             height,
-            self.0.ui.layer,
+            self.0.ui_state.layer,
             self.0.theme.background.clone(),
         );
 
         ///////////////////////
         self.0.children_content(contents);
         ///////////////////////
-        self.0.ui.layer = old_layer;
-        self.0.ui.bounds = old_bounds;
-        self.0.ui.scissor_idx = scissor;
+        self.0.ui_state.layer = old_layer;
+        self.0.ui_state.bounds = old_bounds;
+        self.0.ui_state.scissor_idx = scissor;
     }
 
     pub fn theme(&self) -> &Theme {
@@ -3470,17 +3475,17 @@ impl<'a> UiRoot<'a> {
 
     /// key should be a unique index for each empty call in an application
     pub fn empty(&mut self, key: i32, contents: impl FnMut(&mut Ui)) {
-        let old_bounds = self.0.ui.bounds;
-        self.0.ui.root_hash = fnv_1a(bytemuck::cast_slice(&[1, key]));
+        let old_bounds = self.0.ui_state.bounds;
+        self.0.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[1, key]));
         let scissor = self.0.push_scissor(old_bounds);
         let old_layer = self.0.push_layer();
 
         ///////////////////////
         self.0.children_content(contents);
         ///////////////////////
-        self.0.ui.layer = old_layer;
-        self.0.ui.bounds = old_bounds;
-        self.0.ui.scissor_idx = scissor;
+        self.0.ui_state.layer = old_layer;
+        self.0.ui_state.bounds = old_bounds;
+        self.0.ui_state.scissor_idx = scissor;
     }
 }
 
@@ -3502,7 +3507,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         Self(Ui {
             ids,
             next_ids,
-            ui,
+            ui_state: ui,
             texture_cache,
             shaping_results: text_assets,
             theme,
@@ -3629,7 +3634,7 @@ fn bounding_rect(history: &[UiRect]) -> UiRect {
 
 fn draw_bounding_boxes(mut ui: UiRoot) {
     let mut boxes: Vec<_> =
-        ui.0.ui
+        ui.0.ui_state
             .bounding_boxes
             .iter()
             .map(|(k, v)| (*k, *v))
@@ -3643,7 +3648,7 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
             let mut id = id;
             ancestry.push(id);
             while id.parent != SENTINEL {
-                id = ui.ui.widget_ids[id.parent as usize];
+                id = ui.ui_state.widget_ids[id.parent as usize];
                 ancestry.push(id);
             }
         }
