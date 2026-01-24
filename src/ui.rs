@@ -2204,23 +2204,18 @@ impl<'a> Ui<'a> {
         let layer = self.push_layer();
         let history_start = self.ui_state.rect_history.len();
 
-        let [p_left, p_right, p_top, p_bot] = self
-            .theme
-            .padding
-            .as_abs(self.ui_state.bounds.width(), self.ui_state.bounds.height());
-
         let r = outline_radius as i32;
-        self.ui_state.bounds.min_x += p_left + r;
-        self.ui_state.bounds.min_y += p_top + r;
+        self.ui_state.bounds.min_x += r;
+        self.ui_state.bounds.min_y += r;
         //////////////////
         self.children_content(content);
         //////////////////
 
         let mut rect = self.history_bounding_rect(history_start);
-        rect.min_x -= p_left + r;
-        rect.max_x += p_right + r;
-        rect.min_y -= p_top + r;
-        rect.max_y += p_bot + r;
+        rect.min_x -= r;
+        rect.max_x += r;
+        rect.min_y -= r;
+        rect.max_y += r;
         // TODO: would be nice to support this drawing mode in the renderer, currently it will draw
         // a lot of transparent pixels
         self.color_rect_from_rect_with_outline(
