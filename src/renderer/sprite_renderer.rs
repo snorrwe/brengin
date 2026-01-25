@@ -734,22 +734,23 @@ fn add_missing_instances(
     mut pipeline: ResMut<SpritePipeline>,
     q: Query<(&MeshHandle, &WeakHandle<SpriteSheet>), With<Visible>>,
 ) {
-    let mut instances = q
+    let instances = q
         .iter()
         .map(|(mesh, sheet)| InstanceKey {
             sprite_sheet: sheet.id(),
             mesh: mesh.into(),
         })
-        .collect::<Vec<_>>();
+        .fold(HashMap::new(), |mut a, b| {
+            *a.entry(b).or_default() += 1;
+            a
+        });
 
-    instances.sort_unstable();
-    for g in instances.chunk_by_mut(|a, b| a == b) {
-        let k = g[0];
+    for (k, count) in instances.into_iter() {
         pipeline
             .instances
             .entry(k)
             .or_insert_with(|| SpriteInstances {
-                count: g.len(),
+                count,
                 instance_gpu: renderer.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some(&format!(
                         "Sprite Instance Buffer - {} {:?}",
