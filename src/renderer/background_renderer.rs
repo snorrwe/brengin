@@ -1,7 +1,7 @@
+use crate::prelude::*;
 use crate::renderer::texture::{texture_bind_group_layout, texture_to_bindings};
 use crate::renderer::{texture, GraphicsState, RenderCommand, RenderCommandPlugin};
 use crate::Plugin;
-use crate::{prelude::*, GameWorld};
 use image::DynamicImage;
 use wgpu::include_wgsl;
 
@@ -110,37 +110,33 @@ pub struct BackgroundImage(pub Handle<DynamicImage>);
 fn extract_background(
     mut pipeline: ResMut<BackgroundPipeline>,
     renderer: Res<GraphicsState>,
-    game_world: Res<GameWorld>,
+    img: Option<Res<BackgroundImage>>,
+    images: Res<Assets<DynamicImage>>,
 ) {
-    game_world.world().run_view_system(
-        |img: Option<Res<BackgroundImage>>, images: Res<Assets<DynamicImage>>| {
-            let Some(img) = img else {
-                pipeline.texture.take();
-                return;
-            };
-            let id = img.0.id();
-            let img = images.get(&img.0);
+    let Some(img) = img else {
+        pipeline.texture.take();
+        return;
+    };
+    let id = img.0.id();
+    let img = images.get(&img.0);
 
-            if let Some(t) = pipeline.texture.as_ref().map(|t| t.id) {
-                if t == id {
-                    // texture is already registered
-                    return;
-                }
-                // new texture, clear the old one
-                pipeline.texture.take();
-            }
-            let texture =
-                texture::Texture::from_image(renderer.device(), renderer.queue(), img, None)
-                    .expect("Failed to create texture");
+    if let Some(t) = pipeline.texture.as_ref().map(|t| t.id) {
+        if t == id {
+            // texture is already registered
+            return;
+        }
+        // new texture, clear the old one
+        pipeline.texture.take();
+    }
+    let texture = texture::Texture::from_image(renderer.device(), renderer.queue(), img, None)
+        .expect("Failed to create texture");
 
-            let (_, texture_bind_group) = texture_to_bindings(&renderer.device, &texture);
-            pipeline.texture = Some(BackgroundTextureRenderingData {
-                id,
-                texture,
-                texture_bind_group,
-            });
-        },
-    );
+    let (_, texture_bind_group) = texture_to_bindings(&renderer.device, &texture);
+    pipeline.texture = Some(BackgroundTextureRenderingData {
+        id,
+        texture,
+        texture_bind_group,
+    });
 }
 
 impl Plugin for BackgroundPlugin {
@@ -149,10 +145,10 @@ impl Plugin for BackgroundPlugin {
             crate::renderer::RenderPass::Background,
         ));
         app.require_plugin(AssetsPlugin::<DynamicImage>::default());
-        app.extract_stage.add_system(extract_background);
-        if let Some(ref mut app) = app.render_app {
-            app.add_startup_system(setup_pipeline);
-        }
+        app.with_stage(crate::Stage::Update, |s| {
+            s.add_system(extract_background);
+        });
+        app.add_startup_system(setup_pipeline);
     }
 }
 

@@ -4,18 +4,14 @@ pub mod texture;
 
 use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
 
-use cecs::{
-    prelude::*,
-    query::{filters::Filter, QueryFragment, WorldQuery},
-    Component,
-};
+use cecs::{prelude::*, query::WorldQuery};
 use glam::UVec2;
 use wgpu::{Backends, ExperimentalFeatures, InstanceFlags, StoreOp, SurfaceTarget};
 
 pub use crate::camera::camera_bundle;
 use crate::{
     camera::{CameraBuffer, CameraPlugin, CameraUniform},
-    ExtractionTick, GameWorld, Plugin,
+    Plugin,
 };
 
 use self::sprite_renderer::SpriteRendererPlugin;
@@ -73,16 +69,6 @@ impl RenderCommandInternal {
             }),
             pass,
         }
-    }
-}
-
-impl Extract for RenderCommandInternal {
-    type QueryItem = &'static Self;
-    type Filter = ();
-    type Out = (Self,);
-
-    fn extract<'a>(it: <Self::QueryItem as QueryFragment>::Item<'a>) -> Option<Self::Out> {
-        Some((it.clone(),))
     }
 }
 
@@ -277,41 +263,18 @@ pub type RenderResult = Result<(), wgpu::SurfaceError>;
 
 pub struct RendererPlugin;
 
-fn extract_passes(mut cmd: Commands, game_world: Res<GameWorld>) {
-    cmd.insert_resource(
-        game_world
-            .world()
-            .get_resource::<RenderPasses>()
-            .cloned()
-            .unwrap_or_default(),
-    )
-}
-
-fn extract_window_size(mut cmd: Commands, game_world: Res<GameWorld>) {
-    cmd.insert_resource(
-        game_world
-            .world()
-            .get_resource::<WindowSize>()
-            .cloned()
-            .unwrap(),
-    );
-}
-
 impl Plugin for RendererPlugin {
     fn build(self, app: &mut crate::App) {
-        app.render_app_mut().with_stage(crate::Stage::Render, |s| {
+        app.with_stage(crate::Stage::Render, |s| {
             s.add_system(render_system);
         });
         app.insert_resource(WindowSize {
             width: 0,
             height: 0,
         });
-        app.add_extract_system(extract_passes);
-        app.add_extract_system(extract_window_size);
         app.add_plugin(CameraPlugin);
         app.add_plugin(SpriteRendererPlugin);
         app.add_plugin(background_renderer::BackgroundPlugin);
-        app.add_plugin(ExtractionPlugin::<RenderCommandInternal>::default());
     }
 }
 
@@ -535,124 +498,4 @@ fn render_system(mut world: WorldAccess) {
         state.resize(size);
     }
     w.insert_resource(result);
-}
-
-pub trait Extract: Component {
-    type QueryItem: QueryFragment + 'static;
-    type Filter: Filter + 'static;
-    type Out: Bundle;
-
-    fn extract(it: <Self::QueryItem as QueryFragment>::Item<'_>) -> Option<Self::Out>;
-}
-
-fn extractor_system<T: Extract>(
-    mut cmd: Commands,
-    game_world: Res<GameWorld>,
-    tick: Res<ExtractionTick>,
-) where
-    Query<'static, (EntityId, T::QueryItem), T::Filter>: cecs::query::WorldQuery<'static>,
-{
-    game_world
-        .world()
-        .run_view_system(|q: Query<(EntityId, T::QueryItem), T::Filter>| {
-            let tick: ExtractionTick = *tick;
-            for (id, q) in q.iter() {
-                if let Some(out) = <T as Extract>::extract(q) {
-                    cmd.insert_id(id).insert(tick).insert_bundle(out);
-                }
-            }
-        });
-}
-
-fn gc_system<T: Extract>(
-    mut cmd: Commands,
-    q: Query<(EntityId, &ExtractionTick)>,
-    tick: Res<ExtractionTick>,
-) {
-    for (id, t) in q.iter() {
-        if t != &*tick {
-            cmd.delete(id);
-        }
-    }
-}
-
-pub struct ExtractionPlugin<T> {
-    _m: PhantomData<T>,
-}
-
-impl<T> Default for ExtractionPlugin<T> {
-    fn default() -> Self {
-        Self { _m: PhantomData }
-    }
-}
-
-impl<T> Plugin for ExtractionPlugin<T>
-where
-    T: Extract,
-{
-    fn build(self, app: &mut crate::App) {
-        app.add_extract_system(extractor_system::<T>);
-        let render_app = app.render_app_mut();
-        render_app.insert_resource(ExtractionTick(0));
-        render_app.with_stage(crate::Stage::PreUpdate, |s| {
-            s.add_system(gc_system::<T>);
-        });
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::ptr::NonNull;
-
-    use super::*;
-
-    struct TestRenderComponent {
-        pub i: i32,
-        pub j: u32,
-    }
-
-    impl Extract for TestRenderComponent {
-        type QueryItem = (&'static i32, &'static u32);
-
-        type Filter = ();
-
-        type Out = (Self,);
-
-        fn extract((i, j): <Self::QueryItem as QueryFragment>::Item<'_>) -> Option<Self::Out> {
-            Some((Self { i: *i, j: *j },))
-        }
-    }
-
-    #[test]
-    fn test_extract_basic() {
-        let mut game_world = World::new(4);
-        game_world
-            .run_system(|mut cmd: Commands| {
-                cmd.spawn().insert_bundle((42i32, 32u32));
-            })
-            .unwrap();
-
-        let mut render_world = World::new(4);
-        render_world.insert_resource(GameWorld {
-            world: NonNull::new(&mut game_world).unwrap(),
-        });
-        render_world.insert_resource(ExtractionTick(0));
-
-        // inserts should be idempotent
-        for _ in 0..5 {
-            render_world
-                .run_system(extractor_system::<TestRenderComponent>)
-                .unwrap();
-        }
-
-        render_world.run_view_system(|q: Query<&TestRenderComponent>| {
-            let mut n = 0;
-            for i in q.iter() {
-                assert_eq!(i.i, 42);
-                assert_eq!(i.j, 32);
-                n += 1
-            }
-            assert_eq!(n, 1);
-        });
-    }
 }

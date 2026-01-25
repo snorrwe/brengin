@@ -4,34 +4,18 @@ use std::mem::size_of;
 use crate::assets::{AssetId, Assets, Handle, WeakHandle};
 use crate::renderer::texture::Texture;
 use crate::renderer::{
-    texture, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput,
-    RenderCommandPlugin, RenderPass,
+    texture, GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass,
 };
 use crate::wgpu::include_wgsl;
-use crate::GameWorld;
 use cecs::prelude::*;
 use image::DynamicImage;
 
-use crate::{renderer::Extract, Plugin};
+use crate::Plugin;
 
 use super::UiScissor;
 
 #[derive(Default, Clone)]
 pub struct TextureRectRequests(pub Vec<DrawTextureRect>);
-
-impl Extract for TextureRectRequests {
-    type QueryItem = (&'static Self, &'static UiScissor);
-
-    type Filter = ();
-
-    type Out = (Self, UiScissor);
-
-    fn extract<'a>(
-        (it, sc): <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
-    ) -> Option<Self::Out> {
-        Some((it.clone(), *sc))
-    }
-}
 
 /// XY are top-left corner, WH are full-extents
 #[derive(Default, Clone)]
@@ -116,33 +100,29 @@ fn extract_textures(
     renderer: Res<GraphicsState>,
     mut pipeline: ResMut<UiTexturePipeline>,
     mut refs: ResMut<UiTextureReferences>,
-    game_world: Res<GameWorld>,
+    requests: Query<&TextureRectRequests>,
+    images: Res<Assets<DynamicImage>>,
 ) {
-    game_world.world().run_view_system(
-        |requests: Query<&TextureRectRequests>, images: Res<Assets<DynamicImage>>| {
-            for r in requests.iter() {
-                for handle in r.0.iter().map(|r| &r.image) {
-                    let res = images.get(handle);
-                    let id = handle.id();
-                    if refs.0.contains_key(&id) {
-                        continue;
-                    }
-                    let texture =
-                        Texture::from_image(renderer.device(), renderer.queue(), res, None)
-                            .expect("Failed to create text texture");
-                    let texture_bind_group = texture_to_bindings(renderer.device(), &texture);
-
-                    refs.0.insert(id, handle.downgrade());
-                    let rendering_data = UiTextureRenderingData {
-                        texture_bind_group,
-                        texture,
-                    };
-
-                    pipeline.textures.insert(id, rendering_data);
-                }
+    for r in requests.iter() {
+        for handle in r.0.iter().map(|r| &r.image) {
+            let res = images.get(handle);
+            let id = handle.id();
+            if refs.0.contains_key(&id) {
+                continue;
             }
-        },
-    );
+            let texture = Texture::from_image(renderer.device(), renderer.queue(), res, None)
+                .expect("Failed to create text texture");
+            let texture_bind_group = texture_to_bindings(renderer.device(), &texture);
+
+            refs.0.insert(id, handle.downgrade());
+            let rendering_data = UiTextureRenderingData {
+                texture_bind_group,
+                texture,
+            };
+
+            pipeline.textures.insert(id, rendering_data);
+        }
+    }
 }
 
 impl UiTexturePipeline {
@@ -337,22 +317,18 @@ pub struct UiTextureRectPlugin;
 impl Plugin for UiTextureRectPlugin {
     fn build(self, app: &mut crate::App) {
         app.insert_resource(TextureRectRequests::default());
-        app.add_plugin(ExtractionPlugin::<TextureRectRequests>::default());
 
         app.add_plugin(RenderCommandPlugin::<RectRenderCommand>::new(
             RenderPass::Ui,
         ));
-        app.extract_stage.add_system(extract_textures);
-        if let Some(ref mut renderer) = app.render_app {
-            renderer.add_startup_system(setup_renderer);
-            renderer.with_stage(crate::Stage::Update, |s| {
-                s.add_system(update_instances);
-            });
-            renderer.insert_resource(UiTextureReferences::default());
-            renderer.with_stage(crate::Stage::PostUpdate, |s| {
-                s.add_system(gc_text_textures);
-            });
-        }
+        app.add_startup_system(setup_renderer);
+        app.with_stage(crate::Stage::Update, |s| {
+            s.add_system(update_instances).add_system(extract_textures);
+        });
+        app.insert_resource(UiTextureReferences::default());
+        app.with_stage(crate::Stage::PostUpdate, |s| {
+            s.add_system(gc_text_textures);
+        });
     }
 }
 

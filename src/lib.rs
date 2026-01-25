@@ -35,7 +35,6 @@ use parking_lot::Mutex;
 use std::{
     any::{type_name, TypeId},
     collections::{HashMap, HashSet},
-    ptr::NonNull,
     sync::{atomic::AtomicBool, Arc},
     thread::JoinHandle,
     time::Duration,
@@ -62,28 +61,11 @@ pub struct Timer {
     just_finished: bool,
 }
 
-pub struct GameWorld {
-    world: NonNull<World>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Tick(pub u64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExtractionTick(pub u32);
-
-unsafe impl Send for GameWorld {}
-unsafe impl Sync for GameWorld {}
-
-impl GameWorld {
-    pub fn world(&self) -> &World {
-        unsafe { self.world.as_ref() }
-    }
-
-    pub fn world_mut(&mut self) -> &mut World {
-        unsafe { self.world.as_mut() }
-    }
-}
 
 impl Timer {
     pub fn new(duration: std::time::Duration, repeat: bool) -> Self {
@@ -139,39 +121,6 @@ fn update_time(mut time: ResMut<Time>, mut dt: ResMut<DeltaTime>, mut tick: ResM
     tick.0 += 1;
 }
 
-/// extraction
-///
-/// move rendering data from the game simulation to the rendering database
-pub fn extract_render_data(
-    game_world: &Mutex<World>,
-    render_world: &mut World,
-    render_extract: &SystemStage,
-) {
-    let mut gw = game_world.lock();
-    render_world
-        .run_system(|mut tick: ResMut<ExtractionTick>| {
-            tick.0 += 1;
-        })
-        .unwrap();
-    render_world.insert_resource(GameWorld {
-        world: NonNull::from(&mut *gw),
-    });
-    render_world
-        .run_system(
-            |world: Res<GameWorld>, mut cmd: Commands, q: Query<EntityId>| {
-                // clear invalid ids
-                for id in q.iter() {
-                    if !world.world().is_id_valid(id) {
-                        cmd.delete(id);
-                    }
-                }
-            },
-        )
-        .unwrap();
-    render_world.run_stage(render_extract.clone()).unwrap();
-    render_world.remove_resource::<GameWorld>();
-}
-
 pub struct App {
     world: World,
     stages: std::collections::BTreeMap<Stage, SystemStageBuilder<'static>>,
@@ -180,9 +129,6 @@ pub struct App {
     /// after build assert that these plugins are available
     /// store id: type name
     required_plugins: HashMap<TypeId, &'static str>,
-
-    extract_stage: SystemStageBuilder<'static>,
-    pub render_app: Option<Box<App>>,
 }
 
 /// The main reason behind requiring types instead of just functions is that a plugin may only be
@@ -207,17 +153,14 @@ impl std::ops::DerefMut for App {
 
 impl Default for App {
     fn default() -> Self {
-        let mut app = App::empty();
-        app.render_app = Some(Box::new(App::empty()));
-        app
+        App::empty()
     }
 }
 
 enum RunningApp {
     Pending(App),
     Initialized {
-        render_world: World,
-        render_extract: SystemStage<'static>,
+        render_stage: SystemStage<'static>,
         game_world: Arc<Mutex<World>>,
         game_thread: JoinHandle<()>,
         enabled: Arc<AtomicBool>,
@@ -231,14 +174,6 @@ impl RunningApp {
             Some(v)
         } else {
             None
-        }
-    }
-
-    fn world_mut(&mut self) -> &mut World {
-        match self {
-            RunningApp::Pending(app) => &mut app.render_app_mut().world,
-            RunningApp::Initialized { render_world, .. } => render_world,
-            RunningApp::Terminated => unreachable!(),
         }
     }
 
@@ -257,13 +192,17 @@ impl RunningApp {
     /// panics if self is not Pending
     fn initialize_pending(&mut self, graphics_state: GraphicsState) {
         let app = self.as_pending().unwrap();
-        app.render_app_mut().insert_resource(graphics_state);
+        app.insert_resource(graphics_state);
 
         let InitializedWorlds {
-            game_world,
-            mut render_world,
-            render_extract,
+            mut game_world,
+            render_stage,
         } = std::mem::take(app).build();
+
+        let (close_tx, close_rx) = crossbeam::channel::bounded(4);
+        game_world.insert_resource(CloseRequest { tx: close_tx });
+        game_world.insert_resource(CloseRequestRx { rx: close_rx });
+
         let game_world = Arc::new(Mutex::new(game_world));
         let enabled = Arc::new(AtomicBool::new(true));
         let game_thread = std::thread::spawn({
@@ -272,19 +211,10 @@ impl RunningApp {
             move || game_thread(game_world, enabled)
         });
 
-        let (close_tx, close_rx) = crossbeam::channel::bounded(4);
-
-        game_world
-            .lock()
-            .insert_resource(CloseRequest { tx: close_tx });
-
-        render_world.insert_resource(CloseRequestRx { rx: close_rx });
-
         *self = RunningApp::Initialized {
-            render_world,
             game_world,
             game_thread,
-            render_extract,
+            render_stage,
             enabled,
         };
     }
@@ -357,7 +287,7 @@ impl ApplicationHandler for RunningApp {
             },
         ));
 
-        app.render_app_mut().insert_resource(window);
+        app.insert_resource(window);
 
         self.initialize_pending(graphics_state);
     }
@@ -371,9 +301,8 @@ impl ApplicationHandler for RunningApp {
         #[cfg(feature = "tracing")]
         tracing::trace!(?event, "Event received");
         let RunningApp::Initialized {
-            render_world,
             game_world,
-            render_extract,
+            render_stage,
             ..
         } = self
         else {
@@ -388,11 +317,10 @@ impl ApplicationHandler for RunningApp {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
-                let w = Arc::clone(game_world);
-                render_world
-                    .run_system(move |mut state: ResMut<GraphicsState>| {
-                        let mut w = w.lock();
-                        w.insert_resource(WindowSize {
+                game_world
+                    .lock()
+                    .run_system(move |mut state: ResMut<GraphicsState>, mut cmd: Commands| {
+                        cmd.insert_resource(WindowSize {
                             width: size.width,
                             height: size.height,
                         });
@@ -438,7 +366,8 @@ impl ApplicationHandler for RunningApp {
                     .cursor_position = position;
             }
             WindowEvent::RedrawRequested => {
-                if render_world
+                let mut world = game_world.lock();
+                if world
                     .get_resource::<CloseRequestRx>()
                     .map(|CloseRequestRx { rx }| rx.try_recv().is_ok())
                     .unwrap_or(false)
@@ -447,11 +376,9 @@ impl ApplicationHandler for RunningApp {
                     return;
                 }
 
-                extract_render_data(&game_world, render_world, render_extract);
+                world.run_stage(render_stage.clone());
 
-                render_world.tick();
-
-                let result = render_world.get_resource::<RenderResult>();
+                let result = world.get_resource::<RenderResult>();
                 if let Some(result) = result {
                     match result {
                         Ok(_) => {}
@@ -462,6 +389,7 @@ impl ApplicationHandler for RunningApp {
                         }
                         // The system is out of memory, we should probably quit
                         Err(wgpu::SurfaceError::OutOfMemory) => {
+                            drop(world);
                             #[cfg(feature = "tracing")]
                             tracing::error!("gpu out of memory");
                             self.stop();
@@ -487,27 +415,22 @@ impl ApplicationHandler for RunningApp {
             tracing::trace!("x about_to_wait");
             return;
         }
-        self.world_mut()
-            .run_system(|window: Res<Arc<winit::window::Window>>| {
-                #[cfg(feature = "tracing")]
-                tracing::trace!("redraw {:?}", &*window);
-                window.request_redraw();
-            })
-            .unwrap();
+        let sys = |window: Res<Arc<winit::window::Window>>| {
+            #[cfg(feature = "tracing")]
+            tracing::trace!("redraw {:?}", &*window);
+            window.request_redraw();
+        };
+        match self {
+            RunningApp::Pending(app) => app.world.run_view_system(sys),
+            RunningApp::Initialized { game_world, .. } => game_world.lock().run_view_system(sys),
+            RunningApp::Terminated => unreachable!(),
+        }
         #[cfg(feature = "tracing")]
         tracing::trace!("✓ about_to_wait");
     }
 }
 
 impl App {
-    pub fn render_app(&self) -> &App {
-        self.render_app.as_ref().unwrap()
-    }
-
-    pub fn render_app_mut(&mut self) -> &mut App {
-        self.render_app.as_mut().unwrap()
-    }
-
     fn empty() -> Self {
         let mut world = World::new(1024);
         world.insert_resource(WindowDescriptor::default());
@@ -515,10 +438,8 @@ impl App {
             world,
             stages: Default::default(),
             startup_systems: SystemStage::new("startup"),
-            extract_stage: SystemStage::new("extract"),
             plugins: Default::default(),
             required_plugins: Default::default(),
-            render_app: None,
         }
     }
 
@@ -588,15 +509,6 @@ impl App {
         self
     }
 
-    /// extraction systems run on the RenderWorld with readonly access to the GameWorld
-    pub fn add_extract_system<P>(
-        &mut self,
-        sys: impl cecs::systems::IntoSystem<'static, P, ()>,
-    ) -> &mut Self {
-        self.extract_stage.add_system(sys);
-        self
-    }
-
     pub async fn run(mut self) -> anyhow::Result<()> {
         let event_loop = EventLoop::new().context("Failed to initialize EventLoop")?;
 
@@ -637,35 +549,38 @@ impl App {
     }
 
     pub fn build(mut self) -> InitializedWorlds {
-        if self
-            .stages
-            .get(&Stage::Render)
-            .map(|s| s.is_empty())
-            .unwrap_or(false)
-        {
-            #[cfg(feature = "tracing")]
-            tracing::warn!("Rendering is performed in a sub-app not the main app. But the main app's Render stage is non-empty.");
+        for (id, name) in self.required_plugins {
+            assert!(
+                self.plugins.contains(&id),
+                "Plugin {name} is marked required but has not been initialized",
+            );
         }
-        let rw = self
-            .render_app
-            .take()
-            .map(|a| a._build())
-            .unwrap_or_else(|| World::new(4));
-        let render_extract =
-            std::mem::replace(&mut self.extract_stage, SystemStage::new("nil")).build();
-        let w = self._build();
+
+        let render_stage = self
+            .stages
+            .remove(&Stage::Render)
+            .unwrap_or_default()
+            .build();
+        let mut world = self.world;
+        for (_, stage) in self
+            .stages
+            .into_iter()
+            .filter(|(_, stage)| !stage.is_empty())
+        {
+            world.add_stage(stage.build());
+        }
+        world.run_stage(self.startup_systems.build()).unwrap();
+        world.vacuum();
         InitializedWorlds {
-            game_world: w,
-            render_world: rw,
-            render_extract,
+            game_world: world,
+            render_stage,
         }
     }
 }
 
 pub struct InitializedWorlds {
     pub game_world: World,
-    pub render_world: World,
-    pub render_extract: SystemStage<'static>,
+    pub render_stage: SystemStage<'static>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

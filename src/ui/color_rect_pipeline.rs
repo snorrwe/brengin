@@ -1,14 +1,13 @@
 use std::mem::size_of;
 
 use crate::renderer::{
-    texture, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput,
-    RenderCommandPlugin, RenderPass,
+    texture, GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass,
 };
 use crate::wgpu::include_wgsl;
 use cecs::prelude::*;
 use wgpu::util::DeviceExt as _;
 
-use crate::{renderer::Extract, Plugin};
+use crate::Plugin;
 
 use super::UiScissor;
 
@@ -19,20 +18,6 @@ struct RectInstanceBuffer {
     buffer: wgpu::Buffer,
     len: usize,
     capacity: usize,
-}
-
-impl Extract for RectRequests {
-    type QueryItem = (&'static Self, &'static UiScissor);
-
-    type Filter = ();
-
-    type Out = (Self, UiScissor);
-
-    fn extract<'a>(
-        (it, sc): <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
-    ) -> Option<Self::Out> {
-        Some((it.clone(), *sc))
-    }
 }
 
 /// XY are top-left corner, WH are full-extents
@@ -284,16 +269,13 @@ pub struct UiColorRectPlugin;
 impl Plugin for UiColorRectPlugin {
     fn build(self, app: &mut crate::App) {
         app.insert_resource(RectRequests::default());
-        app.add_plugin(ExtractionPlugin::<RectRequests>::default());
 
         app.add_plugin(RenderCommandPlugin::<RectRenderCommand>::new(
             RenderPass::Ui,
         ));
-        if let Some(ref mut renderer) = app.render_app {
-            renderer.add_startup_system(setup_renderer);
-            renderer.with_stage(crate::Stage::Update, |s| {
-                s.add_system(update_instances);
-            });
-        }
+        app.add_startup_system(setup_renderer);
+        app.with_stage(crate::Stage::Update, |s| {
+            s.add_system(update_instances);
+        });
     }
 }

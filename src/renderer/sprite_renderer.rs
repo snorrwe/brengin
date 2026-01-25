@@ -8,7 +8,7 @@
 //! TODO: support arbitrary sized meshes in visibility
 //!
 use image::DynamicImage;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use tracing::trace;
 
 use cecs::prelude::*;
@@ -19,13 +19,12 @@ use crate::{
     assets::{AssetId, Assets, AssetsPlugin, Handle, WeakHandle},
     camera::ViewFrustum,
     transform::GlobalTransform,
-    GameWorld, Plugin, Stage,
+    Plugin, Stage,
 };
 
 use super::{
     texture::{texture_bind_group_layout, texture_to_bindings, Texture},
-    Extract, ExtractionPlugin, GraphicsState, RenderCommand, RenderCommandInput,
-    RenderCommandPlugin, RenderPass, Vertex,
+    GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, Vertex,
 };
 
 pub fn sprite_sheet_bundle(
@@ -151,17 +150,13 @@ pub struct SpriteInstance {
 pub fn add_missing_sheets(
     mut pipeline: ResMut<SpritePipeline>,
     renderer: Res<GraphicsState>,
-    game_world: Res<GameWorld>,
+    sheets: Res<crate::assets::Assets<SpriteSheet>>,
 ) {
-    game_world
-        .world()
-        .run_view_system(|sheets: Res<crate::assets::Assets<SpriteSheet>>| {
-            for (id, sheet) in sheets.iter() {
-                if !pipeline.sheets.contains_key(&id) {
-                    pipeline.add_sheet(id, sheet, &renderer);
-                }
-            }
-        });
+    for (id, sheet) in sheets.iter() {
+        if !pipeline.sheets.contains_key(&id) {
+            pipeline.add_sheet(id, sheet, &renderer);
+        }
+    }
 }
 
 fn unload_sheets(
@@ -219,44 +214,22 @@ fn clear_pipeline_instances(mut instances: ResMut<SpritePipelineInstances>) {
     }
 }
 
-impl Extract for SpriteInstanceRaw {
-    type QueryItem = (
-        &'static Handle<SpriteSheet>,
-        &'static SpriteInstanceRaw,
-        Option<&'static Handle<SpriteMesh>>,
-    );
-
-    type Filter = With<Visible>;
-
-    type Out = (
-        WeakHandle<SpriteSheet>,
-        SpriteInstanceRaw,
-        Visible,
-        MeshHandle,
-    );
-
-    fn extract<'a>(
-        (handle, instance, mesh): <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
-    ) -> Option<Self::Out> {
-        Some((
-            handle.downgrade(),
-            *instance,
-            Visible,
-            mesh.map(|h| MeshHandle::Mesh(h.downgrade()))
-                .unwrap_or_default(),
-        ))
-    }
-}
-
 fn update_sprite_pipelines(
     renderer: Res<GraphicsState>,
-    q: Query<(&WeakHandle<SpriteSheet>, &SpriteInstanceRaw, &MeshHandle)>,
+    q: Query<(
+        &Handle<SpriteSheet>,
+        &SpriteInstanceRaw,
+        Option<&Handle<SpriteMesh>>,
+    )>,
     mut pipeline: ResMut<SpritePipeline>,
     mut instances: ResMut<SpritePipelineInstances>,
 ) {
-    for (handle, raw, mesh) in q.iter() {
+    for (sheet, raw, mesh) in q.iter() {
+        let mesh = mesh
+            .map(|h| MeshHandle::Mesh(h.downgrade()))
+            .unwrap_or_default();
         let k = InstanceKey {
-            sprite_sheet: handle.id(),
+            sprite_sheet: sheet.id(),
             mesh: mesh.into(),
         };
         instances.0.entry(k).or_default().push(*raw);
@@ -605,37 +578,32 @@ impl Plugin for SpriteRendererPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(AssetsPlugin::<SpriteSheet>::default());
         app.add_plugin(AssetsPlugin::<SpriteMesh>::default());
-        app.add_plugin(ExtractionPlugin::<SpriteInstanceRaw>::default());
+        app.with_stage(Stage::PreUpdate, |s| {
+            s.add_system(clear_pipeline_instances);
+        });
         app.with_stage(Stage::Update, |s| {
             // putting this system in update means that the last frame's data will be presented
             s.add_system(compute_sprite_instances)
                 .add_system(insert_missing_cull)
                 .add_system(update_visible)
-                .add_system(update_invisible);
+                .add_system(update_invisible)
+                .add_system(unload_sheets)
+                .add_system(update_sprite_pipelines)
+                .add_system(unload_meshes);
+        });
+        app.with_stage(Stage::PostUpdate, |s| {
+            s.add_system(add_missing_sheets)
+                .add_system(add_missing_meshes)
+                .add_system(add_missing_instances);
         });
 
         app.add_plugin(RenderCommandPlugin::<SpriteRenderCommand>::new(
             RenderPass::Opaque,
         ));
-        app.extract_stage.add_system(add_missing_sheets);
-        app.extract_stage.add_system(add_missing_meshes);
-        app.extract_stage.add_system(add_missing_instances);
-
-        if let Some(ref mut app) = app.render_app {
-            app.add_startup_system(setup);
-            app.insert_resource(SpritePipelineInstances::default());
-            app.insert_resource(RenderSpritesheetHandles::default());
-            app.insert_resource(SpriteMeshHandles::default());
-            app.with_stage(Stage::PreUpdate, |s| {
-                s.add_system(clear_pipeline_instances);
-                s.add_system(add_missing_instances);
-            });
-            app.with_stage(Stage::Update, |s| {
-                s.add_system(unload_sheets)
-                    .add_system(update_sprite_pipelines)
-                    .add_system(unload_meshes);
-            });
-        }
+        app.add_startup_system(setup);
+        app.insert_resource(SpritePipelineInstances::default());
+        app.insert_resource(RenderSpritesheetHandles::default());
+        app.insert_resource(SpriteMeshHandles::default());
     }
 }
 
@@ -689,69 +657,70 @@ impl<'a> From<&'a MeshHandle> for MeshKey {
 
 fn add_missing_meshes(
     renderer: Res<GraphicsState>,
-    game_world: Res<GameWorld>,
     mut pipeline: ResMut<SpritePipeline>,
+    meshes: Res<crate::assets::Assets<SpriteMesh>>,
 ) {
-    game_world
-        .world()
-        .run_view_system(|meshes: Res<crate::assets::Assets<SpriteMesh>>| {
-            for (id, sheet) in meshes.iter() {
-                let key = MeshKey::Mesh(id);
-                if !pipeline.meshes.contains_key(&key) {
-                    let vertex_buffer =
-                        renderer
-                            .device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Sprite Vertex Buffer"),
-                                contents: bytemuck::cast_slice(sheet.vertices.as_slice()),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            });
+    for (id, sheet) in meshes.iter() {
+        let key = MeshKey::Mesh(id);
+        if !pipeline.meshes.contains_key(&key) {
+            let vertex_buffer =
+                renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Sprite Vertex Buffer"),
+                        contents: bytemuck::cast_slice(sheet.vertices.as_slice()),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
 
-                    let index_buffer =
-                        renderer
-                            .device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Sprite Index Buffer"),
-                                contents: bytemuck::cast_slice(sheet.indices.as_slice()),
-                                usage: wgpu::BufferUsages::INDEX,
-                            });
-                    let num_indices = sheet.indices.len() as u32;
+            let index_buffer =
+                renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Sprite Index Buffer"),
+                        contents: bytemuck::cast_slice(sheet.indices.as_slice()),
+                        usage: wgpu::BufferUsages::INDEX,
+                    });
+            let num_indices = sheet.indices.len() as u32;
 
-                    pipeline.meshes.insert(
-                        key,
-                        SpriteMeshGpu {
-                            vertex_buffer,
-                            index_buffer,
-                            num_indices,
-                        },
-                    );
-                }
-            }
-        });
+            pipeline.meshes.insert(
+                key,
+                SpriteMeshGpu {
+                    vertex_buffer,
+                    index_buffer,
+                    num_indices,
+                },
+            );
+        }
+    }
 }
 
 fn add_missing_instances(
     renderer: Res<GraphicsState>,
     mut pipeline: ResMut<SpritePipeline>,
-    q: Query<(&MeshHandle, &WeakHandle<SpriteSheet>), With<Visible>>,
+    q: Query<(Option<&Handle<SpriteMesh>>, &Handle<SpriteSheet>), With<Visible>>,
 ) {
     let instances = q
         .iter()
-        .map(|(mesh, sheet)| InstanceKey {
-            sprite_sheet: sheet.id(),
-            mesh: mesh.into(),
+        .map(|(mesh, sheet)| {
+            let mesh = mesh
+                .map(|h| MeshHandle::Mesh(h.downgrade()))
+                .unwrap_or_default();
+            InstanceKey {
+                sprite_sheet: sheet.id(),
+                mesh: mesh.into(),
+            }
         })
-        .fold(HashMap::new(), |mut a, b| {
-            *a.entry(b).or_default() += 1;
+        .fold(HashSet::new(), |mut a, b| {
+            a.insert(b);
             a
         });
 
-    for (k, count) in instances.into_iter() {
+    for k in instances.into_iter() {
         pipeline
             .instances
             .entry(k)
             .or_insert_with(|| SpriteInstances {
-                count,
+                count: 0,
                 instance_gpu: renderer.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some(&format!(
                         "Sprite Instance Buffer - {} {:?}",

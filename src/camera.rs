@@ -2,7 +2,7 @@ use cecs::prelude::*;
 use glam::{Mat4, Vec3, Vec4};
 
 use crate::{
-    renderer::{ExtractionPlugin, GraphicsState, WindowSize},
+    renderer::{GraphicsState, WindowSize},
     transform::GlobalTransform,
     Plugin, Stage,
 };
@@ -117,20 +117,6 @@ fn update_view_projections(
     }
 }
 
-impl crate::renderer::Extract for CameraUniform {
-    type QueryItem = &'static CameraUniform;
-
-    type Filter = ();
-
-    type Out = (Self,);
-
-    fn extract<'a>(
-        it: <Self::QueryItem as cecs::query::QueryFragment>::Item<'a>,
-    ) -> Option<Self::Out> {
-        Some((*it,))
-    }
-}
-
 fn upload_camera_uniform(queue: &wgpu::Queue, buffer: &wgpu::Buffer, uni: &CameraUniform) {
     queue.write_buffer(
         &buffer,
@@ -212,13 +198,8 @@ impl Plugin for CameraPlugin {
         })
         .with_stage(Stage::Update, |s| {
             s.add_system(update_view_projections)
-                .add_system(update_frustum.after(update_view_projections));
-        });
-
-        app.add_plugin(ExtractionPlugin::<CameraUniform>::default());
-
-        app.render_app_mut().with_stage(Stage::Update, |s| {
-            s.add_system(insert_missing_camera_buffers)
+                .add_system(update_frustum.after(update_view_projections))
+                .add_system(insert_missing_camera_buffers)
                 .add_system(update_camera_buffers);
         });
     }
