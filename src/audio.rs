@@ -1,10 +1,7 @@
 use parking_lot::Mutex;
 use std::{path::Path, sync::Arc};
 
-use kira::{
-    backend::{cpal::CpalBackend, DefaultBackend},
-    sound::static_sound::StaticSoundData,
-};
+use kira::{backend::DefaultBackend, sound::static_sound::StaticSoundData};
 
 use crate::{
     assets::{Assets, AssetsPlugin, Handle},
@@ -79,8 +76,8 @@ impl Audio {
 
 impl Plugin for AudioPlugin {
     fn build(self, app: &mut crate::App) {
-        let manager = AM::<CpalBackend>::new(kira::AudioManagerSettings::default())
-            .expect("Failed to initialize audio");
+        let manager =
+            AM::new(kira::AudioManagerSettings::default()).expect("Failed to initialize audio");
 
         app.insert_resource(AudioManager::new(manager));
         app.add_plugin(AssetsPlugin::<Audio>::default());
