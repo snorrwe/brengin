@@ -271,6 +271,7 @@ fn update_sprite_pipelines(
         let size = instance_data_bytes.len() as u64;
         if instances.instance_gpu.size() < size {
             // resize the buffer
+            instances.instance_gpu.destroy();
             instances.instance_gpu = renderer.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(&format!(
                     "Sprite Instance Buffer - {} {:?}",
