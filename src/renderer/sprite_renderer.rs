@@ -277,7 +277,7 @@ fn update_sprite_pipelines(
                     "Sprite Instance Buffer - {} {:?}",
                     id.sprite_sheet, id.mesh
                 )),
-                size: size * 2,
+                size: size * 3 / 2,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
