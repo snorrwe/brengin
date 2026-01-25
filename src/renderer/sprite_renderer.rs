@@ -115,7 +115,13 @@ pub struct SpriteSheet {
 }
 
 impl SpriteSheet {
+    #[deprecated = "Use from_grid instead"]
     pub fn from_image(padding: Vec2, box_size: Vec2, num_cols: u32, image: DynamicImage) -> Self {
+        Self::from_grid(padding, box_size, num_cols, image)
+    }
+
+    /// Construct a spritesheet from a uniform grid of sprites
+    pub fn from_grid(padding: Vec2, box_size: Vec2, num_cols: u32, image: DynamicImage) -> Self {
         Self {
             padding,
             box_size,
