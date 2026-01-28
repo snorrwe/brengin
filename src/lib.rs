@@ -57,7 +57,7 @@ pub struct DeltaTime(pub std::time::Duration);
 pub struct Timer {
     target: std::time::Duration,
     elapsed: std::time::Duration,
-    repeat: bool,
+    pub repeat: bool,
     just_finished: bool,
 }
 
