@@ -112,6 +112,11 @@ impl Timer {
         self.target = target;
         self.reset();
     }
+
+    pub fn percent(&self) -> f32 {
+        let t = self.elapsed.as_secs_f32() / self.target.as_secs_f32();
+        t.clamp(0.0, 1.0)
+    }
 }
 
 fn update_time(mut time: ResMut<Time>, mut dt: ResMut<DeltaTime>, mut tick: ResMut<Tick>) {
