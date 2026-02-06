@@ -17,11 +17,11 @@ pub fn spawn_child(
     cmd.insert_bundle((Parent(parent), AppendChild));
 }
 
-fn clean_children(mut q: Query<&mut Children>, exists: Query<&Parent>) {
-    q.par_for_each_mut(|ch| {
+fn clean_children(mut q: Query<(EntityId, &mut Children)>, exists: Query<&Parent>) {
+    q.par_for_each_mut(|(parent_id, ch)| {
         for i in (0..ch.len()).rev() {
             let id = ch[i];
-            if !exists.contains(id) {
+            if exists.fetch(id).map(|p| p.0 != parent_id).unwrap_or(true) {
                 ch.0.swap_remove(i);
             }
         }
@@ -54,6 +54,32 @@ fn append_new_children(
         }
     }
 }
+
+fn reparent_system(
+    mut cmd: Commands,
+    mut ch: Query<(EntityId, &Reparent, &mut Parent)>,
+    mut children: Query<&mut Children>,
+) {
+    for (id, Reparent(new_parent), Parent(current_parent)) in ch.iter_mut() {
+        let cmd = cmd.entity(id).remove::<Reparent>();
+        match children.fetch_mut(*new_parent) {
+            Some(children) => {
+                children.0.push(id);
+            }
+            None => {
+                cmd.insert(AppendChild);
+            }
+        }
+        // clean_children system will take care of removing the current entity as a child of old
+        // parent
+        *current_parent = *new_parent;
+    }
+}
+
+/// Set the parent entity to the target id
+///
+/// Meaningless if the entity is not part of a transform hierarchy already
+pub struct Reparent(pub EntityId);
 
 // parent id
 struct AppendChild;
@@ -182,8 +208,9 @@ impl Plugin for TransformPlugin {
     fn build(self, app: &mut crate::App) {
         app.with_stage(crate::Stage::PostUpdate, |s| {
             s.add_system(insert_missing_children)
-                .add_system(clean_children)
-                .add_system(append_new_children.after(insert_missing_children));
+                .add_system(reparent_system)
+                .add_system(clean_children.after(reparent_system))
+                .add_system(append_new_children.after(reparent_system));
         })
         .with_stage(crate::Stage::Transform, |s| {
             s.add_system(update_root_transforms)
