@@ -22,11 +22,11 @@
           inherit system overlays;
         };
         x11libs = with pkgs; [
-          xorg.libxcb
-          xorg.libX11
-          xorg.libXcursor
-          xorg.libXi
-          xorg.libXrandr
+          libxcb
+          libX11
+          libXcursor
+          libXi
+          libXrandr
           libxkbcommon
           libGL
           udev
