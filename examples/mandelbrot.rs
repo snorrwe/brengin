@@ -117,9 +117,7 @@ impl Plugin for GamePlugin {
         app.add_plugin(RenderCommandPlugin::<MandelbrotPipeline>::new(
             brengin::renderer::RenderPass::Ui,
         ));
-        if let Some(ref mut app) = app.render_app {
-            app.add_startup_system(setup_pipeline);
-        }
+        app.add_startup_system(setup_pipeline);
     }
 }
 
