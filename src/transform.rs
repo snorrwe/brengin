@@ -213,7 +213,11 @@ impl Plugin for TransformPlugin {
                 .add_system(reparent_system)
                 .add_system(clean_children.after(reparent_system))
                 .add_system(append_new_children.after(reparent_system))
-                .add_system(delete_hierarchy);
+                .add_system(
+                    delete_hierarchy
+                        .after(append_new_children)
+                        .after(clean_children),
+                );
         })
         .with_stage(crate::Stage::Transform, |s| {
             s.add_system(update_root_transforms)
