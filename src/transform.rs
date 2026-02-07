@@ -84,6 +84,7 @@ pub struct Reparent(pub EntityId);
 // parent id
 struct AppendChild;
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Parent(EntityId);
 
 impl std::ops::Deref for Parent {
@@ -94,6 +95,7 @@ impl std::ops::Deref for Parent {
     }
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct Children(smallvec::SmallVec<[EntityId; 4]>);
 unsafe impl Send for Children {}
 
