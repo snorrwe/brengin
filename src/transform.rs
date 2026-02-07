@@ -210,7 +210,8 @@ impl Plugin for TransformPlugin {
             s.add_system(insert_missing_children)
                 .add_system(reparent_system)
                 .add_system(clean_children.after(reparent_system))
-                .add_system(append_new_children.after(reparent_system));
+                .add_system(append_new_children.after(reparent_system))
+                .add_system(delete_hierarchy);
         })
         .with_stage(crate::Stage::Transform, |s| {
             s.add_system(update_root_transforms)
@@ -222,6 +223,34 @@ impl Plugin for TransformPlugin {
 fn update_root_transforms(mut root: Query<(&Transform, &mut GlobalTransform), WithOut<Parent>>) {
     for (tr, global_tr) in root.iter_mut() {
         global_tr.0 = *tr;
+    }
+}
+
+/// Marker component. Marks the entity and all children for deleteion in the PostUpdate stage.
+pub struct DeleteHierarchy {
+    /// Also delete the parent entity
+    pub delete_self: bool,
+}
+
+fn delete_hierarchy(
+    mut cmd: Commands,
+    q_to_delete: Query<(EntityId, &DeleteHierarchy)>,
+    q_children: Query<&Children>,
+) {
+    fn clean_recursive(cmd: &mut Commands, id: EntityId, q_children: &Query<&Children>) {
+        if let Some(c) = q_children.fetch(id) {
+            for id in c.iter().copied() {
+                cmd.delete(id);
+                clean_recursive(cmd, id, q_children);
+            }
+        }
+    }
+
+    for (id, DeleteHierarchy { delete_self }) in q_to_delete.iter() {
+        if *delete_self {
+            cmd.delete(id);
+        }
+        clean_recursive(&mut cmd, id, &q_children);
     }
 }
 
