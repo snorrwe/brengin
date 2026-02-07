@@ -1261,7 +1261,7 @@ impl<'a> Ui<'a> {
         self.ui_state.id_stack.pop();
     }
 
-    pub fn button(&mut self, label: impl Into<String>) -> ButtonResponse {
+    pub fn button<S: Into<String>>(&mut self, desc: ButtonDescriptor<S>) -> ButtonResponse {
         fn _button(this: &mut Ui, label: String) -> ButtonResponse {
             let id = this.begin_widget();
             let layer = this.ui_state.layer;
@@ -1392,7 +1392,7 @@ impl<'a> Ui<'a> {
             }
         }
 
-        _button(self, label.into())
+        _button(self, desc.label.into())
     }
 
     pub fn theme(&self) -> &Theme {
@@ -2389,7 +2389,9 @@ impl<'a> Ui<'a> {
         current: T,
         options: &'b [T],
     ) -> SelectResponse {
-        let resp = self.button(format!("{label}: {}", current.as_ref()));
+        let resp = self.button(ButtonDescriptor {
+            label: format!("{label}: {}", current.as_ref()),
+        });
 
         let parent_id = resp.id;
 
@@ -2440,7 +2442,7 @@ impl<'a> Ui<'a> {
                 ui.vertical(None, |ui| {
                     // TODO: highlight if matches current
                     for (i, t) in options.iter().enumerate() {
-                        if ui.button(t.as_ref()).pressed() {
+                        if ui.button(ButtonDescriptor { label: t.as_ref() }).pressed() {
                             selected = Some(i);
                             state.open = false;
                         }
@@ -3803,4 +3805,8 @@ impl Default for OutlineDescriptor {
 pub struct SelectResponse {
     pub inner: Response<()>,
     pub selected: Option<usize>,
+}
+
+pub struct ButtonDescriptor<S> {
+    pub label: S,
 }
