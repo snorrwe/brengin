@@ -17,7 +17,7 @@ cecs = { git = "https://github.com/snorrwe/cecs", default-features = false }
 anyhow = "1.0.100"
 bytemuck = { version = "1.24.0", features = ["derive"] }
 fastrand = "2.3.0"
-glam = { version = "0.30.9", features = ["bytemuck"] }
+glam = { version = "0.31.0", features = ["bytemuck"] }
 image = { version = "0.25.9", default-features = false, features = ["png"] }
 smallvec = "1.15.1"
 wgpu = "28.0.0"
@@ -27,7 +27,7 @@ instant = { version = "0.1.13", features = [] }
 pollster = "0.4.0"
 parking_lot = "0.12.5"
 rustybuzz = "0.20.1"
-tiny-skia = "0.11.4"
+tiny-skia = "0.12.0"
 crossbeam = { version = "0.8.4", features = ["crossbeam-channel", "nightly"] }
 thiserror = "2.0.17"
 
