@@ -4,7 +4,7 @@ use glam::{Quat, Vec3};
 use crate::Plugin;
 
 pub fn transform_bundle(tr: Transform) -> impl Bundle {
-    (tr, GlobalTransform(tr))
+    (tr, GlobalTransform(tr), Children::default())
 }
 
 pub fn spawn_child(
