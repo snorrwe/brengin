@@ -46,8 +46,6 @@ fn append_new_children(
     mut children: Query<&mut Children>,
 ) {
     for (id, Parent(parent_id)) in q.iter() {
-        // FIXME: add cecs command sentinel that ensures commands in
-        // `insert_missing_children` execute before executing this system?
         if let Some(children) = children.fetch_mut(*parent_id) {
             children.0.push(id);
             cmd.entity(id).remove::<AppendChild>();
