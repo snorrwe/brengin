@@ -221,7 +221,7 @@ impl Plugin for TransformPlugin {
         })
         .with_stage(crate::Stage::Transform, |s| {
             s.add_system(update_root_transforms)
-                .add_system(update_child_transforms);
+                .add_system(update_child_transforms.after(update_root_transforms));
         });
     }
 }
