@@ -180,6 +180,30 @@ impl Transform {
         self.rot = rot;
         self
     }
+
+    pub fn local_x(&self) -> Vec3 {
+        self.rot.mul_vec3(Vec3::X)
+    }
+
+    pub fn local_y(&self) -> Vec3 {
+        self.rot.mul_vec3(Vec3::Y)
+    }
+
+    pub fn local_z(&self) -> Vec3 {
+        self.rot.mul_vec3(Vec3::Z)
+    }
+
+    pub fn forward(&self) -> Vec3 {
+        self.local_z()
+    }
+
+    pub fn right(&self) -> Vec3 {
+        self.local_x()
+    }
+
+    pub fn up(&self) -> Vec3 {
+        self.local_y()
+    }
 }
 
 impl<'a> std::ops::Mul<&'a Self> for Transform {
