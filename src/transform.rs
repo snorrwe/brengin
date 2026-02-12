@@ -376,3 +376,13 @@ impl Default for Transform {
         }
     }
 }
+
+pub trait DeleteHierarchyCommand {
+    fn delete_hierarchy(&mut self, delete_self: bool) -> &mut Self;
+}
+
+impl DeleteHierarchyCommand for EntityCommands {
+    fn delete_hierarchy(&mut self, delete_self: bool) -> &mut Self {
+        self.insert(DeleteHierarchy { delete_self })
+    }
+}

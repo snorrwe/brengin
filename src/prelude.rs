@@ -1,6 +1,8 @@
 pub use crate::assets::*;
 pub use crate::color::Color;
-pub use crate::transform::{transform_bundle, GlobalTransform, Transform};
+pub use crate::transform::{
+    transform_bundle, DeleteHierarchyCommand as _, GlobalTransform, Transform,
+};
 pub use crate::App;
 pub use crate::DeltaTime;
 pub use crate::Plugin;
