@@ -60,9 +60,17 @@ fn update_camera_aspect(
 }
 
 impl PerspectiveCamera {
-    pub fn view_projection(&self) -> Mat4 {
-        let view = Mat4::look_at_rh(self.eye, self.target, self.up);
-        let proj = Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar);
+    pub fn look_at(&self) -> Mat4 {
+        Mat4::look_at_rh(self.eye, self.target, self.up)
+    }
+
+    pub fn perspective(&self) -> Mat4 {
+        Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar)
+    }
+
+    pub fn projection(&self) -> Mat4 {
+        let view = self.look_at();
+        let proj = self.perspective();
 
         proj * view
     }
@@ -112,7 +120,7 @@ fn update_view_projections(
     for (tr, cam, uni) in q.iter_mut() {
         uni.view = tr.0.inverse().compute_matrix();
         uni.view_inv = uni.view.inverse();
-        uni.proj = cam.view_projection();
+        uni.proj = cam.projection();
         uni.view_proj = uni.proj * uni.view;
     }
 }
