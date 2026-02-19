@@ -89,15 +89,22 @@ fn update_invisible(
     }
 }
 
-fn insert_missing_cull(
-    q: Query<(EntityId, &Handle<SpriteSheet>), WithOut<CullSize>>,
+fn update_cull(
+    mut q: Query<(&GlobalTransform, &mut CullSize, &Handle<SpriteSheet>)>,
     assets: Res<Assets<SpriteSheet>>,
+) {
+    q.par_for_each_mut(|(GlobalTransform(tr), cull, sheet)| {
+        let sheet = assets.get(sheet);
+        cull.0 = (sheet.box_size.x * tr.scale.x).max(sheet.box_size.y * tr.scale.y);
+    });
+}
+
+fn insert_missing_cull(
+    q: Query<EntityId, (WithOut<CullSize>, With<Handle<SpriteSheet>>)>,
     mut cmd: Commands,
 ) {
-    for (id, handle) in q.iter() {
-        let sheet = assets.get(handle);
-        cmd.entity(id)
-            .insert(CullSize(sheet.box_size.x.max(sheet.box_size.y)));
+    for id in q.iter() {
+        cmd.entity(id).insert(CullSize(0.0));
     }
 }
 
@@ -585,8 +592,9 @@ impl Plugin for SpriteRendererPlugin {
             // putting this system in update means that the last frame's data will be presented
             s.add_system(compute_sprite_instances)
                 .add_system(insert_missing_cull)
-                .add_system(update_visible)
-                .add_system(update_invisible)
+                .add_system(update_cull)
+                .add_system(update_visible.after(update_cull))
+                .add_system(update_invisible.after(update_cull))
                 .add_system(unload_sheets)
                 .add_system(update_sprite_pipelines)
                 .add_system(unload_meshes);
