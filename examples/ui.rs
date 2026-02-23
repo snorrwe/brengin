@@ -49,33 +49,52 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
             vertical: VerticalAlignment::Center,
         },
         |ui| {
-            ui.grid(4, |ui| {
-                for col in 0..4 {
-                    ui.column(col, |ui| {
-                        for row in 0..4 {
-                            ui.context_menu(
-                                |ui| {
-                                    ui.with_tooltip(
-                                        |ui| {
-                                            ui.margin(brengin::ui::Padding::vertical(10), |ui| {
-                                                ui.image(
-                                                    ui_state.boid.clone(),
-                                                    UiCoord::Percent(50),
-                                                    UiCoord::Absolute(56),
+            ui.grid(4, |cols| {
+                for row in 0..4 {
+                    if row % 2 == 0 {
+                        for col in 0..4 {
+                            cols.column(col, |ui| {
+                                ui.context_menu(
+                                    |ui| {
+                                        ui.with_tooltip(
+                                            |ui| {
+                                                ui.margin(
+                                                    brengin::ui::Padding::vertical(10),
+                                                    |ui| {
+                                                        ui.image(
+                                                            ui_state.boid.clone(),
+                                                            UiCoord::Percent(50),
+                                                            UiCoord::Absolute(56),
+                                                        );
+                                                    },
                                                 );
-                                            });
-                                        },
-                                        &format!("hiiiiiiiiiiiiiiiiii {col} {row}"),
-                                    );
-                                },
-                                |ui, _| {
-                                    ui.allocate_area(128.into(), 128.into(), |ui| {
-                                        ui.label(format!("col - {col} row - {row}"));
-                                    });
-                                },
-                            );
+                                            },
+                                            &format!("hiiiiiiiiiiiiiiiiii {col} {row}"),
+                                        );
+                                    },
+                                    |ui, _| {
+                                        ui.allocate_area(128.into(), 128.into(), |ui| {
+                                            ui.label(format!("col - {col} row - {row}"));
+                                        });
+                                    },
+                                );
+                            });
                         }
-                    });
+                    } else {
+                        for col in [0, 1] {
+                            let c = col * 2;
+                            cols.span(c..=c + 1, |ui| {
+                                ui.margin(brengin::ui::Padding::vertical(10), |ui| {
+                                    ui.image(
+                                        ui_state.boid.clone(),
+                                        UiCoord::Percent(50),
+                                        UiCoord::Absolute(56),
+                                    );
+                                });
+                            });
+                        }
+                    }
+                    cols.end_row();
                 }
             });
         },

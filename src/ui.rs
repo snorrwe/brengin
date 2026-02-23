@@ -18,6 +18,7 @@ use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
     i32,
+    ops::RangeBounds,
     ptr::NonNull,
     time::Duration,
 };
@@ -3025,15 +3026,28 @@ pub struct Columns<'a> {
 }
 
 impl<'a> Columns<'a> {
-    pub fn column(&mut self, i: u32, mut contents: impl FnMut(&mut Ui)) {
+    pub fn column(&mut self, i: u32, contents: impl FnMut(&mut Ui)) {
         assert!(i < self.cols);
+        self.span(i as usize..=i as usize, contents);
+    }
+
+    pub fn span(&mut self, span: impl RangeBounds<usize>, mut contents: impl FnMut(&mut Ui)) {
         // setup
         let ctx = unsafe { self.ctx.as_mut() };
-        let idx = i as usize;
+        let start = match span.start_bound() {
+            std::ops::Bound::Included(i) => *i,
+            std::ops::Bound::Excluded(i) => *i + 1,
+            std::ops::Bound::Unbounded => 0,
+        };
+        let end = match span.end_bound() {
+            std::ops::Bound::Included(i) => *i,
+            std::ops::Bound::Excluded(i) => *i + 1,
+            std::ops::Bound::Unbounded => self.cols as usize - 1,
+        };
         let bounds = ctx.ui_state.bounds;
-        ctx.ui_state.bounds.min_x = self.dims[idx][0];
-        ctx.ui_state.bounds.max_x = self.dims[idx][1];
-        ctx.ui_state.bounds.min_y += self.dims[idx][2];
+        ctx.ui_state.bounds.min_x = self.dims[start][0];
+        ctx.ui_state.bounds.max_x = self.dims[end][1];
+        ctx.ui_state.bounds.min_y += self.dims[start][2];
         let w = ctx.ui_state.bounds.width();
         let layer = ctx.ui_state.layer;
         ctx.ui_state.layer += 1;
@@ -3049,17 +3063,20 @@ impl<'a> Columns<'a> {
         let rect = ctx.history_bounding_rect(history_start);
         ctx.ui_state.bounds.min_y = bounds.min_y;
         ctx.ui_state.bounds.max_y = bounds.max_y;
-        if rect.width() > w && i + 1 < self.cols {
+        if rect.width() > w && end as u32 + 1 < self.cols {
             let diff = rect.width() - w;
-            for d in &mut self.dims[idx + 1..] {
+            for d in &mut self.dims[end as usize + 1..] {
                 d[0] += diff;
                 d[1] += diff;
             }
         }
-        self.dims[idx][2] += rect.height();
+        for d in &mut self.dims[start..=end] {
+            d[2] += rect.height();
+        }
         ctx.ui_state.layer = layer;
     }
 
+    /// Call after each row in the grid to ensure that rows align correctly.
     pub fn end_row(&mut self) {
         let offset = self.dims.iter().map(|x| x[2]).max().unwrap_or(0);
         for d in self.dims.iter_mut() {
