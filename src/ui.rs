@@ -3059,6 +3059,13 @@ impl<'a> Columns<'a> {
         self.dims[idx][2] += rect.height();
         ctx.ui_state.layer = layer;
     }
+
+    pub fn end_row(&mut self) {
+        let offset = self.dims.iter().map(|x| x[2]).max().unwrap_or(0);
+        for d in self.dims.iter_mut() {
+            d[2] = offset;
+        }
+    }
 }
 
 fn begin_frame(
