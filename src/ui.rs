@@ -870,7 +870,7 @@ impl<'a> Ui<'a> {
         let width = (bounds.width() / cols + 1) as i32;
 
         let dims = (0..cols as i32)
-            .map(|i| [bounds.min_x + i * width, bounds.min_x + (i + 1) * width])
+            .map(|i| [bounds.min_x + i * width, bounds.min_x + (i + 1) * width, 0])
             .collect();
 
         let mut cols = Columns {
@@ -3020,8 +3020,8 @@ pub struct ButtonState {
 pub struct Columns<'a> {
     ctx: NonNull<Ui<'a>>,
     cols: u32,
-    /// [x start, x end][cols]
-    dims: Vec<[i32; 2]>,
+    /// [x start, x end, offset][cols]
+    dims: Vec<[i32; 3]>,
 }
 
 impl<'a> Columns<'a> {
@@ -3033,6 +3033,7 @@ impl<'a> Columns<'a> {
         let bounds = ctx.ui_state.bounds;
         ctx.ui_state.bounds.min_x = self.dims[idx][0];
         ctx.ui_state.bounds.max_x = self.dims[idx][1];
+        ctx.ui_state.bounds.min_y += self.dims[idx][2];
         let w = ctx.ui_state.bounds.width();
         let layer = ctx.ui_state.layer;
         ctx.ui_state.layer += 1;
@@ -3055,6 +3056,7 @@ impl<'a> Columns<'a> {
                 d[1] += diff;
             }
         }
+        self.dims[idx][2] += rect.height();
         ctx.ui_state.layer = layer;
     }
 }
