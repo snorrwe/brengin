@@ -3728,6 +3728,17 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
         let pic = &e.texture;
         let line_width = pic.width() as i32;
         let line_height = pic.height() as i32;
+
+        let color = {
+            if ui.is_active(id) {
+                Color::BLUE
+            } else if ui.is_hovered(id) {
+                Color::YELLOW
+            } else {
+                Color::BLACK
+            }
+        };
+
         ui.color_rect_with_outline(
             rect.min_x,
             rect.min_y,
@@ -3735,7 +3746,7 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
             line_height,
             Color::from_rgba(0x0000008F),
             2,
-            Color::BLACK,
+            color,
             CONTEXT_LAYER + 100,
         );
         ui.text_rect(
