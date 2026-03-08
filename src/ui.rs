@@ -185,7 +185,7 @@ fn update_ids(
             lhs.context_menu = UiId::SENTINEL;
         }
     }
-    if !lhs.hovered.is_empty() || lhs.dragged != UiId::SENTINEL || lhs.dragged != UiId::SENTINEL {
+    if !lhs.hovered.is_empty() || lhs.scrolling != UiId::SENTINEL || lhs.dragged != UiId::SENTINEL {
         inputs.wants_mouse = true;
     }
 }
