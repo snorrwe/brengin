@@ -89,7 +89,7 @@ impl Plugin for UiPlugin {
             .add_system(update_ids)
             .add_system(gc_bounding_boxes.after(draw_bounding_boxes))
             .add_system(shaping_gc_system)
-            .add_system(update_ui_inputs);
+            .add_system(update_ui_inputs.after(update_ids));
         });
     }
 }
@@ -138,12 +138,15 @@ pub struct ShapingResult {
 }
 
 /// assign new ids, lhs = rhs
-fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>, mut inputs: ResMut<UiInputs>) {
+fn update_ids(
+    mut lhs: ResMut<UiIds>,
+    mut rhs: ResMut<NextUiIds>,
+    mut inputs: ResMut<NextUiInputs>,
+) {
     let ids = &mut rhs.0;
     ids.sort_by_key(|x| x.layer);
     for mut idset in ids.drain(..) {
         if idset.has_added_flag(InteractionFlag::Hovered) {
-            inputs.wants_mouse = true;
             lhs.hovered.insert(idset.id);
             lhs.top_hovered = idset.id;
         }
@@ -181,6 +184,9 @@ fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>, mut inputs: Re
         if idset.has_removed_flag(InteractionFlag::ContextMenu) {
             lhs.context_menu = UiId::SENTINEL;
         }
+    }
+    if !lhs.hovered.is_empty() || lhs.dragged != UiId::SENTINEL || lhs.dragged != UiId::SENTINEL {
+        inputs.wants_mouse = true;
     }
 }
 
