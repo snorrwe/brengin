@@ -132,11 +132,12 @@ pub struct ShapingResult {
 }
 
 /// assign new ids, lhs = rhs
-fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>) {
+fn update_ids(mut lhs: ResMut<UiIds>, mut rhs: ResMut<NextUiIds>, mut inputs: ResMut<UiInputs>) {
     let ids = &mut rhs.0;
     ids.sort_by_key(|x| x.layer);
     for mut idset in ids.drain(..) {
         if idset.has_added_flag(InteractionFlag::Hovered) {
+            inputs.wants_mouse = true;
             lhs.hovered.insert(idset.id);
             lhs.top_hovered = idset.id;
         }
@@ -334,15 +335,17 @@ fn gc_bounding_boxes(mut state: ResMut<UiState>) {
 
 #[derive(Debug, Clone, Default)]
 pub struct UiInputs {
-    pub wants_keyboard: bool,
+    wants_keyboard: bool,
     /// keys consumed by the UI
     pub keys: HashSet<KeyCode>,
+    wants_mouse: bool,
 }
 
 impl UiInputs {
     pub fn clear(&mut self) {
         self.wants_keyboard = false;
         self.keys.clear();
+        self.wants_mouse = false;
     }
 
     pub fn wants_input(&self) -> bool {
@@ -354,8 +357,7 @@ impl UiInputs {
     }
 
     pub fn wants_mouse(&self) -> bool {
-        // TODO:
-        false
+        self.wants_mouse
     }
 }
 
