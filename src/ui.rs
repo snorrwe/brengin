@@ -145,7 +145,8 @@ fn update_ids(
 ) {
     let ids = &mut rhs.0;
     ids.sort_by_key(|x| x.layer);
-    for mut idset in ids.drain(..) {
+    lhs.clear();
+    for idset in ids.drain(..) {
         if idset.has_added_flag(InteractionFlag::Hovered) {
             lhs.hovered.insert(idset.id);
             lhs.top_hovered = idset.id;
@@ -163,27 +164,6 @@ fn update_ids(
         if idset.has_added_flag(InteractionFlag::ContextMenu) {
             lhs.context_menu = idset.id;
         }
-        if lhs.dragged == idset.id && idset.has_removed_flag(InteractionFlag::Dragged) {
-            lhs.dragged = UiId::SENTINEL;
-            if !idset.has_added_flag(InteractionFlag::Active) {
-                idset.remove_flag(InteractionFlag::Active);
-            }
-        }
-        if idset.has_removed_flag(InteractionFlag::Hovered) {
-            lhs.hovered.remove(&idset.id);
-            if lhs.top_hovered == idset.id {
-                lhs.top_hovered = UiId::SENTINEL;
-            }
-        }
-        if lhs.active == idset.id && idset.has_removed_flag(InteractionFlag::Active) {
-            lhs.active = UiId::SENTINEL;
-        }
-        if lhs.scrolling == idset.id && idset.has_removed_flag(InteractionFlag::Scrolling) {
-            lhs.scrolling = UiId::SENTINEL;
-        }
-        if idset.has_removed_flag(InteractionFlag::ContextMenu) {
-            lhs.context_menu = UiId::SENTINEL;
-        }
     }
     if !lhs.hovered.is_empty() || lhs.scrolling != UiId::SENTINEL || lhs.dragged != UiId::SENTINEL {
         inputs.wants_mouse = true;
@@ -200,6 +180,17 @@ pub struct UiIds {
     context_menu: UiId,
     scrolling: UiId,
 }
+
+impl UiIds {
+    pub fn clear(&mut self) {
+        self.hovered.clear();
+        self.top_hovered = UiId::SENTINEL;
+        self.active = UiId::SENTINEL;
+        self.dragged = UiId::SENTINEL;
+        self.context_menu = UiId::SENTINEL;
+        self.scrolling = UiId::SENTINEL;
+    }
+}
 pub struct NextUiIds(pub Vec<NextUiIdSet>);
 
 impl NextUiIds {
@@ -209,7 +200,6 @@ impl NextUiIds {
                 layer,
                 id,
                 added_flags: 0,
-                removed_flags: 0,
             });
         }
         self.0.last_mut().unwrap()
@@ -270,7 +260,6 @@ pub struct NextUiIdSet {
     pub id: UiId,
     pub layer: u16,
     pub added_flags: u8,
-    pub removed_flags: u8,
 }
 
 impl std::fmt::Debug for NextUiIdSet {
@@ -281,9 +270,6 @@ impl std::fmt::Debug for NextUiIdSet {
             .field_with("added_flags", |f| {
                 InteractionFlag::write_interaction_flags(f, self.added_flags)
             })
-            .field_with("removed_flags", |f| {
-                InteractionFlag::write_interaction_flags(f, self.removed_flags)
-            })
             .finish()
     }
 }
@@ -291,20 +277,14 @@ impl std::fmt::Debug for NextUiIdSet {
 impl NextUiIdSet {
     pub fn add_flag(&mut self, flag: InteractionFlag) {
         self.added_flags |= flag as u8;
-        self.removed_flags &= !(flag as u8);
     }
 
     pub fn remove_flag(&mut self, flag: InteractionFlag) {
         self.added_flags &= !(flag as u8);
-        self.removed_flags |= flag as u8;
     }
 
     pub fn has_added_flag(&self, flag: InteractionFlag) -> bool {
         (self.added_flags & flag as u8) != 0
-    }
-
-    pub fn has_removed_flag(&self, flag: InteractionFlag) -> bool {
-        (self.removed_flags & flag as u8) != 0
     }
 }
 
@@ -688,6 +668,11 @@ impl<'a> Ui<'a> {
     }
 
     #[inline]
+    pub fn is_dragged(&self, id: UiId) -> bool {
+        id != UiId::SENTINEL
+    }
+
+    #[inline]
     pub fn is_scrolling(&self, id: UiId) -> bool {
         self.ids.scrolling == id
     }
@@ -783,22 +768,6 @@ impl<'a> Ui<'a> {
         }
     }
 
-    #[inline]
-    fn set_not_scrolling(&mut self, id: UiId) {
-        if self.ids.scrolling == id {
-            self.next_ids
-                .push(id, self.ui_state.layer)
-                .remove_flag(InteractionFlag::Scrolling);
-        }
-    }
-
-    #[inline]
-    fn set_not_hovered(&mut self, id: UiId) {
-        self.next_ids
-            .push(id, self.ui_state.layer)
-            .remove_flag(InteractionFlag::Hovered);
-    }
-
     pub fn horizontal(
         &mut self,
         vertical_alignment: impl Into<Option<VerticalAlignment>>,
@@ -852,7 +821,7 @@ impl<'a> Ui<'a> {
     }
 
     fn _with_layout(&mut self, contents: impl FnMut(&mut Self), layout: LayoutDirection) {
-        let id = self.begin_widget();
+        let WidgetInfo { id, .. } = self.begin_widget();
         let history_start = self.ui_state.rect_history.len();
         let bounds = self.ui_state.bounds;
         let layout = std::mem::replace(&mut self.ui_state.layout_dir, layout);
@@ -1123,7 +1092,11 @@ impl<'a> Ui<'a> {
         width: UiCoord,
         height: UiCoord,
     ) -> Response<()> {
-        let id = self.begin_widget();
+        let WidgetInfo {
+            id,
+            is_hovered,
+            is_active,
+        } = self.begin_widget();
         let layer = self.ui_state.layer;
 
         let width = width.as_abolute(self.ui_state.bounds.width());
@@ -1142,15 +1115,19 @@ impl<'a> Ui<'a> {
 
         Response {
             id,
-            hovered: self.is_hovered(id),
-            active: self.is_active(id),
+            hovered: is_hovered,
+            active: is_active,
             inner: (),
             rect,
         }
     }
 
     pub fn label(&mut self, label: impl Into<String>) -> Response<()> {
-        let id = self.begin_widget();
+        let WidgetInfo {
+            id,
+            is_hovered,
+            is_active,
+        } = self.begin_widget();
         let layer = self.ui_state.layer;
         let label = label.into();
 
@@ -1213,8 +1190,8 @@ impl<'a> Ui<'a> {
 
         Response {
             id,
-            hovered: self.is_hovered(id),
-            active: self.is_active(id),
+            hovered: is_hovered,
+            active: is_active,
             inner: (),
             rect,
         }
@@ -1250,7 +1227,7 @@ impl<'a> Ui<'a> {
         self.ui_state.rect_history.push(rect);
     }
 
-    pub fn begin_widget(&mut self) -> UiId {
+    pub fn begin_widget(&mut self) -> WidgetInfo {
         let index = self.ui_state.widget_ids.len() as IdxType;
 
         let parent = self
@@ -1282,7 +1259,14 @@ impl<'a> Ui<'a> {
         if let Some(i) = self.ui_state.id_stack.last_mut() {
             *i = id.index;
         }
-        id
+        if self.contains_mouse(id) {
+            self.set_hovered(id);
+        }
+        WidgetInfo {
+            id,
+            is_hovered: self.is_hovered(id),
+            is_active: self.is_active(id),
+        }
     }
 
     fn push_child(&mut self) {
@@ -1295,22 +1279,25 @@ impl<'a> Ui<'a> {
 
     pub fn button<S: Into<String>>(&mut self, desc: ButtonDescriptor<S>) -> ButtonResponse {
         fn _button(this: &mut Ui, label: String) -> ButtonResponse {
-            let id = this.begin_widget();
+            let WidgetInfo {
+                id,
+                is_hovered,
+                is_active,
+            } = this.begin_widget();
             let layer = this.ui_state.layer;
 
             let mut pressed = false;
-            let contains_mouse = this.contains_mouse(id);
             let mut bg_color = this.theme.button_default.clone();
-            let active = this.is_active(id);
-            if active {
+            if is_active {
                 bg_color = this
                     .theme
                     .button_pressed
                     .as_ref()
                     .unwrap_or(&this.theme.button_default)
                     .clone();
+                this.set_active(id);
                 if this.mouse_up() {
-                    if this.is_hovered(id) {
+                    if is_hovered {
                         pressed = true;
                     }
                     this.set_not_active(id);
@@ -1322,14 +1309,9 @@ impl<'a> Ui<'a> {
                     .as_ref()
                     .unwrap_or(&this.theme.button_default)
                     .clone();
-                if !contains_mouse {
-                    this.set_not_hovered(id);
-                } else if this.mouse_down() {
+                if this.mouse_down() {
                     this.set_active(id);
                 }
-            }
-            if contains_mouse {
-                this.set_hovered(id);
             }
 
             // shape the text
@@ -1352,7 +1334,7 @@ impl<'a> Ui<'a> {
                 h += line_height + 1;
 
                 let mut delta = 0;
-                if !active {
+                if !is_active {
                     // add a shadow
                     this.text_rect(
                         0,
@@ -1417,8 +1399,8 @@ impl<'a> Ui<'a> {
 
             ButtonResponse {
                 id,
-                hovered: this.is_hovered(id),
-                active,
+                hovered: is_hovered,
+                active: is_active,
                 inner: ButtonState { pressed },
                 rect,
             }
@@ -1486,7 +1468,11 @@ impl<'a> Ui<'a> {
         layer: u16,
         parent_state: &mut ScrollState,
     ) {
-        let id = self.begin_widget();
+        let WidgetInfo {
+            id,
+            is_active,
+            is_hovered,
+        } = self.begin_widget();
 
         // bar
         let bounds = UiRect {
@@ -1501,10 +1487,9 @@ impl<'a> Ui<'a> {
         // pip
         let t = parent_state.ty;
         let id = self.current_id();
-        let active = self.is_active(id);
-        let contains_mouse = self.contains_mouse(id);
         let mut y = scissor_bounds.min_y + (scissor_bounds.height() as f32 * t) as i32;
-        if active {
+        if is_active {
+            self.set_active(id);
             if self.mouse_up() {
                 self.set_not_active(id);
             } else {
@@ -1518,14 +1503,9 @@ impl<'a> Ui<'a> {
                     / (scissor_bounds.height() - scroll_bar_width) as f32;
             }
         } else if self.is_top_hovered(id) {
-            if !contains_mouse {
-                self.set_not_hovered(id);
-            } else if self.mouse_down() {
+            if is_hovered && self.mouse_down() {
                 self.set_active(id);
             }
-        }
-        if !self.is_anything_active() && contains_mouse {
-            self.set_hovered(id);
         }
         let x = scissor_bounds.max_x.saturating_sub(scroll_bar_width);
         let control_box = UiRect {
@@ -1545,7 +1525,11 @@ impl<'a> Ui<'a> {
         layer: u16,
         parent_state: &mut ScrollState,
     ) {
-        let id = self.begin_widget();
+        let WidgetInfo {
+            id,
+            is_active,
+            is_hovered,
+        } = self.begin_widget();
 
         // bar
         let bounds = UiRect {
@@ -1560,9 +1544,9 @@ impl<'a> Ui<'a> {
         // pip
         let t = parent_state.tx;
         let id = self.current_id();
-        let contains_mouse = self.contains_mouse(id);
         let mut x = scissor_bounds.min_x + (scissor_bounds.width() as f32 * t) as i32;
-        if self.is_active(id) {
+        if is_active {
+            self.set_active(id);
             if self.mouse_up() {
                 self.set_not_active(id);
             } else {
@@ -1576,14 +1560,9 @@ impl<'a> Ui<'a> {
                     / (scissor_bounds.width() - scroll_bar_height) as f32;
             }
         } else if self.is_top_hovered(id) {
-            if !contains_mouse {
-                self.set_not_hovered(id);
-            } else if self.mouse_down() {
+            if is_hovered && self.mouse_down() {
                 self.set_active(id);
             }
-        }
-        if contains_mouse && !self.is_anything_active() {
-            self.set_hovered(id);
         }
         let control_box = UiRect {
             min_x: x,
@@ -1596,7 +1575,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn scroll_area(&mut self, desc: ScrollDescriptor, contents: impl FnMut(&mut Self)) {
-        let id = self.begin_widget();
+        let WidgetInfo { id, is_hovered, .. } = self.begin_widget();
         let width = desc
             .width
             .unwrap_or(UiCoord::Percent(100))
@@ -1610,16 +1589,8 @@ impl<'a> Ui<'a> {
         let line_height = self.theme.font_size + self.theme.text_padding;
 
         'scroll_handler: {
-            let is_hovered = self.is_hovered(id);
-            if self.contains_mouse(id) {
-                self.set_hovered(id);
-            } else if is_hovered {
-                self.set_not_hovered(id);
-            }
             if is_hovered {
                 self.set_scrolling(id);
-            } else {
-                self.set_not_scrolling(id);
             }
             if self.is_scrolling(id) {
                 let mut dt = 0.0;
@@ -1772,19 +1743,27 @@ impl<'a> Ui<'a> {
         bounds.resize_h(height);
         // TODO: layout
 
-        let id = self.begin_widget();
+        let WidgetInfo {
+            id,
+            is_hovered,
+            is_active,
+        } = self.begin_widget();
         self.submit_rect(id, bounds, self.theme.padding);
         Response {
             id,
-            hovered: self.is_hovered(id),
-            active: self.is_active(id),
+            hovered: is_hovered,
+            active: is_active,
             rect: bounds,
             inner: (),
         }
     }
 
     pub fn drag_source(&mut self, mut contents: impl FnMut(&mut Self, &DragState)) -> DragResponse {
-        let id = self.begin_widget();
+        let WidgetInfo {
+            id,
+            is_hovered,
+            is_active,
+        } = self.begin_widget();
         let old_bounds = self.ui_state.bounds;
 
         let mut state = self
@@ -1792,18 +1771,16 @@ impl<'a> Ui<'a> {
             .map(|x| *x)
             .unwrap_or_default();
         let mut is_being_dragged = false;
-        if self.is_active(id) {
+        if is_active {
             // mark as dragged even if it was just released,
             // otherwise the parent bounds will end
             // up weird for 1 frame
             is_being_dragged = true;
-            if self.mouse_up() {
-                self.set_not_active(id);
-                state.dragged = false;
-                self.next_ids
-                    .push(id, DRAG_LAYER)
-                    .remove_flag(InteractionFlag::Dragged);
-            } else {
+            if !self.is_dragged(id) {
+                state.drag_start = self.mouse.cursor_position;
+            }
+            if self.mouse_down() {
+                self.set_active(id);
                 let drag_anchor = state.drag_anchor();
                 let drag_start = state.drag_start;
 
@@ -1812,26 +1789,21 @@ impl<'a> Ui<'a> {
                     (self.mouse.cursor_position.y - drag_start.y) as i32,
                 );
 
-                if offset.length_squared() > 5 {
-                    state.dragged = true;
-                }
+                // snap the widget to its original location if the cursor has not moved
+                state.dragged = offset.length_squared() > 5;
                 if state.dragged {
                     state.pos = drag_anchor + offset;
                     self.next_ids
                         .push(id, DRAG_LAYER)
                         .add_flag(InteractionFlag::Dragged);
                 }
+            } else {
+                state.dragged = false;
             }
         } else {
             state.pos = IVec2::new(old_bounds.min_x, old_bounds.min_y);
-            if !self.is_anything_active() && self.contains_mouse(id) {
-                self.set_hovered(id);
-                if self.is_top_hovered(id) && self.mouse_down() {
-                    is_being_dragged = true;
-                    state.drag_start = self.mouse.cursor_position;
-                    state.dragged = false;
-                    self.set_active(id);
-                }
+            if is_hovered && !self.is_anything_active() && self.mouse_down() {
+                self.set_active(id);
             }
         }
 
@@ -1866,7 +1838,7 @@ impl<'a> Ui<'a> {
         let child_history = std::mem::replace(&mut self.ui_state.rect_history, history);
         let mut content_bounds = bounding_rect(&child_history);
 
-        if is_being_dragged {
+        if is_active {
             self.color_rect_from_rect(content_bounds, self.theme.primary_color, layer);
             // move the content_bounds back to their origin, so they're submitted in their original
             // position, so the layout stays the same while dragging
@@ -1874,7 +1846,7 @@ impl<'a> Ui<'a> {
         } else {
             self.ui_state.rect_history.extend_from_slice(&child_history);
             state.content_rect = content_bounds;
-            state.pos = IVec2::new(content_bounds.min_x, content_bounds.min_y);
+            state.pos = state.drag_anchor();
         }
         self.ui_state.scissor_idx = last_scissor;
 
@@ -1886,7 +1858,7 @@ impl<'a> Ui<'a> {
             is_being_dragged,
             inner: Response {
                 id,
-                hovered: self.is_hovered(id),
+                hovered: is_hovered,
                 active: is_being_dragged,
                 rect: content_bounds,
                 inner: (),
@@ -1908,7 +1880,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self, DropState)) -> DropResponse {
-        let id = self.begin_widget();
+        let WidgetInfo { id, .. } = self.begin_widget();
         let old_bounds = self.ui_state.bounds;
         let bg_layer = self.push_layer();
         let mut state = DropState::default();
@@ -1921,12 +1893,6 @@ impl<'a> Ui<'a> {
                 if self.mouse_up() {
                     state.dropped = true;
                 }
-                if !self.contains_mouse(id) {
-                    self.set_not_hovered(id);
-                }
-            }
-            if self.contains_mouse(id) {
-                self.set_hovered(id);
             }
         }
 
@@ -1984,7 +1950,11 @@ impl<'a> Ui<'a> {
     }
 
     fn input_string_impl(&mut self, desc: InputStringDescriptor) -> Response<InputResponse> {
-        let id = self.begin_widget();
+        let WidgetInfo {
+            id,
+            is_hovered,
+            is_active,
+        } = self.begin_widget();
         let last_layer = self.push_layer();
         let layer = self.ui_state.layer;
 
@@ -2001,7 +1971,6 @@ impl<'a> Ui<'a> {
         let mouse_pos = self.mouse.cursor_position;
 
         // handle input
-        let is_active = self.is_active(id);
         if is_active {
             self.ui_inputs.wants_keyboard = true;
             state.caret_timer.update(self.delta_time.0);
@@ -2099,16 +2068,10 @@ impl<'a> Ui<'a> {
                     }
                 }
             }
-        } else if self.is_hovered(id) {
-            if !self.contains_mouse(id) {
-                self.set_not_hovered(id);
-            } else if !self.is_anything_active() && self.mouse_down() {
-                self.set_not_hovered(id);
+        } else if is_hovered {
+            if !self.is_anything_active() && self.mouse_down() {
                 self.set_active(id);
             }
-        }
-        if self.contains_mouse(id) {
-            self.set_hovered(id);
         }
 
         // shape the text
@@ -2190,8 +2153,8 @@ impl<'a> Ui<'a> {
             );
         }
 
-        if is_active && self.mouse_up() && !self.contains_mouse(id) {
-            self.set_not_active(id);
+        if is_active && (is_hovered || !self.mouse_up()) {
+            self.set_active(id);
         }
 
         let w = w.max(self.theme.font_size as i32 * 10);
@@ -2211,7 +2174,7 @@ impl<'a> Ui<'a> {
         self.ui_state.layer = last_layer;
         self.insert_memory(id, state);
         Response {
-            hovered: self.is_hovered(id),
+            hovered: is_hovered,
             active: self.is_active(id),
             inner: InputResponse { changed },
             rect,
@@ -2228,7 +2191,7 @@ impl<'a> Ui<'a> {
         }: OutlineDescriptor,
         content: impl FnMut(&mut Self),
     ) {
-        let id = self.begin_widget();
+        let WidgetInfo { id, .. } = self.begin_widget();
         let last_layer = self.push_layer();
         let layer = self.push_layer();
         let history_start = self.ui_state.rect_history.len();
@@ -2288,7 +2251,7 @@ impl<'a> Ui<'a> {
         let parent_id = resp.id;
         let contains_mouse = self.contains_mouse(parent_id);
 
-        let id = self.begin_widget();
+        let WidgetInfo { id, .. } = self.begin_widget();
 
         let mut state = self
             .remove_memory::<ContextMenuState>(parent_id)
@@ -2430,7 +2393,7 @@ impl<'a> Ui<'a> {
 
         let parent_id = resp.id;
 
-        let id = self.begin_widget();
+        let WidgetInfo { id, .. } = self.begin_widget();
 
         let mut state = self
             .remove_memory::<ContextMenuState>(parent_id)
@@ -2564,7 +2527,7 @@ impl<'a> Ui<'a> {
         contents: impl FnMut(&mut Self) + 'b,
         context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
-        let id = self.begin_widget();
+        let WidgetInfo { id, is_hovered, .. } = self.begin_widget();
 
         let history_start = self.ui_state.rect_history.len();
         ///////////////////////
@@ -2573,7 +2536,7 @@ impl<'a> Ui<'a> {
         let content_bounds = self.submit_rect_group(id, history_start);
 
         let resp = Response {
-            hovered: self.is_hovered(id),
+            hovered: is_hovered,
             active: false, // the root element is never active
             rect: content_bounds,
             inner: (),
@@ -2613,7 +2576,7 @@ impl<'a> Ui<'a> {
         height: UiCoord,
         contents: impl FnMut(&mut Self),
     ) {
-        let id = self.begin_widget();
+        let WidgetInfo { id, .. } = self.begin_widget();
         let bounds = self.ui_state.bounds;
 
         let width = width.as_abolute(bounds.width());
@@ -2638,7 +2601,7 @@ impl<'a> Ui<'a> {
 
     /// Add a margin around the inner contents
     pub fn margin(&mut self, m: Padding, contents: impl FnMut(&mut Self)) {
-        let id = self.begin_widget();
+        let WidgetInfo { id, .. } = self.begin_widget();
         let bounds = self.ui_state.bounds;
         self.ui_state.bounds = layout_rect(RectLayoutDescriptor {
             width: bounds.width(),
@@ -2660,7 +2623,7 @@ impl<'a> Ui<'a> {
 
     /// Add background to the widget. If background is None, then the Theme background is used
     pub fn background(&mut self, background: Option<ThemeEntry>, contents: impl FnMut(&mut Self)) {
-        let id = self.begin_widget();
+        let WidgetInfo { id, .. } = self.begin_widget();
         let history_start = self.ui_state.rect_history.len();
         let layer = self.push_layer();
 
@@ -2719,7 +2682,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn with_tooltip(&mut self, contents: impl FnMut(&mut Self), label: &str) {
-        let id = self.begin_widget();
+        let WidgetInfo { id, .. } = self.begin_widget();
         let history_start = self.ui_state.rect_history.len();
         self.children_content(contents);
         let bounds = self.history_bounding_rect(history_start);
@@ -3383,8 +3346,12 @@ impl<'a> UiRoot<'a> {
             self.0.ui_state.bounds = title_bounds;
             self.0.push_scissor(title_bounds);
             self.0.label(desc.name);
-            let title_id = self.0.begin_widget();
-            if self.0.is_active(title_id) {
+            let WidgetInfo {
+                id: title_id,
+                is_active,
+                ..
+            } = self.0.begin_widget();
+            if is_active {
                 if self.0.mouse_up() {
                     self.0.set_not_active(title_id);
                 }
@@ -3880,4 +3847,10 @@ pub struct SelectResponse {
 
 pub struct ButtonDescriptor<S> {
     pub label: S,
+}
+
+pub struct WidgetInfo {
+    pub id: UiId,
+    pub is_hovered: bool,
+    pub is_active: bool,
 }
