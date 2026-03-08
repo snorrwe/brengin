@@ -18,7 +18,7 @@ use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
     i32,
-    ops::RangeBounds,
+    ops::{Deref, DerefMut, RangeBounds},
     ptr::NonNull,
     time::Duration,
 };
@@ -47,6 +47,10 @@ pub struct UiDebug {
 
 pub struct UiPlugin;
 
+fn update_ui_inputs(mut inputs: ResMut<UiInputs>, mut next: ResMut<NextUiInputs>) {
+    *inputs = std::mem::take(&mut next.0);
+}
+
 impl Plugin for UiPlugin {
     fn build(self, app: &mut crate::App) {
         app.add_plugin(color_rect_pipeline::UiColorRectPlugin);
@@ -62,6 +66,7 @@ impl Plugin for UiPlugin {
         app.insert_resource(TextTextureCache::default());
         app.insert_resource(UiMemory::default());
         app.insert_resource(UiInputs::default());
+        app.insert_resource(NextUiInputs::default());
 
         if app.get_resource::<Theme>().is_none() {
             app.insert_resource(Theme::default());
@@ -83,7 +88,8 @@ impl Plugin for UiPlugin {
             .add_system(submit_frame_texture_rects)
             .add_system(update_ids)
             .add_system(gc_bounding_boxes.after(draw_bounding_boxes))
-            .add_system(shaping_gc_system);
+            .add_system(shaping_gc_system)
+            .add_system(update_ui_inputs);
         });
     }
 }
@@ -339,6 +345,23 @@ pub struct UiInputs {
     /// keys consumed by the UI
     pub keys: HashSet<KeyCode>,
     wants_mouse: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+struct NextUiInputs(pub UiInputs);
+
+impl Deref for NextUiInputs {
+    type Target = UiInputs;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for NextUiInputs {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl UiInputs {
@@ -3090,7 +3113,7 @@ impl<'a> Columns<'a> {
 fn begin_frame(
     mut ui: ResMut<UiState>,
     window_size: Res<crate::renderer::WindowSize>,
-    mut inputs: ResMut<UiInputs>,
+    mut next_inputs: ResMut<NextUiInputs>,
 ) {
     ui.layout_dir = LayoutDirection::TopDown(HorizontalAlignment::Left);
     ui.root_hash = 0;
@@ -3111,7 +3134,7 @@ fn begin_frame(
     ui.scissors.push(b);
     ui.scissor_idx = 0;
     ui.layer = 0;
-    inputs.clear();
+    next_inputs.0.clear();
 }
 
 // preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
@@ -3232,7 +3255,7 @@ pub struct Ui<'a> {
     fonts: Res<'a, Assets<OwnedTypeFace>>,
     delta_time: Res<'a, DeltaTime>,
     tick: Res<'a, Tick>,
-    ui_inputs: ResMut<'a, UiInputs>,
+    ui_inputs: ResMut<'a, NextUiInputs>,
 }
 
 /// Root of the UI used to instantiate UI containers
@@ -3559,7 +3582,7 @@ unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
         set.insert(TypeId::of::<Assets<ShapingResult>>());
         set.insert(TypeId::of::<Theme>());
         set.insert(TypeId::of::<UiMemory>());
-        set.insert(TypeId::of::<UiInputs>());
+        set.insert(TypeId::of::<NextUiInputs>());
     }
 
     fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
