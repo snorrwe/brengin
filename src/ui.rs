@@ -1610,10 +1610,13 @@ impl<'a> Ui<'a> {
         let line_height = self.theme.font_size + self.theme.text_padding;
 
         'scroll_handler: {
+            let is_hovered = self.is_hovered(id);
             if self.contains_mouse(id) {
                 self.set_hovered(id);
+            } else if is_hovered {
+                self.set_not_hovered(id);
             }
-            if self.is_hovered(id) {
+            if is_hovered {
                 self.set_scrolling(id);
             } else {
                 self.set_not_scrolling(id);
