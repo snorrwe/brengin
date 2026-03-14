@@ -863,8 +863,7 @@ impl<'a> Ui<'a> {
     where
         'a: 'b,
     {
-        self.begin_widget();
-        self.push_child();
+        let WidgetInfo { id, .. } = self.begin_widget();
         let cols = columns as i32;
         let history_start = self.ui_state.rect_history.len();
         let bounds = self.ui_state.bounds;
@@ -879,13 +878,14 @@ impl<'a> Ui<'a> {
             cols: columns,
             dims,
         };
+        self.push_child();
         ///////////////////////
         contents(&mut cols);
         ///////////////////////
 
         self.pop_child();
         self.ui_state.bounds = bounds;
-        self.submit_rect_group(self.current_id(), history_start);
+        self.submit_rect_group(id, history_start);
     }
 
     pub fn color_rect_from_rect(&mut self, rect: UiRect, color: Color, layer: u16) {
@@ -3043,9 +3043,12 @@ impl<'a> Columns<'a> {
         };
         let end = match span.end_bound() {
             std::ops::Bound::Included(i) => *i,
-            std::ops::Bound::Excluded(i) => *i + 1,
+            std::ops::Bound::Excluded(i) => i.saturating_sub(1),
             std::ops::Bound::Unbounded => self.cols as usize - 1,
         };
+        if start > end {
+            return;
+        }
         let bounds = ctx.ui_state.bounds;
         ctx.ui_state.bounds.min_x = self.dims[start][0];
         ctx.ui_state.bounds.max_x = self.dims[end][1];
