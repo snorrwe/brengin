@@ -3043,9 +3043,12 @@ impl<'a> Columns<'a> {
         };
         let end = match span.end_bound() {
             std::ops::Bound::Included(i) => *i,
-            std::ops::Bound::Excluded(i) => *i + 1,
+            std::ops::Bound::Excluded(i) => i.saturating_sub(1),
             std::ops::Bound::Unbounded => self.cols as usize - 1,
         };
+        if start >= end {
+            return;
+        }
         let bounds = ctx.ui_state.bounds;
         ctx.ui_state.bounds.min_x = self.dims[start][0];
         ctx.ui_state.bounds.max_x = self.dims[end][1];
