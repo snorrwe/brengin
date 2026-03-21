@@ -1798,6 +1798,7 @@ impl<'a> Ui<'a> {
         } else {
             state.pos = IVec2::new(old_bounds.min_x, old_bounds.min_y);
             if is_hovered && !self.is_anything_active() && self.mouse_down() {
+                state.drag_start = self.mouse.cursor_position;
                 self.set_active(id);
             }
         }
