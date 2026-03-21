@@ -1886,7 +1886,7 @@ impl<'a> Ui<'a> {
             id,
             dragged: self.ids.dragged,
             dropped: is_active,
-            ..Default::default()
+            hovered: false, // only set if something is being dragged
         };
 
         if self.is_anything_dragged() {
