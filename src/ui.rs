@@ -1776,18 +1776,13 @@ impl<'a> Ui<'a> {
             // otherwise the parent bounds will end
             // up weird for 1 frame
             is_being_dragged = true;
-            if !self.is_dragged(id) {
-                state.drag_start = self.mouse.cursor_position;
-            }
             if self.mouse_down() {
                 self.set_active(id);
                 let drag_anchor = state.drag_anchor();
                 let drag_start = state.drag_start;
 
-                let offset = IVec2::new(
-                    (self.mouse.cursor_position.x - drag_start.x) as i32,
-                    (self.mouse.cursor_position.y - drag_start.y) as i32,
-                );
+                let PhysicalPosition { x: cx, y: cy } = self.mouse.cursor_position;
+                let offset = IVec2::new((cx - drag_start.x) as i32, (cy - drag_start.y) as i32);
 
                 // snap the widget to its original location if the cursor has not moved
                 state.dragged = offset.length_squared() > 5;
@@ -1844,7 +1839,6 @@ impl<'a> Ui<'a> {
             // position, so the layout stays the same while dragging
             content_bounds = state.content_rect;
         } else {
-            self.ui_state.rect_history.extend_from_slice(&child_history);
             state.content_rect = content_bounds;
             state.pos = state.drag_anchor();
         }
