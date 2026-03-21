@@ -646,6 +646,15 @@ pub struct MouseInputs {
 }
 
 impl MouseInputs {
+    pub fn clear(&mut self) {
+        self.just_released.clear();
+        self.just_pressed.clear();
+        self.scroll.clear();
+        self.pressed.clear();
+        self.just_released.clear();
+        self.just_pressed.clear();
+    }
+
     pub fn update(&mut self) {
         self.just_released.clear();
         self.just_pressed.clear();
