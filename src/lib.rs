@@ -634,7 +634,7 @@ impl KeyBoardInputs {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct MouseInputs {
     pub(crate) next: Vec<(MouseButton, ElementState)>,
     pub(crate) next_scroll: Vec<winit::event::MouseScrollDelta>,
