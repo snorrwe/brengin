@@ -597,7 +597,7 @@ pub enum Stage {
     Render = 5,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct KeyBoardInputs {
     pub(crate) next: Vec<KeyEvent>,
     pub pressed: HashSet<KeyCode>,
@@ -607,6 +607,14 @@ pub struct KeyBoardInputs {
 }
 
 impl KeyBoardInputs {
+    pub fn clear(&mut self) {
+        self.just_released.clear();
+        self.just_pressed.clear();
+        self.events.clear();
+        self.next.clear();
+        self.pressed.clear();
+    }
+
     pub fn update(&mut self) {
         self.just_released.clear();
         self.just_pressed.clear();
@@ -634,7 +642,7 @@ impl KeyBoardInputs {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct MouseInputs {
     pub(crate) next: Vec<(MouseButton, ElementState)>,
     pub(crate) next_scroll: Vec<winit::event::MouseScrollDelta>,
@@ -646,6 +654,15 @@ pub struct MouseInputs {
 }
 
 impl MouseInputs {
+    pub fn clear(&mut self) {
+        self.just_released.clear();
+        self.just_pressed.clear();
+        self.scroll.clear();
+        self.pressed.clear();
+        self.just_released.clear();
+        self.just_pressed.clear();
+    }
+
     pub fn update(&mut self) {
         self.just_released.clear();
         self.just_pressed.clear();
