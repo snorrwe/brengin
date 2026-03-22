@@ -1309,7 +1309,7 @@ impl<'a> Ui<'a> {
                     .as_ref()
                     .unwrap_or(&this.theme.button_default)
                     .clone();
-                if this.mouse_down() {
+                if !this.is_anything_active() && this.mouse_down() {
                     this.set_active(id);
                 }
             }
