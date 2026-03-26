@@ -3306,8 +3306,9 @@ impl<'a> UiRoot<'a> {
             });
 
         let padding = self.0.theme.window_padding as i32;
-        let width = state.size.x;
-        let height = state.size.y - self.0.theme.window_title_height as i32;
+        let size = state.size + 2 * IVec2::splat(padding);
+        let width = size.x;
+        let height = size.y - self.0.theme.window_title_height as i32;
         let bounds = UiRect {
             min_x: state.pos.x,
             min_y: state.pos.y + self.0.theme.window_title_height as i32,
@@ -3335,50 +3336,43 @@ impl<'a> UiRoot<'a> {
             WINDOW_LAYER,
             self.theme().window_background.clone(),
         );
-        self.0.push_child();
         ///////////////////////
         // Title
-        {
-            self.0.ui_state.bounds = title_bounds;
-            self.0.push_scissor(title_bounds);
-            self.0.label(desc.name);
+        self.0.children_content(|ui| {
+            ui.ui_state.bounds = title_bounds;
+            ui.push_scissor(title_bounds);
+            ui.label(desc.name);
             let WidgetInfo {
                 id: title_id,
                 is_active,
                 ..
-            } = self.0.begin_widget();
+            } = ui.begin_widget();
             if is_active {
-                if self.0.mouse_up() {
-                    self.0.set_not_active(title_id);
+                if ui.mouse_up() {
+                    ui.set_not_active(title_id);
                 }
-                let state: &mut WindowState = self.0.ui_state.windows.get_mut(desc.name).unwrap();
+                let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
 
                 let drag_anchor = state.drag_anchor;
                 let drag_start = state.drag_start;
 
                 let offset = IVec2::new(
-                    (self.0.mouse.cursor_position.x - drag_start.x) as i32,
-                    (self.0.mouse.cursor_position.y - drag_start.y) as i32,
+                    (ui.mouse.cursor_position.x - drag_start.x) as i32,
+                    (ui.mouse.cursor_position.y - drag_start.y) as i32,
                 );
 
                 state.pos = drag_anchor + offset;
             } else {
-                if !self.0.is_anything_active()
-                    && self.0.contains_mouse(title_id)
-                    && self.0.mouse_down()
-                {
-                    let state: &mut WindowState =
-                        self.0.ui_state.windows.get_mut(desc.name).unwrap();
-                    state.drag_start = self.0.mouse.cursor_position;
+                if !ui.is_anything_active() && ui.contains_mouse(title_id) && ui.mouse_down() {
+                    let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
+                    state.drag_start = ui.mouse.cursor_position;
                     state.drag_anchor = state.pos;
-                    self.0.set_active(title_id);
+                    ui.set_active(title_id);
                 }
             }
-            self.0
-                .submit_rect(title_id, title_bounds, self.0.theme.padding);
-            self.0
-                .color_rect_from_rect(title_bounds, Color::from_rgb(0x00ffff), WINDOW_LAYER);
-        }
+            ui.submit_rect(title_id, title_bounds, ui.theme.padding);
+            ui.color_rect_from_rect(title_bounds, Color::from_rgb(0x00ffff), WINDOW_LAYER);
+        });
         ///////////////////////
         ///////////////////////
         // Content
@@ -3390,21 +3384,24 @@ impl<'a> UiRoot<'a> {
             bounds.shrink_y(padding);
             self.0.ui_state.bounds = bounds;
             self.0.ui_state.layer = WINDOW_LAYER + 2;
-            self.0.begin_widget();
-            contents(&mut self.0);
+            self.0.children_content(|ui| {
+                contents(ui);
+            });
         }
         ///////////////////////
         self.0.ui_state.layer = layer;
-        self.0.pop_child();
         self.0.ui_state.bounds = old_bounds;
         self.0.ui_state.scissor_idx = scissor;
 
         let r = self.0.history_bounding_rect(history_start);
 
         let state: &mut WindowState = self.0.ui_state.windows.get_mut(desc.name).unwrap();
-        state.content_size = IVec2::new(r.width(), r.height());
-        state.size = state.content_size + 2 * IVec2::splat(padding);
-        state.size.y = (state.size.y).max(5) + self.0.theme.window_title_height as i32;
+        let size = r.size();
+        if size != state.content_size {
+            state.content_size = size;
+            state.size = state.content_size;
+            state.size.y = (state.size.y).max(5) + self.0.theme.window_title_height as i32;
+        }
         self.0.ui_state.window_allocator = allocator;
     }
 

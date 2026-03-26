@@ -1,3 +1,5 @@
+use glam::IVec2;
+
 use super::div_half_ceil;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -141,5 +143,9 @@ impl UiRect {
         self.max_x = self.max_x.min(other.max_x);
         self.max_y = self.max_y.min(other.max_y);
         Some(self)
+    }
+
+    pub fn size(&self) -> IVec2 {
+        IVec2::new(self.width(), self.height())
     }
 }
