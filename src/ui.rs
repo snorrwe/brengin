@@ -300,6 +300,7 @@ pub struct UiState {
     scissors: Vec<UiRect>,
     scissor_idx: u32,
     bounds: UiRect,
+    viewport: UiRect,
 
     /// Layers go from back to front
     layer: u16,
@@ -459,6 +460,7 @@ impl UiState {
             scissors: Default::default(),
             scissor_idx: 0,
             bounds: Default::default(),
+            viewport: Default::default(),
             layer: 0,
             bounding_boxes: Default::default(),
             rect_history: Default::default(),
@@ -2273,12 +2275,33 @@ impl<'a> Ui<'a> {
             let p_vertical = p_bot + p_top;
 
             let mut bounds = resp.rect;
+            // layout
+            // first compute its ideal position,
+            // if it overshoots the screen on the bottom, move it up so it doesn't
+            // then, if it overshoots the screen on top, move it down so it doesn't
             bounds.move_to_x(state.offset.x);
             bounds.move_to_y(state.offset.y);
+            bounds.resize_w(state.context_size.x);
+            bounds.resize_h(state.context_size.y);
             bounds.max_x = self.ui_state.scissors[0].max_x - p_horizontal - outline_size;
             bounds.max_y = self.ui_state.scissors[0].max_y - p_vertical - outline_size;
 
-            let new_bounds = std::mem::replace(&mut self.ui_state.bounds, bounds);
+            if bounds.max_x > self.ui_state.viewport.max_x {
+                let offset = self.ui_state.viewport.max_x - bounds.max_x;
+                bounds.offset_x(offset);
+            }
+            if bounds.min_x < 0 {
+                bounds.offset_x(-bounds.min_x);
+            }
+            if bounds.max_y > self.ui_state.viewport.max_y {
+                let offset = self.ui_state.viewport.max_y - bounds.max_y;
+                bounds.offset_y(offset);
+            }
+            if bounds.min_y < 0 {
+                bounds.offset_y(-bounds.min_y);
+            }
+
+            let original_bounds = std::mem::replace(&mut self.ui_state.bounds, bounds);
 
             let scissor = self.push_scissor(UiRect {
                 min_x: bounds.min_x - p_horizontal - outline_size,
@@ -2292,9 +2315,10 @@ impl<'a> Ui<'a> {
                 context_menu(ui, &mut state);
             });
             ///////////////////////
-            self.ui_state.bounds = new_bounds;
+            self.ui_state.bounds = original_bounds;
 
             let context_bounds = self.history_bounding_rect(history_start);
+            state.context_size = context_bounds.size();
 
             let mut bounds = context_bounds;
             bounds = bounds.grow_over_point(
@@ -2867,6 +2891,7 @@ impl<'a, 'b> ContextMenuResponse<'a, 'b> {
 pub struct ContextMenuState {
     pub open: bool,
     pub offset: IVec2,
+    pub context_size: IVec2,
 }
 
 #[derive(Debug, Default)]
@@ -3091,12 +3116,14 @@ fn begin_frame(
     ui.color_rects.clear();
     ui.text_rects.clear();
     ui.texture_rects.clear();
-    ui.bounds = UiRect {
+    let b = UiRect {
         min_x: 0,
         min_y: 0,
         max_x: window_size.width as i32,
         max_y: window_size.height as i32,
     };
+    ui.bounds = b;
+    ui.viewport = b;
     let b = ui.bounds;
     ui.scissors.clear();
     ui.scissors.push(b);
