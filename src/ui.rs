@@ -2518,14 +2518,7 @@ impl<'a> Ui<'a> {
         }
 
         let open = state.open;
-        let is_currently_open = self.has_context_menu(parent_id);
-        if is_currently_open {
-            if !open {
-                self.next_ids
-                    .push(parent_id, self.ui_state.layer)
-                    .remove_flag(InteractionFlag::ContextMenu);
-            }
-        } else if open {
+        if open {
             self.next_ids
                 .push(parent_id, self.ui_state.layer)
                 .add_flag(InteractionFlag::ContextMenu);
