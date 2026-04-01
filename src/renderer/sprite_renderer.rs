@@ -596,8 +596,7 @@ impl Plugin for SpriteRendererPlugin {
                 .add_system(update_visible.after(update_cull))
                 .add_system(update_invisible.after(update_cull))
                 .add_system(unload_sheets)
-                .add_system(update_sprite_pipelines)
-                .add_system(unload_meshes);
+                .add_system(update_sprite_pipelines);
         });
         app.with_stage(Stage::PostUpdate, |s| {
             s.add_system(add_missing_sheets)
@@ -611,7 +610,6 @@ impl Plugin for SpriteRendererPlugin {
         app.add_startup_system(setup);
         app.insert_resource(SpritePipelineInstances::default());
         app.insert_resource(RenderSpritesheetHandles::default());
-        app.insert_resource(SpriteMeshHandles::default());
     }
 }
 
@@ -625,13 +623,6 @@ struct SpriteMeshGpu {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_indices: u32,
-}
-
-#[derive(Default)]
-struct SpriteMeshHandles(pub BTreeMap<AssetId, WeakHandle<SpriteMesh>>);
-
-fn unload_meshes(mut handles: ResMut<SpriteMeshHandles>) {
-    handles.0.retain(|_, h| h.upgrade().is_some());
 }
 
 #[derive(Debug, Default)]
