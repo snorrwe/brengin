@@ -287,6 +287,7 @@ struct SpriteInstances {
 pub struct SpritePipeline {
     instances: HashMap<InstanceKey, SpriteInstances>,
     sheets: HashMap<AssetId, SpriteRenderingData>,
+    // TODO: unload unused meshes
     meshes: BTreeMap<MeshKey, SpriteMeshGpu>,
     // shared
     render_pipeline: wgpu::RenderPipeline,
