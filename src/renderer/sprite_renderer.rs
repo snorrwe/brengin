@@ -195,12 +195,12 @@ fn compute_sprite_instances(
     >,
 ) {
     q.par_for_each_mut(|(tr, i, instance)| {
-        let pos = tr.0.pos;
-        let scale = tr.0.scale;
+        let pos = tr.0.pos.to_array();
+        let scale = tr.0.scale.truncate().to_array();
         *instance = SpriteInstanceRaw {
             index: i.index,
-            pos_scale: [pos.x, pos.y, pos.z, scale.x],
-            scale_y: scale.y,
+            pos,
+            scale,
             flip: i.flip as u32,
         };
     });
@@ -510,8 +510,8 @@ impl<'a> RenderCommand<'a> for SpriteRenderCommand {
 #[repr(C)]
 #[derive(Default, Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct SpriteInstanceRaw {
-    pos_scale: [f32; 4],
-    scale_y: f32,
+    pos: [f32; 3],
+    scale: [f32; 2],
     index: u32,
     /// bool
     flip: u32,
@@ -520,7 +520,8 @@ struct SpriteInstanceRaw {
 impl SpriteInstanceRaw {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         use std::mem;
-        const ROW_SIZE: wgpu::BufferAddress = mem::size_of::<[f32; 4]>() as wgpu::BufferAddress;
+        const POS_SIZE: wgpu::BufferAddress = mem::size_of::<[f32; 3]>() as wgpu::BufferAddress;
+        const SCALE_SIZE: wgpu::BufferAddress = mem::size_of::<[f32; 2]>() as wgpu::BufferAddress;
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<SpriteInstanceRaw>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
@@ -528,20 +529,20 @@ impl SpriteInstanceRaw {
                 wgpu::VertexAttribute {
                     offset: 0,
                     shader_location: 2,
-                    format: wgpu::VertexFormat::Float32x4,
+                    format: wgpu::VertexFormat::Float32x3,
                 },
                 wgpu::VertexAttribute {
-                    offset: ROW_SIZE,
+                    offset: POS_SIZE,
                     shader_location: 3,
-                    format: wgpu::VertexFormat::Float32,
+                    format: wgpu::VertexFormat::Float32x2,
                 },
                 wgpu::VertexAttribute {
-                    offset: ROW_SIZE + 4,
+                    offset: POS_SIZE + SCALE_SIZE,
                     shader_location: 4,
                     format: wgpu::VertexFormat::Uint32,
                 },
                 wgpu::VertexAttribute {
-                    offset: ROW_SIZE + 4 + 4,
+                    offset: POS_SIZE + SCALE_SIZE + 4,
                     shader_location: 5,
                     format: wgpu::VertexFormat::Uint32,
                 },

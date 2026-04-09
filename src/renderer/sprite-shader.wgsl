@@ -29,8 +29,8 @@ struct Vertex {
 }
 
 struct Instance {
-    @location(2) pos_scale: vec4<f32>,
-    @location(3) scale_y: f32,
+    @location(2) pos: vec3<f32>,
+    @location(3) scale: vec2<f32>,
     @location(4) sprite_index: u32,
     @location(5) flip: u32,
 }
@@ -77,13 +77,13 @@ fn vs_main(
     out.uv = total_uv;
 
     // billboarding
-    let scale_x = instance.pos_scale.w;
-    var pos = vec4<f32>(instance.pos_scale.xyz, 1.0);
+    let scale_x = instance.scale.x;
+    var pos = vec4<f32>(instance.pos, 1.0);
     let up: vec4<f32> = camera.view_inv[1];
     let right: vec4<f32> = camera.view_inv[0];
 
     pos += right * model.pos.x * scale_x;
-    pos += up * model.pos.y * instance.scale_y;
+    pos += up * model.pos.y * instance.scale.y;
 
     out.clip_position = camera.view_proj * pos;
     return out;
@@ -92,7 +92,7 @@ fn vs_main(
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(texture, texture_sampler, in.uv);
-    if (color.a < 0.2 ) {
+    if color.a < 0.2 {
         discard;
     }
     return color;
