@@ -18,6 +18,7 @@ use wgpu::{include_wgsl, util::DeviceExt};
 use crate::{
     assets::{AssetId, Assets, AssetsPlugin, Handle, WeakHandle},
     camera::ViewFrustum,
+    color::Color,
     transform::GlobalTransform,
     Plugin, Stage,
 };
@@ -35,6 +36,7 @@ pub fn sprite_sheet_bundle(
         instance.into().unwrap_or(SpriteInstance {
             index: 0,
             flip: false,
+            color: Color::TRANSPARENT_BLACK,
         }),
         Visible,
         handle,
@@ -118,6 +120,9 @@ pub struct SpriteSheet {
     pub image: DynamicImage,
     /// Size of the entire sheet
     pub size: Vec2,
+    /// Color to mask by each instance's color.
+    /// Transparent black is not supported
+    pub mask_color: Option<Color>,
 }
 
 impl SpriteSheet {
@@ -134,6 +139,7 @@ impl SpriteSheet {
             num_cols,
             size: Vec2::new(image.width() as f32, image.height() as f32),
             image,
+            mask_color: None,
         }
     }
 
@@ -143,7 +149,7 @@ impl SpriteSheet {
             box_size: self.box_size.to_array(),
             num_cols: self.num_cols,
             size: self.size.to_array(),
-            _pad: 0xDEADBEEF,
+            mask_color: self.mask_color.map(|c| c.0 >> 8).unwrap_or(0),
         }
     }
 }
@@ -152,6 +158,9 @@ impl SpriteSheet {
 pub struct SpriteInstance {
     pub index: u32,
     pub flip: bool,
+    /// RGB Color to use when masking the sprite
+    /// If sprite masking is disabled on the spritesheet, then
+    pub color: Color,
 }
 
 pub fn add_missing_sheets(
@@ -201,7 +210,7 @@ fn compute_sprite_instances(
             index: i.index,
             pos,
             scale,
-            flip: i.flip as u32,
+            color_flip: (i.color.0 & 0xFFFFFF00) | i.flip as u32,
         };
     });
 }
@@ -301,7 +310,8 @@ struct SpriteSheetGpu {
     pub box_size: [f32; 2],
     pub size: [f32; 2],
     pub num_cols: u32,
-    pub _pad: u32,
+    /// rgb color to mask by instances
+    pub mask_color: u32,
 }
 
 impl SpritePipeline {
@@ -513,8 +523,8 @@ struct SpriteInstanceRaw {
     pos: [f32; 3],
     scale: [f32; 2],
     index: u32,
-    /// bool
-    flip: u32,
+    /// rgb 24 bits, bool 8 bits
+    color_flip: u32,
 }
 
 impl SpriteInstanceRaw {

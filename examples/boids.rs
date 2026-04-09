@@ -153,7 +153,14 @@ fn setup_boids(
             .insert_bundle(transform_bundle(transform::Transform::from_position(
                 Vec3::new(x, y, 0.0),
             )))
-            .insert_bundle(sprite_renderer::sprite_sheet_bundle(boid.clone(), None))
+            .insert_bundle(sprite_renderer::sprite_sheet_bundle(
+                boid.clone(),
+                Some(sprite_renderer::SpriteInstance {
+                    index: 0,
+                    flip: false,
+                    color: Color::from_rgb(0xFF00FF),
+                }),
+            ))
             .insert_bundle((
                 Boid,
                 Pos(Vec2::new(x, y)),
@@ -175,7 +182,8 @@ fn load_sprite_sheet(
     assets: &mut Assets<SpriteSheet>,
 ) -> Handle<SpriteSheet> {
     let image = image::load_from_memory(bytes).expect("Failed to load spritesheet");
-    let sprite_sheet = SpriteSheet::from_grid(Vec2::ZERO, box_size, num_cols, image);
+    let mut sprite_sheet = SpriteSheet::from_grid(Vec2::ZERO, box_size, num_cols, image);
+    sprite_sheet.mask_color = Some(Color::from_rgb(0xFBF236));
 
     assets.insert(sprite_sheet)
 }

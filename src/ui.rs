@@ -3845,7 +3845,7 @@ pub struct OutlineDescriptor {
 impl Default for OutlineDescriptor {
     fn default() -> Self {
         Self {
-            fill_color: Color::TRANSPARENT,
+            fill_color: Color::TRANSPARENT_BLACK,
             outline_color: Color::BLACK,
             outline_radius: 1,
         }
