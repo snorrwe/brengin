@@ -386,9 +386,9 @@ impl SpritePipeline {
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Sprite Render Pipeline Layout"),
                     bind_group_layouts: &[
-                        &renderer.camera_bind_group_layout,
-                        &texture_bind_group_layout,
-                        &sprite_sheet_layout,
+                        Some(&renderer.camera_bind_group_layout),
+                        Some(&texture_bind_group_layout),
+                        Some(&sprite_sheet_layout),
                     ],
                     ..Default::default()
                 });
@@ -428,8 +428,8 @@ impl SpritePipeline {
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
                         format: super::texture::Texture::DEPTH_FORMAT,
-                        depth_write_enabled: true,
-                        depth_compare: wgpu::CompareFunction::Less,
+                        depth_write_enabled: Some(true),
+                        depth_compare: Some(wgpu::CompareFunction::Less),
                         stencil: wgpu::StencilState::default(),
                         bias: wgpu::DepthBiasState::default(),
                     }),

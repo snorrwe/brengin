@@ -22,7 +22,7 @@ impl BackgroundPipeline {
                 .device()
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("background-render-pipeline-layout"),
-                    bind_group_layouts: &[&texture_bind_group_layout],
+                    bind_group_layouts: &[Some(&texture_bind_group_layout)],
                     ..Default::default()
                 });
 

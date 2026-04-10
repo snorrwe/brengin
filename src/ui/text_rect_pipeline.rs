@@ -152,7 +152,7 @@ impl TextPipeline {
                     layout: Some(&renderer.device().create_pipeline_layout(
                         &wgpu::PipelineLayoutDescriptor {
                             label: Some("Ui Text Rect Render Pipeline Layout"),
-                            bind_group_layouts: &[&texture_bind_group_layout],
+                            bind_group_layouts: &[Some(&texture_bind_group_layout)],
                             ..Default::default()
                         },
                     )),
@@ -183,8 +183,8 @@ impl TextPipeline {
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
                         format: texture::Texture::DEPTH_FORMAT,
-                        depth_write_enabled: true,
-                        depth_compare: wgpu::CompareFunction::Less,
+                        depth_write_enabled: Some(true),
+                        depth_compare: Some(wgpu::CompareFunction::Less),
                         stencil: wgpu::StencilState::default(),
                         bias: wgpu::DepthBiasState::default(),
                     }),

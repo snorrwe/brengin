@@ -7,6 +7,7 @@ use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
 use cecs::{prelude::*, query::WorldQuery};
 use glam::UVec2;
 use wgpu::{Backends, ExperimentalFeatures, InstanceFlags, StoreOp, SurfaceTarget};
+use winit::event_loop::OwnedDisplayHandle;
 
 pub use crate::camera::camera_bundle;
 use crate::{
@@ -103,13 +104,18 @@ where
 }
 
 impl GraphicsState {
-    pub async fn new(window: impl Into<SurfaceTarget<'static>>, size: UVec2) -> Self {
+    pub async fn new(
+        handle: OwnedDisplayHandle,
+        window: impl Into<SurfaceTarget<'static>>,
+        size: UVec2,
+    ) -> Self {
         #[cfg(not(debug_assertions))]
         let flags = InstanceFlags::default();
         #[cfg(debug_assertions)]
         let flags = InstanceFlags::debugging();
 
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            display: Some(Box::new(handle)),
             backends: Backends::all(),
             flags,
             backend_options: wgpu::BackendOptions::default(),
@@ -259,7 +265,7 @@ impl Vertex {
     }
 }
 
-pub type RenderResult = Result<(), wgpu::SurfaceError>;
+pub type RenderResult = Result<(), wgpu::CurrentSurfaceTexture>;
 
 pub struct RendererPlugin;
 
@@ -423,7 +429,12 @@ fn render_system(mut world: WorldAccess) {
                 tracing::trace!("No render pass has been registered");
                 return Ok(());
             };
-            let output = state.surface.get_current_texture()?;
+            let output = state.surface.get_current_texture();
+            let output = match output {
+                wgpu::CurrentSurfaceTexture::Success(surface_texture)
+                | wgpu::CurrentSurfaceTexture::Suboptimal(surface_texture) => surface_texture,
+                _ => return Err(output),
+            };
             let view = output
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
@@ -492,10 +503,10 @@ fn render_system(mut world: WorldAccess) {
     );
     let w = world.world_mut();
     // Reconfigure the surface if lost
-    if let Err(wgpu::SurfaceError::Lost) = result {
+    if let Err(wgpu::CurrentSurfaceTexture::Lost) = result {
         let state = w.get_resource_mut::<GraphicsState>().unwrap();
         let size = state.size();
         state.resize(size);
     }
-    w.insert_resource(result);
+    w.insert_resource::<RenderResult>(result);
 }

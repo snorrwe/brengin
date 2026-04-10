@@ -285,6 +285,7 @@ impl ApplicationHandler for RunningApp {
         // do not block here
         let size = window.inner_size();
         let graphics_state = pollster::block_on(GraphicsState::new(
+            event_loop.owned_display_handle(),
             Arc::clone(&window),
             glam::UVec2 {
                 x: size.width,
@@ -388,22 +389,14 @@ impl ApplicationHandler for RunningApp {
                     match result {
                         Ok(_) => {}
                         // handled by the renderer system
-                        Err(wgpu::SurfaceError::Lost) => {
+                        Err(wgpu::CurrentSurfaceTexture::Lost) => {
                             #[cfg(feature = "tracing")]
                             tracing::info!("Surface lost")
-                        }
-                        // The system is out of memory, we should probably quit
-                        Err(wgpu::SurfaceError::OutOfMemory) => {
-                            drop(world);
-                            #[cfg(feature = "tracing")]
-                            tracing::error!("gpu out of memory");
-                            self.stop();
-                            event_loop.exit();
                         }
                         // All other errors (Outdated, Timeout) should be resolved by the next frame
                         Err(_e) => {
                             #[cfg(feature = "tracing")]
-                            tracing::info!(error=?_e,"rendering failed")
+                            tracing::debug!(error=?_e,"rendering failed")
                         }
                     }
                 }
