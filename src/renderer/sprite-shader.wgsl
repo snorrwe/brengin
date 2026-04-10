@@ -40,7 +40,41 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) color: vec3<f32>,
-    @location(2) mask: vec3<f32>,
+    @location(2) mask_oklab: vec3<f32>,
+}
+
+// cube root
+fn cbrt(x: f32) -> f32 {
+    var y = sign(x) * bitcast<f32>(bitcast<u32>(abs(x)) / 3u + 0x2a514067u);
+
+    // newton iters
+    for (var i = 0; i < 1; i++) {
+        y = (2. * y + x / (y * y)) * .333333333;
+    }
+
+    // halley iters
+    for (var i = 0; i < 1; i++) {
+        let y3 = y * y * y;
+        y *= (y3 + 2. * x) / (2. * y3 + x);
+    }
+
+    return y;
+}
+
+fn linear_srgb_to_oklab(c: vec3<f32>) -> vec3<f32> {
+    let l = 0.4122214708f * c.r + 0.5363325363f * c.g + 0.0514459929f * c.b;
+    let m = 0.2119034982f * c.r + 0.6806995451f * c.g + 0.1073969566f * c.b;
+    let s = 0.0883024619f * c.r + 0.2817188376f * c.g + 0.6299787005f * c.b;
+
+    let l_ = cbrt(l);
+    let m_ = cbrt(m);
+    let s_ = cbrt(s);
+
+    return vec3(
+        0.2104542553f * l_ + 0.7936177850f * m_ - 0.0040720468f * s_,
+        1.9779984951f * l_ - 2.4285922050f * m_ + 0.4505937099f * s_,
+        0.0259040371f * l_ + 0.7827717662f * m_ - 0.8086757660f * s_,
+    );
 }
 
 fn lerp(a: f32, b: f32, t: f32) -> f32 {
@@ -82,7 +116,10 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
     out.color = parse_rgb(instance.color_flip >> 8);
-    out.mask = parse_rgb(sprite_sheet.mask_color);
+    let mask = parse_rgb(sprite_sheet.mask_color);
+    if dot(mask, mask) != 0 {
+        out.mask_oklab = linear_srgb_to_oklab(mask);
+    }
 
     let row: u32 = instance.sprite_index / sprite_sheet.num_cols;
     let col: u32 = instance.sprite_index - sprite_sheet.num_cols * row;
@@ -118,8 +155,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
     // mask the color with the instance color
-    if dot(in.mask, in.mask) != 0 {
-        let t = abs(color.rgb - in.mask);
+    if dot(in.mask_oklab, in.mask_oklab) != 0 {
+        let color_oklab = linear_srgb_to_oklab(color.rgb);
+        let t = length(color_oklab - in.mask_oklab);
         let rgb = lerp_vec3(in.color, color.rgb, vec3(t));
         color = vec4<f32>(rgb, color.a);
     }
