@@ -120,7 +120,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // mask the color with the instance color
     if dot(in.mask, in.mask) != 0 {
         let t = abs(color.rgb - in.mask);
-        let rgb = lerp_vec3(color.rgb, in.color, 1.0 - t);
+        let rgb = lerp_vec3(in.color, color.rgb, vec3(t));
         color = vec4<f32>(rgb, color.a);
     }
     return color;
