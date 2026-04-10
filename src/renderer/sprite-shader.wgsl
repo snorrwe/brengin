@@ -157,7 +157,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // mask the color with the instance color
     if dot(in.mask_oklab, in.mask_oklab) != 0 {
         let color_oklab = linear_srgb_to_oklab(color.rgb);
-        let t = length(color_oklab - in.mask_oklab);
+        let t = length(color_oklab - in.mask_oklab) / length(in.mask_oklab);
         let rgb = lerp_vec3(in.color, color.rgb, vec3(t));
         color = vec4<f32>(rgb, color.a);
     }
