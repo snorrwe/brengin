@@ -1279,8 +1279,8 @@ impl<'a> Ui<'a> {
         self.ui_state.id_stack.pop();
     }
 
-    pub fn button<S: Into<String>>(&mut self, desc: ButtonDescriptor<S>) -> ButtonResponse {
-        fn _button(this: &mut Ui, label: String) -> ButtonResponse {
+    pub fn button<'b>(&'b mut self, desc: impl Into<ButtonDescriptor<'b>>) -> ButtonResponse {
+        fn _button(this: &mut Ui, label: ButtonDescriptor) -> ButtonResponse {
             let WidgetInfo {
                 id,
                 is_hovered,
@@ -1316,67 +1316,122 @@ impl<'a> Ui<'a> {
                 }
             }
 
-            // shape the text
-            let mut w = 0;
-            let mut h = 0;
-            let mut text_y = 0;
-            let text_color = this
-                .theme
-                .button_text_color
-                .unwrap_or(this.theme.primary_color);
+            let rect = if let Some(label) = label.as_str() {
+                // shape the text
+                let mut w = 0;
+                let mut h = 0;
+                let mut text_y = 0;
+                let text_color = this
+                    .theme
+                    .button_text_color
+                    .unwrap_or(this.theme.primary_color);
 
-            let text_rect_idx = this.ui_state.text_rects.len();
+                let text_rect_idx = this.ui_state.text_rects.len();
 
-            for line in label.split('\n').filter(|l| !l.is_empty()) {
-                let (handle, e) =
-                    this.shape_and_draw_line(line.to_owned(), this.theme.font_size as u32);
-                let pic = &e.texture;
-                let line_width = pic.width() as i32;
-                let line_height = pic.height() as i32;
-                h += line_height + 1;
+                for line in label.split('\n').filter(|l| !l.is_empty()) {
+                    let (handle, e) =
+                        this.shape_and_draw_line(line.to_owned(), this.theme.font_size as u32);
+                    let pic = &e.texture;
+                    let line_width = pic.width() as i32;
+                    let line_height = pic.height() as i32;
+                    h += line_height + 1;
 
-                let mut delta = 0;
-                if !is_active {
-                    // add a shadow
+                    let mut delta = 0;
+                    if !is_active {
+                        // add a shadow
+                        this.text_rect(
+                            0,
+                            text_y + 1,
+                            line_width,
+                            line_height,
+                            Color::BLACK,
+                            layer + 1,
+                            handle.clone(),
+                        );
+                    } else {
+                        // if active, then move the text into the shadow's position
+                        // so it appears to have lowered
+                        delta = 1
+                    }
+                    w = w.max(line_width + delta);
                     this.text_rect(
-                        0,
-                        text_y + 1,
+                        delta,
+                        text_y + delta,
                         line_width,
                         line_height,
-                        Color::BLACK,
-                        layer + 1,
-                        handle.clone(),
+                        text_color,
+                        layer + 2,
+                        handle,
                     );
-                } else {
-                    // if active, then move the text into the shadow's position
-                    // so it appears to have lowered
-                    delta = 1
+                    text_y += line_height;
                 }
-                w = w.max(line_width + delta);
-                this.text_rect(
-                    delta,
-                    text_y + delta,
-                    line_width,
-                    line_height,
-                    text_color,
-                    layer + 2,
-                    handle,
-                );
-                text_y += line_height;
-            }
-            // background
-            let text_padding = this.theme().text_padding as i32;
+                // background
+                let text_padding = this.theme().text_padding as i32;
 
-            let rect = layout_rect(RectLayoutDescriptor {
-                padding: Some(this.theme.padding),
-                width: w + 2 * text_padding,
-                height: h + 2 * text_padding,
-                dir: this.ui_state.layout_dir,
-                bounds: this.ui_state.bounds,
-            });
+                let rect = layout_rect(RectLayoutDescriptor {
+                    padding: Some(this.theme.padding),
+                    width: w + 2 * text_padding,
+                    height: h + 2 * text_padding,
+                    dir: this.ui_state.layout_dir,
+                    bounds: this.ui_state.bounds,
+                });
+                let offset = layout_rect(RectLayoutDescriptor {
+                    padding: Some(Padding::splat(text_padding)),
+                    width: w,
+                    height: h,
+                    dir: LayoutDirection::TopDown(HorizontalAlignment::Center),
+                    bounds: rect,
+                });
 
-            this.submit_rect(id, rect, this.theme.padding);
+                for r in &mut this.ui_state.text_rects[text_rect_idx..] {
+                    r.x += offset.min_x;
+                    r.y += offset.min_y;
+                }
+                rect
+            } else {
+                match label {
+                    ButtonDescriptor::Label(_) | ButtonDescriptor::OwnedLabel(_) => unreachable!(),
+                    ButtonDescriptor::Image {
+                        image,
+                        width,
+                        height,
+                    } => {
+                        let width = width.as_abolute(this.ui_state.bounds.width());
+                        let height = height.as_abolute(this.ui_state.bounds.height());
 
+                        let padding = 6;
+                        let rect = layout_rect(RectLayoutDescriptor {
+                            padding: Some(this.theme.padding),
+                            width: width + 2 * padding,
+                            height: height + 2 * padding,
+                            dir: this.ui_state.layout_dir,
+                            bounds: this.ui_state.bounds,
+                        });
+                        let inner = layout_rect(RectLayoutDescriptor {
+                            padding: Some(Padding::splat(padding)),
+                            width: width,
+                            height: height,
+                            dir: LayoutDirection::TopDown(HorizontalAlignment::Center),
+                            bounds: rect,
+                        });
+
+                        let last_layer = this.push_layer();
+
+                        this.image_rect(
+                            inner.min_x,
+                            inner.min_y,
+                            inner.width(),
+                            inner.height(),
+                            image,
+                            this.ui_state.layer,
+                        );
+
+                        this.ui_state.layer = last_layer;
+
+                        rect
+                    }
+                }
+            };
             this.theme_rect(
                 rect.min_x,
                 rect.min_y,
@@ -1385,19 +1440,7 @@ impl<'a> Ui<'a> {
                 layer,
                 bg_color,
             );
-
-            let offset = layout_rect(RectLayoutDescriptor {
-                padding: Some(Padding::splat(text_padding)),
-                width: w,
-                height: h,
-                dir: LayoutDirection::TopDown(HorizontalAlignment::Center),
-                bounds: rect,
-            });
-
-            for r in &mut this.ui_state.text_rects[text_rect_idx..] {
-                r.x += offset.min_x;
-                r.y += offset.min_y;
-            }
+            this.submit_rect(id, rect, this.theme.padding);
 
             ButtonResponse {
                 id,
@@ -1408,7 +1451,7 @@ impl<'a> Ui<'a> {
             }
         }
 
-        _button(self, desc.label.into())
+        _button(self, desc.into())
     }
 
     pub fn theme(&self) -> &Theme {
@@ -2404,9 +2447,7 @@ impl<'a> Ui<'a> {
         current: T,
         options: &'b [T],
     ) -> SelectResponse {
-        let resp = self.button(ButtonDescriptor {
-            label: format!("{label}: {}", current.as_ref()),
-        });
+        let resp = self.button(format!("{label}: {}", current.as_ref()));
 
         let parent_id = resp.id;
 
@@ -2457,7 +2498,7 @@ impl<'a> Ui<'a> {
                 ui.vertical(None, |ui| {
                     // TODO: highlight if matches current
                     for (i, t) in options.iter().enumerate() {
-                        if ui.button(ButtonDescriptor { label: t.as_ref() }).pressed() {
+                        if ui.button(t.as_ref()).pressed() {
                             selected = Some(i);
                             state.open = false;
                         }
@@ -3858,8 +3899,40 @@ pub struct SelectResponse {
     pub selected: Option<usize>,
 }
 
-pub struct ButtonDescriptor<S> {
-    pub label: S,
+pub enum ButtonDescriptor<'a> {
+    Label(&'a str),
+    OwnedLabel(String),
+    Image {
+        image: Handle<DynamicImage>,
+        width: UiCoord,
+        height: UiCoord,
+    },
+}
+
+impl<'a> ButtonDescriptor<'a> {
+    pub fn as_str(&'a self) -> Option<&'a str> {
+        match self {
+            ButtonDescriptor::Label(s) => Some(s),
+            ButtonDescriptor::OwnedLabel(s) => Some(s.as_str()),
+            ButtonDescriptor::Image { .. } => None,
+        }
+    }
+}
+
+impl<'a> From<String> for ButtonDescriptor<'a> {
+    fn from(value: String) -> Self {
+        Self::OwnedLabel(value)
+    }
+}
+impl<'a> From<&'a String> for ButtonDescriptor<'a> {
+    fn from(value: &'a String) -> Self {
+        Self::from(value.as_str())
+    }
+}
+impl<'a> From<&'a str> for ButtonDescriptor<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::Label(value)
+    }
 }
 
 pub struct WidgetInfo {

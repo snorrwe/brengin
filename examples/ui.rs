@@ -61,11 +61,11 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                                                 ui.margin(
                                                     brengin::ui::Padding::vertical(10),
                                                     |ui| {
-                                                        ui.image(
-                                                            ui_state.boid.clone(),
-                                                            UiCoord::Percent(50),
-                                                            UiCoord::Absolute(56),
-                                                        );
+                                                        ui.button(ButtonDescriptor::Image {
+                                                            image: ui_state.boid.clone(),
+                                                            width: UiCoord::Percent(50),
+                                                            height: UiCoord::Absolute(56),
+                                                        });
                                                     },
                                                 );
                                             },
@@ -85,11 +85,11 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                             let c = col * 2;
                             cols.span(c..=c + 1, |ui| {
                                 ui.margin(brengin::ui::Padding::vertical(10), |ui| {
-                                    ui.image(
-                                        ui_state.boid.clone(),
-                                        UiCoord::Percent(50),
-                                        UiCoord::Absolute(56),
-                                    );
+                                    ui.button(ButtonDescriptor::Image {
+                                        image: ui_state.boid.clone(),
+                                        width: UiCoord::Percent(50),
+                                        height: UiCoord::Absolute(56),
+                                    });
                                 });
                             });
                         }
@@ -114,7 +114,7 @@ fn back(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
         },
         |ui| {
             ui.horizontal_rev(None, |ui| {
-                if ui.button(ButtonDescriptor { label: "Back" }).inner.pressed {
+                if ui.button("Back").inner.pressed {
                     *state = MenuState::Main;
                 }
             });
@@ -134,37 +134,19 @@ fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>, cr: Res<CloseRequest>) {
         |ui| {
             ui.vertical(HorizontalAlignment::Center, |ui| {
                 ui.label("Choose example");
-                if ui
-                    .button(ButtonDescriptor {
-                        label: "Drag and drop",
-                    })
-                    .inner
-                    .pressed
-                {
+                if ui.button("Drag and drop").inner.pressed {
                     *state = MenuState::DragNDrop;
                 }
-                if ui
-                    .button(ButtonDescriptor { label: "Buttons" })
-                    .inner
-                    .pressed
-                {
+                if ui.button("Buttons").inner.pressed {
                     *state = MenuState::Buttons;
                 }
-                if ui
-                    .button(ButtonDescriptor { label: "ImageGrid" })
-                    .inner
-                    .pressed
-                {
+                if ui.button("ImageGrid").inner.pressed {
                     *state = MenuState::ImageGrid;
                 }
-                if ui
-                    .button(ButtonDescriptor { label: "Layout" })
-                    .inner
-                    .pressed
-                {
+                if ui.button("Layout").inner.pressed {
                     *state = MenuState::Layout;
                 }
-                if ui.button(ButtonDescriptor { label: "Exit" }).inner.pressed {
+                if ui.button("Exit").inner.pressed {
                     cr.request_close();
                 }
             });
@@ -317,7 +299,7 @@ fn layout_ui(mut ctx: UiRoot) {
             ui.vertical(None, |ui| {
                 for _ in 0..2 {
                     ui.label("top left");
-                    ui.button(ButtonDescriptor { label: "top left" });
+                    ui.button("top left");
                 }
             });
         },
@@ -333,9 +315,7 @@ fn layout_ui(mut ctx: UiRoot) {
             ui.vertical_rev(None, |ui| {
                 for _ in 0..2 {
                     ui.label("bottom left");
-                    ui.button(ButtonDescriptor {
-                        label: "bottom left",
-                    });
+                    ui.button("bottom left");
                 }
             });
         },
@@ -351,9 +331,7 @@ fn layout_ui(mut ctx: UiRoot) {
             ui.vertical_rev(HorizontalAlignment::Right, |ui| {
                 for _ in 0..2 {
                     ui.label("bottom right");
-                    ui.button(ButtonDescriptor {
-                        label: "bottom right",
-                    });
+                    ui.button("bottom right");
                 }
             });
         },
@@ -369,9 +347,7 @@ fn layout_ui(mut ctx: UiRoot) {
             ui.vertical_rev(HorizontalAlignment::Center, |ui| {
                 for _ in 0..2 {
                     ui.label("bottom center");
-                    ui.button(ButtonDescriptor {
-                        label: "bottom center",
-                    });
+                    ui.button("bottom center");
                 }
             });
         },
@@ -399,7 +375,7 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
                                 for row in 0..10 {
                                     let fill = row * 2;
                                     let l = format!("{row} {col}\nPoggies{:s>fill$}", "");
-                                    if ui.button(ButtonDescriptor { label: &l }).pressed() {
+                                    if ui.button(&l).pressed() {
                                         label.0 = l;
                                     }
                                 }
@@ -447,16 +423,14 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
                 });
 
                 // opening a context menu on-demand by user code
-                let resp = ui.button(ButtonDescriptor {
-                    label: "Open context menu",
-                });
+                let resp = ui.button("Open context menu");
                 if resp.inner.pressed {
                     ui.open_context_menu(resp.id, None);
                 }
                 resp.context_menu(ui, |ui, s| {
                     ui.vertical(None, |ui| {
                         ui.label("hello");
-                        if ui.button(ButtonDescriptor { label: "close" }).inner.pressed {
+                        if ui.button("close").inner.pressed {
                             s.open = false;
                         }
                     });
