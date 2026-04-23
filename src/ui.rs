@@ -2744,7 +2744,7 @@ impl<'a> Ui<'a> {
 
         if self.contains_mouse(id) {
             state.hovered_seconds += self.delta_time.0.as_secs_f32();
-            if state.hovered_seconds > 1.2 {
+            if state.hovered_seconds > 0.8 {
                 let history_start = self.ui_state.rect_history.len();
                 let mouse = self.mouse.cursor_position;
 
