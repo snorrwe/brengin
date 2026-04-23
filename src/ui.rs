@@ -2745,17 +2745,27 @@ impl<'a> Ui<'a> {
         if self.contains_mouse(id) {
             state.hovered_seconds += self.delta_time.0.as_secs_f32();
             if state.hovered_seconds > 1.2 {
+                let history_start = self.ui_state.rect_history.len();
                 let mouse = self.mouse.cursor_position;
+
+                let pos = state
+                    .anchor
+                    .get_or_insert(IVec2::new(mouse.x as i32, mouse.y as i32 + 10));
+
                 self.children_content(|ui| {
                     ui.tooltip(TooltipDescriptor {
-                        x: mouse.x as i32,
-                        y: mouse.y as i32 + 10,
+                        x: pos.x,
+                        y: pos.y,
                         label,
                     });
                 });
+                self.ui_state
+                    .rect_history
+                    .resize_with(history_start, || unreachable!());
             }
         } else {
             state.hovered_seconds = 0.0;
+            state.anchor.take();
         }
 
         self.insert_memory(id, state);
@@ -2842,6 +2852,7 @@ pub struct TooltipDescriptor<'a> {
 #[derive(Debug, Default)]
 pub struct TooltipState {
     pub hovered_seconds: f32,
+    pub anchor: Option<IVec2>,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
