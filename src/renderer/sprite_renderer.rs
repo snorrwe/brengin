@@ -7,18 +7,20 @@
 //!
 //! TODO: support arbitrary sized meshes in visibility
 //!
-use image::DynamicImage;
+pub mod sprite_sheet;
+
+#[cfg(test)]
+mod tests;
+
 use std::collections::{BTreeMap, HashMap, HashSet};
 use tracing::trace;
 
 use cecs::prelude::*;
-use glam::Vec2;
 use wgpu::{include_wgsl, util::DeviceExt};
 
 use crate::{
     assets::{AssetId, Assets, AssetsPlugin, Handle, WeakHandle},
     camera::ViewFrustum,
-    color::Color,
     transform::GlobalTransform,
     Plugin, Stage,
 };
@@ -28,21 +30,7 @@ use super::{
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, Vertex,
 };
 
-pub fn sprite_sheet_bundle(
-    handle: Handle<SpriteSheet>,
-    instance: impl Into<Option<SpriteInstance>>,
-) -> impl Bundle {
-    (
-        instance.into().unwrap_or(SpriteInstance {
-            index: 0,
-            flip: false,
-            color: Color::TRANSPARENT_BLACK,
-        }),
-        Visible,
-        handle,
-        SpriteInstanceRaw::default(),
-    )
-}
+pub use sprite_sheet::{sprite_sheet_bundle, SpriteInstance, SpriteSheet};
 
 struct CullSize(pub f32);
 struct Visible;
@@ -108,59 +96,6 @@ fn insert_missing_cull(
     for id in q.iter() {
         cmd.entity(id).insert(CullSize(0.0));
     }
-}
-
-pub struct SpriteSheet {
-    /// Padding applied to the box
-    pub padding: Vec2,
-    /// Size of the entire box
-    pub box_size: Vec2,
-    /// Number of boxes in a row
-    pub num_cols: u32,
-    pub image: DynamicImage,
-    /// Size of the entire sheet
-    pub size: Vec2,
-    /// Color to mask by each instance's color.
-    /// Transparent black is not supported
-    pub mask_color: Option<Color>,
-}
-
-impl SpriteSheet {
-    #[deprecated = "Use from_grid instead"]
-    pub fn from_image(padding: Vec2, box_size: Vec2, num_cols: u32, image: DynamicImage) -> Self {
-        Self::from_grid(padding, box_size, num_cols, image)
-    }
-
-    /// Construct a spritesheet from a uniform grid of sprites
-    pub fn from_grid(padding: Vec2, box_size: Vec2, num_cols: u32, image: DynamicImage) -> Self {
-        Self {
-            padding,
-            box_size,
-            num_cols,
-            size: Vec2::new(image.width() as f32, image.height() as f32),
-            image,
-            mask_color: None,
-        }
-    }
-
-    fn extract(&self) -> SpriteSheetGpu {
-        SpriteSheetGpu {
-            padding: self.padding.to_array(),
-            box_size: self.box_size.to_array(),
-            num_cols: self.num_cols,
-            size: self.size.to_array(),
-            mask_color: self.mask_color.map(|c| c.0 >> 8).unwrap_or(0),
-        }
-    }
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-pub struct SpriteInstance {
-    pub index: u32,
-    pub flip: bool,
-    /// RGB Color to use when masking the sprite
-    /// If sprite masking is disabled on the spritesheet, then
-    pub color: Color,
 }
 
 pub fn add_missing_sheets(
@@ -301,17 +236,6 @@ pub struct SpritePipeline {
     // shared
     render_pipeline: wgpu::RenderPipeline,
     sprite_sheet_layout: wgpu::BindGroupLayout,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct SpriteSheetGpu {
-    pub padding: [f32; 2],
-    pub box_size: [f32; 2],
-    pub size: [f32; 2],
-    pub num_cols: u32,
-    /// rgb color to mask by instances
-    pub mask_color: u32,
 }
 
 impl SpritePipeline {
