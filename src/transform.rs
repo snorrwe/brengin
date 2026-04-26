@@ -254,7 +254,7 @@ fn update_root_transforms(mut root: Query<(&Transform, &mut GlobalTransform), Wi
     }
 }
 
-/// Marker component. Marks the entity and all children for deleteion in the PostUpdate stage.
+/// Marker component. Marks the entity and all children for deletion in the next PostUpdate stage.
 pub struct DeleteHierarchy {
     /// Also delete the parent entity
     pub delete_self: bool,
