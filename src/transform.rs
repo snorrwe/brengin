@@ -18,10 +18,14 @@ pub fn spawn_child(
 }
 
 fn clean_children(mut q: Query<(EntityId, &mut Children)>, exists: Query<&Parent>) {
-    q.par_for_each_mut(|(parent_id, ch)| {
+    q.par_for_each_mut(|(root_id, ch)| {
         for i in (0..ch.len()).rev() {
-            let id = ch[i];
-            if exists.fetch(id).map(|p| p.0 != parent_id).unwrap_or(true) {
+            let child_id = ch[i];
+            if exists
+                .fetch(child_id)
+                .map(|Parent(parent_id)| *parent_id != root_id)
+                .unwrap_or(true)
+            {
                 ch.0.swap_remove(i);
             }
         }
