@@ -79,7 +79,7 @@ fn reparent_system(
 /// Meaningless if the entity is not part of a transform hierarchy already
 pub struct Reparent(pub EntityId);
 
-// parent id
+/// Append this entity to its Parent(parent_id)'s Children
 struct AppendChild;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
