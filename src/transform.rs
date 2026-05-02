@@ -267,11 +267,12 @@ pub struct DeleteHierarchy {
 fn delete_hierarchy(
     mut cmd: Commands,
     q_to_delete: Query<(EntityId, &DeleteHierarchy)>,
-    q_children: Query<&Children>,
+    mut q_children: Query<&mut Children>,
 ) {
-    fn clean_recursive(cmd: &mut Commands, id: EntityId, q_children: &Query<&Children>) {
-        if let Some(c) = q_children.fetch(id) {
-            for id in c.iter().copied() {
+    fn clean_recursive(cmd: &mut Commands, id: EntityId, q_children: &mut Query<&mut Children>) {
+        if let Some(c) = q_children.fetch_mut(id) {
+            let ids = std::mem::take(&mut c.0);
+            for id in ids {
                 cmd.delete(id);
                 clean_recursive(cmd, id, q_children);
             }
@@ -282,7 +283,7 @@ fn delete_hierarchy(
         if *delete_self {
             cmd.delete(id);
         }
-        clean_recursive(&mut cmd, id, &q_children);
+        clean_recursive(&mut cmd, id, &mut q_children);
     }
 }
 
