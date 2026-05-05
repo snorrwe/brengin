@@ -13,7 +13,6 @@ pub mod sprite_sheet;
 mod tests;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use tracing::trace;
 
 use cecs::prelude::*;
 use wgpu::{include_wgsl, util::DeviceExt};
@@ -417,7 +416,6 @@ impl SpritePipeline {
             let Some(sheet) = self.sheets.get(&k.sprite_sheet) else {
                 continue;
             };
-            trace!(mesh=?k.mesh, sprite_sheet=k.sprite_sheet, "Rendering {} instances", instances.count);
 
             render_pass.set_bind_group(0, *camera, &[]);
             render_pass.set_bind_group(1, &sheet.spritesheet_bind_group, &[]);
