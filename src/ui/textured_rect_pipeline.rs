@@ -233,6 +233,9 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
                 .set_bind_group(0, &texture.texture_bind_group, &[]);
             input.render_pass.draw(0..6, 0..requests.count as u32);
         }
+        input
+            .render_pass
+            .set_scissor_rect(0, 0, size.width, size.height);
     }
 }
 

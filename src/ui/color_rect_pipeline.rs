@@ -191,6 +191,9 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
                 .set_vertex_buffer(0, requests.buffer.slice(..));
             input.render_pass.draw(0..6, 0..requests.len as u32);
         }
+        input
+            .render_pass
+            .set_scissor_rect(0, 0, size.width, size.height);
     }
 }
 
