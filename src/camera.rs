@@ -83,6 +83,8 @@ pub struct CameraUniform {
     pub view: Mat4,
     pub proj: Mat4,
     pub view_inv: Mat4,
+    pub proj_inv: Mat4,
+    pub view_proj_inv: Mat4,
 }
 
 impl Default for CameraUniform {
@@ -92,6 +94,8 @@ impl Default for CameraUniform {
             view: Mat4::IDENTITY,
             proj: Mat4::IDENTITY,
             view_inv: Mat4::IDENTITY,
+            proj_inv: Mat4::IDENTITY,
+            view_proj_inv: Mat4::IDENTITY,
         }
     }
 }
@@ -122,6 +126,8 @@ fn update_view_projections(
         uni.view_inv = uni.view.inverse();
         uni.proj = cam.projection();
         uni.view_proj = uni.proj * uni.view;
+        uni.proj_inv = uni.proj.inverse();
+        uni.view_proj_inv = uni.view_proj.inverse();
     }
 }
 

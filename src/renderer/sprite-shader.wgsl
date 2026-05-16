@@ -3,6 +3,8 @@ struct Camera {
     view: mat4x4<f32>,
     proj: mat4x4<f32>,
     view_inv: mat4x4<f32>,
+    proj_inv: mat4x4<f32>,
+    view_proj_inv: mat4x4<f32>,
 }
 
 @group(0) @binding(0)
