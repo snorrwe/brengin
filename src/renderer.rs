@@ -473,21 +473,11 @@ fn render_system(mut world: WorldAccess) {
                 });
             }
             for camera_buffer in cameras.iter() {
-                // FIXME: retain the camera bind ground
-                let camera_bind_group =
-                    state.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        layout: &state.camera_bind_group_layout,
-                        entries: &[wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: camera_buffer.0.as_entire_binding(),
-                        }],
-                        label: Some("camera_bind_group"),
-                    });
                 for pass in render_passes.0.iter() {
                     let mut render_pass = pass.begin(&view, &mut encoder, &state);
                     let mut input = RenderCommandInput {
                         render_pass: &mut render_pass,
-                        camera: &camera_bind_group,
+                        camera: &camera_buffer.bind_group,
                     };
                     for cmd in render_commands.iter().filter(|p| &p.pass == pass) {
                         (cmd.render_cmd)(w, &mut input);

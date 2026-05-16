@@ -151,8 +151,19 @@ fn insert_missing_camera_buffers(
             size: std::mem::size_of::<CameraUniform>() as u64,
             mapped_at_creation: false,
         });
+
+        let bind_group = renderer
+            .device()
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: renderer.camera_bind_group_layout(),
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buffer.as_entire_binding(),
+                }],
+                label: Some("camera_bind_group"),
+            });
         upload_camera_uniform(renderer.queue(), &buffer, uni);
-        cmd.entity(id).insert(CameraBuffer(buffer));
+        cmd.entity(id).insert(CameraBuffer { buffer, bind_group });
     }
 }
 
@@ -160,7 +171,7 @@ fn update_camera_buffers(
     renderer: Res<GraphicsState>,
     q: Query<(&CameraUniform, &mut CameraBuffer)>,
 ) {
-    for (uni, CameraBuffer(buffer)) in q.iter() {
+    for (uni, CameraBuffer { buffer, .. }) in q.iter() {
         upload_camera_uniform(renderer.queue(), &buffer, uni);
     }
 }
@@ -201,7 +212,10 @@ fn update_frustum(mut q: Query<(&mut ViewFrustum, &CameraUniform)>) {
     }
 }
 
-pub struct CameraBuffer(pub wgpu::Buffer);
+pub struct CameraBuffer {
+    pub buffer: wgpu::Buffer,
+    pub bind_group: wgpu::BindGroup,
+}
 
 pub struct CameraPlugin;
 
