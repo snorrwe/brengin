@@ -104,15 +104,14 @@ fn setup_boids(
     cmd.spawn()
         .insert(WindowCamera)
         .insert_bundle(camera_bundle(PerspectiveCamera {
-            eye: Vec3::new(0.0, 0.0, 100.0),
-            target: Vec3::ZERO,
-            up: Vec3::Y,
             aspect: 16.0 / 9.0,
             fovy: std::f32::consts::TAU / 6.0,
             znear: 5.0,
             zfar: 5000.0,
         }))
-        .insert_bundle(transform_bundle(transform::Transform::default()));
+        .insert_bundle(transform_bundle(transform::Transform::from_position(
+            Vec3::Z * -100.0,
+        )));
 
     let boid = load_sprite_sheet(
         include_bytes!("assets/boid.png"),

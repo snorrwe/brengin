@@ -39,9 +39,6 @@ fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
     cmd.spawn()
         .insert(WindowCamera)
         .insert_bundle(camera_bundle(PerspectiveCamera {
-            eye: Vec3::new(0.0, 0.0, 50.0),
-            target: Vec3::ZERO,
-            up: Vec3::Y,
             aspect: 16.0 / 9.0,
             fovy: std::f32::consts::TAU / 6.0,
             znear: 5.0,

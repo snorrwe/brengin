@@ -486,13 +486,13 @@ impl SpriteInstanceRaw {
 const SQUARE_VERTICES: &[Vertex] = &[
     // A
     Vertex {
-        pos: [-0.5, 0.5, 0.0],
-        uv: [0.0, 1.0],
+        pos: [-0.5, -0.5, 0.0],
+        uv: [0.0, 0.0],
     },
     // B
     Vertex {
-        pos: [-0.5, -0.5, 0.0],
-        uv: [0.0, 0.0],
+        pos: [-0.5, 0.5, 0.0],
+        uv: [0.0, 1.0],
     },
     // C
     Vertex {
@@ -506,7 +506,7 @@ const SQUARE_VERTICES: &[Vertex] = &[
     },
 ];
 
-const SQUARE_INDICES: &[u16] = &[3, 2, 1, 3, 1, 0];
+const SQUARE_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
 fn setup(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
     let sprite_pipeline = SpritePipeline::new(&graphics_state);
