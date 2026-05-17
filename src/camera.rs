@@ -1,5 +1,5 @@
 use cecs::prelude::*;
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Mat4, Vec4};
 
 use crate::{
     renderer::{GraphicsState, WindowSize},
@@ -19,9 +19,6 @@ pub struct CameraSize {
 }
 
 pub struct PerspectiveCamera {
-    pub eye: Vec3,
-    pub target: Vec3,
-    pub up: Vec3,
     pub aspect: f32,
     pub fovy: f32,
     pub znear: f32,
@@ -31,9 +28,6 @@ pub struct PerspectiveCamera {
 impl Default for PerspectiveCamera {
     fn default() -> Self {
         PerspectiveCamera {
-            eye: Vec3::Z * -100.0,
-            target: Vec3::ZERO,
-            up: Vec3::NEG_Y,
             aspect: 16.0 / 9.0,
             fovy: std::f32::consts::TAU / 6.0,
             znear: 5.0,
@@ -60,19 +54,8 @@ fn update_camera_aspect(
 }
 
 impl PerspectiveCamera {
-    pub fn look_at(&self) -> Mat4 {
-        Mat4::look_at_rh(self.eye, self.target, self.up)
-    }
-
     pub fn perspective(&self) -> Mat4 {
         Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar)
-    }
-
-    pub fn projection(&self) -> Mat4 {
-        let view = self.look_at();
-        let proj = self.perspective();
-
-        proj * view
     }
 }
 
@@ -121,10 +104,15 @@ impl CameraUniform {
 fn update_view_projections(
     mut q: Query<(&GlobalTransform, &PerspectiveCamera, &mut CameraUniform)>,
 ) {
-    for (tr, cam, uni) in q.iter_mut() {
-        uni.view = tr.0.inverse().compute_matrix();
+    for (GlobalTransform(tr), cam, uni) in q.iter_mut() {
+        let up = tr.local_y();
+        let forward = tr.local_z();
+
+        let look_at = Mat4::look_at_rh(tr.pos, tr.pos + forward, up);
+
+        uni.view = look_at;
         uni.view_inv = uni.view.inverse();
-        uni.proj = cam.projection();
+        uni.proj = cam.perspective();
         uni.view_proj = uni.proj * uni.view;
         uni.proj_inv = uni.proj.inverse();
         uni.view_proj_inv = uni.view_proj.inverse();
@@ -132,11 +120,7 @@ fn update_view_projections(
 }
 
 fn upload_camera_uniform(queue: &wgpu::Queue, buffer: &wgpu::Buffer, uni: &CameraUniform) {
-    queue.write_buffer(
-        &buffer,
-        0,
-        bytemuck::cast_ref::<_, [u8; std::mem::size_of::<CameraUniform>()]>(uni),
-    );
+    queue.write_buffer(&buffer, 0, bytemuck::bytes_of(uni));
 }
 
 fn insert_missing_camera_buffers(
