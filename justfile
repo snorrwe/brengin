@@ -8,6 +8,8 @@ boids flags="": (_example "boids" flags)
 
 sprites flags="": (_example "sprites" flags)
 
+simple_sprite flags="": (_example "simple_sprite" flags)
+
 mandelbrot flags="": (_example "mandelbrot" flags)
 
 ui flags="": (_example "ui" flags)
