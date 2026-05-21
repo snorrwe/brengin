@@ -140,7 +140,7 @@ fn vs_main(
     // billboarding
     let scale_x = instance.scale.x;
     var pos = vec4<f32>(instance.pos, 1.0);
-    let up: vec4<f32> = camera.view[1];
+    let up: vec4<f32> = -camera.view[1];
     let right: vec4<f32> = camera.view[0];
 
     pos += right * model.pos.x * scale_x;

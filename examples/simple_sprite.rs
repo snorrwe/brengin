@@ -35,7 +35,7 @@ fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
 
     // camera eye is in origin, span a bit in front
     cmd.spawn()
-        .insert_bundle(transform_bundle(Transform::from_position(Vec3::Z * 1.5)))
+        .insert_bundle(transform_bundle(Transform::from_position(Vec3::Z * -1.5)))
         .insert_bundle(sprite_renderer::sprite_sheet_bundle(boom.clone(), None))
         .insert(Timer::new(Duration::from_secs_f32(1.0), true));
 }

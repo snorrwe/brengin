@@ -105,9 +105,7 @@ fn update_view_projections(
     mut q: Query<(&GlobalTransform, &PerspectiveCamera, &mut CameraUniform)>,
 ) {
     for (GlobalTransform(tr), cam, uni) in q.iter_mut() {
-        let tr_inv = tr.inverse();
-
-        let look_at = Mat4::look_to_rh(tr_inv.pos, tr_inv.local_z(), -tr_inv.local_y());
+        let look_at = Mat4::look_to_rh(tr.pos, -tr.local_z(), tr.local_y());
 
         uni.view = look_at;
         uni.view_inv = uni.view.inverse();
