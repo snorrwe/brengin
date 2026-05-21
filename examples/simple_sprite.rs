@@ -11,7 +11,7 @@ fn animation_system(dt: Res<DeltaTime>, mut q: Query<(&mut SpriteInstance, &mut 
     q.par_for_each_mut(move |(i, t)| {
         t.update(dt);
         if t.just_finished() {
-            i.index = (i.index + 1) % 64;
+            i.index = (i.index + 1) % 3;
         }
     });
 }
@@ -27,9 +27,9 @@ fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
         .insert_bundle(transform_bundle(Transform::default()));
 
     let boom = load_sprite_sheet(
-        include_bytes!("assets/boom3.png"),
-        Vec2::splat(128.0),
-        8,
+        include_bytes!("assets/test.png"),
+        Vec2::splat(32.0),
+        3,
         &mut assets,
     );
 
@@ -37,10 +37,7 @@ fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
     cmd.spawn()
         .insert_bundle(transform_bundle(Transform::from_position(Vec3::Z * 1.5)))
         .insert_bundle(sprite_renderer::sprite_sheet_bundle(boom.clone(), None))
-        .insert(Timer::new(
-            Duration::from_secs_f32(fastrand::f32() / 30.0),
-            true,
-        ));
+        .insert(Timer::new(Duration::from_secs_f32(1.0), true));
 }
 
 fn load_sprite_sheet(
