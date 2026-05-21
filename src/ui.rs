@@ -3420,8 +3420,8 @@ impl<'a> UiRoot<'a> {
                 ..
             } = ui.begin_widget();
             if is_active {
-                if ui.mouse_up() {
-                    ui.set_not_active(title_id);
+                if ui.mouse_down() {
+                    ui.set_active(title_id);
                 }
                 let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
 
