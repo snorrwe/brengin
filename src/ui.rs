@@ -1244,10 +1244,9 @@ impl<'a> Ui<'a> {
                     .and_then(|i| self.ui_state.widget_ids.get(*i as usize))
                     .copied()
             })
-            .unwrap_or_else(|| {
-                let mut id = UiId::SENTINEL;
-                id.uid = self.ui_state.root_hash;
-                id
+            .unwrap_or(UiId {
+                uid: self.ui_state.root_hash,
+                ..UiId::SENTINEL
             });
 
         let hash = fnv_1a(bytemuck::cast_slice(&[parent.uid, index]));
