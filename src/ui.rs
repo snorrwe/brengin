@@ -1964,6 +1964,7 @@ impl<'a> Ui<'a> {
                 .unwrap_or(&self.theme.drop_target_default)
                 .clone(),
         );
+        self.ui_state.layer = bg_layer;
 
         DropResponse {
             dropped: state.dropped,
