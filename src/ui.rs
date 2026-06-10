@@ -1920,17 +1920,13 @@ impl<'a> Ui<'a> {
     }
 
     pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self, DropState)) -> DropResponse {
-        let WidgetInfo {
-            id,
-            is_hovered,
-            is_active,
-        } = self.begin_widget();
+        let WidgetInfo { id, is_hovered, .. } = self.begin_widget();
         let old_bounds = self.ui_state.bounds;
         let bg_layer = self.push_layer();
         let mut state = DropState {
             id,
             dragged: self.ids.dragged,
-            dropped: is_active,
+            dropped: false,
             hovered: false, // only set if something is being dragged
         };
 
@@ -1938,6 +1934,7 @@ impl<'a> Ui<'a> {
             state.hovered = is_hovered;
             if is_hovered && self.mouse_up() {
                 self.set_active(id);
+                state.dropped = true;
             }
         }
 
