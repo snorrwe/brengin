@@ -218,7 +218,7 @@ struct RenderSpritesheetHandles(pub HashMap<AssetId, WeakHandle<SpriteSheet>>);
 // per spritesheet
 pub struct SpriteRenderingData {
     pub spritesheet_gpu: wgpu::BindGroup,
-    pub spritesheet_bind_group: wgpu::BindGroup,
+    pub texture_bind_group: wgpu::BindGroup,
     pub texture: Texture,
 }
 
@@ -273,7 +273,7 @@ impl SpritePipeline {
             id,
             SpriteRenderingData {
                 spritesheet_gpu,
-                spritesheet_bind_group,
+                texture_bind_group: spritesheet_bind_group,
                 texture,
             },
         );
@@ -418,7 +418,7 @@ impl SpritePipeline {
             };
 
             render_pass.set_bind_group(0, *camera, &[]);
-            render_pass.set_bind_group(1, &sheet.spritesheet_bind_group, &[]);
+            render_pass.set_bind_group(1, &sheet.texture_bind_group, &[]);
             render_pass.set_bind_group(2, &sheet.spritesheet_gpu, &[]);
             render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
             render_pass.set_vertex_buffer(1, instances.instance_gpu.slice(..));
