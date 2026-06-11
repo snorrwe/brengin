@@ -881,6 +881,7 @@ impl<'a> Ui<'a> {
             dims,
         };
         self.push_child();
+        self.begin_widget();
         ///////////////////////
         contents(&mut cols);
         ///////////////////////
@@ -3121,6 +3122,7 @@ impl<'a> Columns<'a> {
         let layer = ctx.ui_state.layer;
         ctx.ui_state.layer += 1;
         ctx.push_child();
+        ctx.begin_widget();
         let history_start = ctx.ui_state.rect_history.len();
 
         ///////////////////////
