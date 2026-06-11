@@ -1267,12 +1267,14 @@ impl<'a> Ui<'a> {
         if let Some(i) = self.ui_state.id_stack.last_mut() {
             *i = index;
         }
+        let mut is_hovered = self.is_hovered(id);
         if self.contains_mouse(id) {
             self.set_hovered(id);
+            is_hovered = true;
         }
         WidgetInfo {
             id,
-            is_hovered: self.is_hovered(id),
+            is_hovered,
             is_active: self.is_active(id),
         }
     }
