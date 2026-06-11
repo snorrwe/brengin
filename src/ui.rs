@@ -293,6 +293,7 @@ pub struct UiState {
     /// Stack of parents in the UI tree
     id_stack: Vec<IdxType>,
     widget_ids: Vec<UiId>,
+    widget_properties: Vec<WidgetProperties>,
 
     color_rects: Vec<DrawColorRect>,
     texture_rects: Vec<DrawTextureRect>,
@@ -454,6 +455,7 @@ impl UiState {
         Self {
             id_stack: Default::default(),
             widget_ids: Default::default(),
+            widget_properties: Default::default(),
             color_rects: Default::default(),
             text_rects: Default::default(),
             texture_rects: Default::default(),
@@ -1231,40 +1233,42 @@ impl<'a> Ui<'a> {
     }
 
     pub fn begin_widget(&mut self) -> WidgetInfo {
-        let parent = self
+        let (parent, children) = self
             .ui_state
             .id_stack
             .len()
             .checked_sub(2)
             .and_then(|i| {
-                self.ui_state
-                    .id_stack
-                    .get(i)
-                    .and_then(|i| self.ui_state.widget_ids.get(*i as usize))
-                    .copied()
-            })
-            .unwrap_or(UiId {
-                uid: self.ui_state.root_hash,
-                ..UiId::SENTINEL
-            });
+                let idx = *self.ui_state.id_stack.get(i)? as usize;
 
-        let current = self
-            .ui_state
-            .id_stack
-            .last()
-            .and_then(|i| self.ui_state.widget_ids.get(*i as usize))
-            .copied()
-            .unwrap_or(UiId::SENTINEL);
+                let id = self.ui_state.widget_ids.get(idx).copied()?;
+                let ch = &mut self.ui_state.widget_properties[idx].children;
+                *ch += 1;
+
+                Some((id, *ch))
+            })
+            .unwrap_or((
+                UiId {
+                    uid: self.ui_state.root_hash,
+                    ..UiId::SENTINEL
+                },
+                0,
+            ));
 
         let index = self.ui_state.widget_ids.len() as IdxType;
-        let hash = fnv_1a(bytemuck::cast_slice(&[parent.uid, current.id + 1]));
+        let hash = fnv_1a(bytemuck::cast_slice(&[
+            parent.uid,
+            (children >> 32) as u32,
+            (children & 0xFFFFFFFF) as u32,
+        ]));
         let id = UiId {
-            parent: parent.id,
+            parent: parent.uid,
             uid: hash,
-            id: current.id + 1,
-            depth: parent.depth + 1,
         };
         self.ui_state.widget_ids.push(id);
+        self.ui_state
+            .widget_properties
+            .push(WidgetProperties::default());
         if let Some(i) = self.ui_state.id_stack.last_mut() {
             *i = index;
         }
@@ -2990,20 +2994,21 @@ pub struct ScrollDescriptor {
 type IdxType = u32;
 const SENTINEL: IdxType = !0;
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WidgetProperties {
+    children: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UiId {
     parent: IdxType,
-    id: IdxType,
     uid: IdxType,
-    depth: IdxType,
 }
 
 impl UiId {
     pub const SENTINEL: UiId = Self {
         parent: SENTINEL,
-        id: 0,
         uid: SENTINEL,
-        depth: 0,
     };
 }
 
@@ -3165,6 +3170,7 @@ fn begin_frame(
     ui.root_hash = 0;
     ui.id_stack.clear();
     ui.widget_ids.clear();
+    ui.widget_properties.clear();
     ui.rect_history.clear();
     ui.color_rects.clear();
     ui.text_rects.clear();
@@ -3761,7 +3767,7 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
         let mut label = ancestry
             .drain(..)
             .rev()
-            .fold(String::new(), |x, a| format!("{x}{}/", a.id));
+            .fold(String::new(), |x, a| format!("{x}{}/", a.uid));
         label.pop(); // pop the last /
         let (handle, e) =
             ui.shape_and_draw_line(format!("{label} [{} {}]", rect.width(), rect.height()), 12);
