@@ -1230,8 +1230,6 @@ impl<'a> Ui<'a> {
     }
 
     pub fn begin_widget(&mut self) -> WidgetInfo {
-        let index = self.ui_state.widget_ids.len() as IdxType;
-
         let parent = self
             .ui_state
             .id_stack
@@ -1249,16 +1247,25 @@ impl<'a> Ui<'a> {
                 ..UiId::SENTINEL
             });
 
-        let hash = fnv_1a(bytemuck::cast_slice(&[parent.uid, index]));
+        let current = self
+            .ui_state
+            .id_stack
+            .last()
+            .and_then(|i| self.ui_state.widget_ids.get(*i as usize))
+            .copied()
+            .unwrap_or(UiId::SENTINEL);
+
+        let index = self.ui_state.widget_ids.len() as IdxType;
+        let hash = fnv_1a(bytemuck::cast_slice(&[parent.uid, current.id + 1]));
         let id = UiId {
-            parent: parent.index,
-            index,
+            parent: parent.id,
             uid: hash,
+            id: current.id + 1,
             depth: parent.depth + 1,
         };
         self.ui_state.widget_ids.push(id);
         if let Some(i) = self.ui_state.id_stack.last_mut() {
-            *i = id.index;
+            *i = index;
         }
         if self.contains_mouse(id) {
             self.set_hovered(id);
@@ -2983,7 +2990,7 @@ const SENTINEL: IdxType = !0;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UiId {
     parent: IdxType,
-    index: IdxType,
+    id: IdxType,
     uid: IdxType,
     depth: IdxType,
 }
@@ -2991,7 +2998,7 @@ pub struct UiId {
 impl UiId {
     pub const SENTINEL: UiId = Self {
         parent: SENTINEL,
-        index: SENTINEL,
+        id: 0,
         uid: SENTINEL,
         depth: 0,
     };
@@ -3750,7 +3757,7 @@ fn draw_bounding_boxes(mut ui: UiRoot) {
         let mut label = ancestry
             .drain(..)
             .rev()
-            .fold(String::new(), |x, a| format!("{x}{}/", a.index));
+            .fold(String::new(), |x, a| format!("{x}{}/", a.id));
         label.pop(); // pop the last /
         let (handle, e) =
             ui.shape_and_draw_line(format!("{label} [{} {}]", rect.width(), rect.height()), 12);
