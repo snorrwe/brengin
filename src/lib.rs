@@ -33,9 +33,9 @@ use winit::{
 
 use parking_lot::Mutex;
 use std::{
-    any::{type_name, TypeId},
+    any::{TypeId, type_name},
     collections::{HashMap, HashSet},
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     thread::JoinHandle,
     time::Duration,
 };

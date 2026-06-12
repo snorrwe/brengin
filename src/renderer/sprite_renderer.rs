@@ -18,18 +18,18 @@ use cecs::prelude::*;
 use wgpu::{include_wgsl, util::DeviceExt};
 
 use crate::{
+    Plugin, Stage,
     assets::{AssetId, Assets, AssetsPlugin, Handle, WeakHandle},
     camera::ViewFrustum,
     transform::GlobalTransform,
-    Plugin, Stage,
 };
 
 use super::{
-    texture::{texture_bind_group_layout, texture_to_bindings, Texture},
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, Vertex,
+    texture::{Texture, texture_bind_group_layout, texture_to_bindings},
 };
 
-pub use sprite_sheet::{sprite_sheet_bundle, SpriteInstance, SpriteSheet};
+pub use sprite_sheet::{SpriteInstance, SpriteSheet, sprite_sheet_bundle};
 
 struct CullSize(pub f32);
 struct Visible;

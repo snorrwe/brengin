@@ -1,10 +1,10 @@
-use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
+use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
 use brengin::ui::{
     ButtonDescriptor, HorizontalAlignment, OutlineDescriptor, ScrollDescriptor, UiCoord, UiRoot,
     VerticalAlignment,
 };
-use brengin::{prelude::*, transform, CloseRequest};
 use brengin::{App, DefaultPlugins};
+use brengin::{CloseRequest, prelude::*, transform};
 use clap::Parser;
 use image::DynamicImage;
 

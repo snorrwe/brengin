@@ -34,7 +34,9 @@ impl From<u32> for Color {
 pub enum ColorParseError {
     #[error("Color strings must begin with a hashmark (#)")]
     MissingHash,
-    #[error("Invalid length of {0}. Expected length 4 (#rgb) or 7 (#rrggbb) or 5 (#rgba) or 9 (#rrggbbaa)")]
+    #[error(
+        "Invalid length of {0}. Expected length 4 (#rgb) or 7 (#rrggbb) or 5 (#rgba) or 9 (#rrggbbaa)"
+    )]
     BadLength(usize),
     #[error("Invalid character in the color string: {0} Expected hexadecimal number")]
     InvalidCharacter(char),

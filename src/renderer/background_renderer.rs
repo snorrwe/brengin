@@ -1,7 +1,7 @@
+use crate::Plugin;
 use crate::prelude::*;
 use crate::renderer::texture::{texture_bind_group_layout, texture_to_bindings};
-use crate::renderer::{texture, GraphicsState, RenderCommand, RenderCommandPlugin};
-use crate::Plugin;
+use crate::renderer::{GraphicsState, RenderCommand, RenderCommandPlugin, texture};
 use image::DynamicImage;
 use wgpu::include_wgsl;
 

@@ -1,4 +1,4 @@
-use cecs::{prelude::*, Component};
+use cecs::{Component, prelude::*};
 use std::{
     collections::HashMap,
     marker::PhantomData,

@@ -4,8 +4,8 @@ use std::{path::Path, sync::Arc};
 use kira::{backend::DefaultBackend, sound::static_sound::StaticSoundData};
 
 use crate::{
-    assets::{Assets, AssetsPlugin, Handle},
     Plugin,
+    assets::{Assets, AssetsPlugin, Handle},
 };
 
 pub use kira;

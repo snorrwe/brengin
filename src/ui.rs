@@ -1,7 +1,7 @@
 use crate::{
+    DeltaTime, KeyBoardInputs, MouseInputs, Plugin, Stage, Tick, Timer,
     assets::{self, Assets, AssetsPlugin, Handle, WeakHandle},
     color::Color,
-    DeltaTime, KeyBoardInputs, MouseInputs, Plugin, Stage, Tick, Timer,
 };
 
 pub mod color_rect_pipeline;
@@ -3703,19 +3703,21 @@ impl ErasedMemoryEntry {
     /// # SAFETY
     /// Must be called with the same type as `new`
     pub unsafe fn as_inner<T>(&self) -> &T {
-        &*self.inner.cast()
+        unsafe { &*self.inner.cast() }
     }
 
     /// # SAFETY
     /// Must be called with the same type as `new`
     pub unsafe fn as_inner_mut<T>(&mut self) -> &mut T {
-        &mut *self.inner.cast()
+        unsafe { &mut *self.inner.cast() }
     }
 
     pub unsafe fn into_inner<T>(mut self) -> Box<T> {
-        let inner = self.inner;
-        self.inner = std::ptr::null_mut();
-        Box::from_raw(inner.cast())
+        unsafe {
+            let inner = self.inner;
+            self.inner = std::ptr::null_mut();
+            Box::from_raw(inner.cast())
+        }
     }
 }
 

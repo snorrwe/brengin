@@ -1,6 +1,6 @@
-use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
+use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
 use brengin::prelude::*;
-use brengin::renderer::{texture, GraphicsState, RenderCommand, RenderCommandPlugin};
+use brengin::renderer::{GraphicsState, RenderCommand, RenderCommandPlugin, texture};
 use brengin::{App, DefaultPlugins, Plugin};
 use wgpu::include_wgsl;
 

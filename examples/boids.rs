@@ -1,18 +1,18 @@
 #![windows_subsystem = "windows"]
 
 use brengin::{
+    App, DefaultPlugins, DeltaTime, Plugin, Stage,
     assets::{self, Assets, Handle},
     camera::{PerspectiveCamera, WindowCamera},
     glam::{Quat, Vec2, Vec3},
     prelude::*,
     renderer::{
+        Vertex,
         background_renderer::BackgroundImage,
         camera_bundle,
         sprite_renderer::{self, SpriteMesh, SpriteSheet},
-        Vertex,
     },
-    transform::{self, transform_bundle, Transform},
-    App, DefaultPlugins, DeltaTime, Plugin, Stage,
+    transform::{self, Transform, transform_bundle},
 };
 use image::DynamicImage;
 
@@ -53,7 +53,7 @@ fn update_boids(
     q.par_for_each_mut(|(tr, vel, last_vel)| {
         let pos = tr.0;
         let mut dir = -min_vel * pos.normalize_or_zero(); // move towards the center if no other
-                                                          // boids are in sight
+        // boids are in sight
         positions.iter().for_each(|gtr| {
             let d = pos - gtr.0;
             let mag = d.length();

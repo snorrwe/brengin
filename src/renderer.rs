@@ -11,8 +11,8 @@ use winit::event_loop::OwnedDisplayHandle;
 
 pub use crate::camera::camera_bundle;
 use crate::{
-    camera::{CameraBuffer, CameraPlugin, CameraUniform},
     Plugin,
+    camera::{CameraBuffer, CameraPlugin, CameraUniform},
 };
 
 use self::sprite_renderer::SpriteRendererPlugin;

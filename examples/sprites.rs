@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use brengin::camera::{camera_bundle, PerspectiveCamera, WindowCamera};
+use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
 use brengin::prelude::*;
 use brengin::renderer::sprite_renderer::{self, SpriteInstance, SpriteSheet};
 use brengin::{App, DefaultPlugins, Plugin};

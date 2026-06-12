@@ -311,28 +311,30 @@ unsafe fn update_children_transforms_recursive(
     child_id: EntityId,
     pool: &JobPool,
 ) {
-    let Some((transform, global_tr, children)) = qchildren.fetch_unsafe(child_id) else {
-        // child may have been despawned
-        return;
-    };
-    (*global_tr).0 = parent_tr * &*transform;
-    let global_tr = &*global_tr;
-    if let Some(children) = children {
-        let children = (&*children).0.as_slice();
-        pool.scope(move |s| {
-            children.chunks(256).for_each(|children| {
-                s.spawn(move |_s| {
-                    for child_id in children {
-                        update_children_transforms_recursive(
-                            qchildren,
-                            &global_tr.0,
-                            *child_id,
-                            pool,
-                        );
-                    }
+    unsafe {
+        let Some((transform, global_tr, children)) = qchildren.fetch_unsafe(child_id) else {
+            // child may have been despawned
+            return;
+        };
+        (*global_tr).0 = parent_tr * &*transform;
+        let global_tr = &*global_tr;
+        if let Some(children) = children {
+            let children = (&*children).0.as_slice();
+            pool.scope(move |s| {
+                children.chunks(256).for_each(|children| {
+                    s.spawn(move |_s| {
+                        for child_id in children {
+                            update_children_transforms_recursive(
+                                qchildren,
+                                &global_tr.0,
+                                *child_id,
+                                pool,
+                            );
+                        }
+                    });
                 });
             });
-        });
+        }
     }
 }
 

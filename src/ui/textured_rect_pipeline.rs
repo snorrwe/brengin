@@ -4,7 +4,7 @@ use std::mem::size_of;
 use crate::assets::{AssetId, Assets, Handle, WeakHandle};
 use crate::renderer::texture::Texture;
 use crate::renderer::{
-    texture, GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass,
+    GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, texture,
 };
 use crate::wgpu::include_wgsl;
 use cecs::prelude::*;
