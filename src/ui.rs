@@ -89,7 +89,8 @@ impl Plugin for UiPlugin {
             .add_system(update_ids)
             .add_system(gc_bounding_boxes.after(draw_bounding_boxes))
             .add_system(shaping_gc_system)
-            .add_system(update_ui_inputs.after(update_ids));
+            .add_system(update_ui_inputs.after(update_ids))
+            .add_system(gc_wants_focus_state_system);
         });
     }
 }
@@ -1988,6 +1989,20 @@ impl<'a> Ui<'a> {
                 rect: content_bounds,
                 inner: (),
             },
+        }
+    }
+
+    /// Mark the given widget as active the first time it appears when no other widget is active
+    pub fn wants_focus(&mut self, id: UiId) {
+        let WidgetInfo { id: this, .. } = self.begin_widget();
+
+        if !self.is_anything_active() {
+            let state =
+                self.get_memory_or_insert::<WantsFocusState>(this, WantsFocusState::default);
+            if !state.consumed {
+                state.consumed = true;
+                self.set_active(id);
+            }
         }
     }
 
@@ -3964,4 +3979,16 @@ pub struct WidgetInfo {
     pub id: UiId,
     pub is_hovered: bool,
     pub is_active: bool,
+}
+
+#[derive(Debug, Default)]
+struct WantsFocusState {
+    consumed: bool,
+}
+
+fn gc_wants_focus_state_system(mut memory: ResMut<UiMemory>, state: Res<UiState>) {
+    let ids: HashSet<_> = state.widget_ids.iter().copied().collect();
+    memory
+        .0
+        .retain(|(id, t), _| t != &TypeId::of::<WantsFocusState>() || ids.contains(id));
 }
