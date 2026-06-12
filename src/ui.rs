@@ -1324,7 +1324,7 @@ impl<'a> Ui<'a> {
                     .as_ref()
                     .unwrap_or(&this.theme.button_default)
                     .clone();
-                if !this.is_anything_active() && this.mouse_down() {
+                if !this.is_anything_dragged() && this.mouse_down() {
                     this.set_active(id);
                 }
             }
@@ -2124,8 +2124,8 @@ impl<'a> Ui<'a> {
                     }
                 }
             }
-        } else if is_hovered {
-            if !self.is_anything_active() && self.mouse_down() {
+        } else if self.is_top_hovered(id) {
+            if !self.is_anything_dragged() && self.mouse_down() {
                 self.set_active(id);
             }
         }
@@ -2209,7 +2209,7 @@ impl<'a> Ui<'a> {
             );
         }
 
-        if is_active && (is_hovered || !self.mouse_up()) {
+        if is_active && (is_hovered || !self.mouse_down()) {
             self.set_active(id);
         }
 
