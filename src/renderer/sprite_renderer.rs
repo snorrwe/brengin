@@ -400,20 +400,26 @@ impl SpritePipeline {
             instances: Default::default(),
         }
     }
+}
 
-    pub fn render(
-        &self,
+struct SpriteRenderCommand;
+
+impl<'a> RenderCommand<'a> for SpriteRenderCommand {
+    type Parameters = Res<'a, SpritePipeline>;
+
+    fn render<'r>(
         RenderCommandInput {
             render_pass,
             camera,
-        }: &mut RenderCommandInput,
+        }: &'r mut RenderCommandInput<'a, 'r>,
+        pipeline: &'r Self::Parameters,
     ) {
-        render_pass.set_pipeline(&self.render_pipeline);
-        for (k, instances) in self.instances.iter().filter(|(_, s)| s.count > 0) {
-            let Some(mesh) = self.meshes.get(&k.mesh) else {
+        render_pass.set_pipeline(&pipeline.render_pipeline);
+        for (k, instances) in pipeline.instances.iter().filter(|(_, s)| s.count > 0) {
+            let Some(mesh) = pipeline.meshes.get(&k.mesh) else {
                 continue;
             };
-            let Some(sheet) = self.sheets.get(&k.sprite_sheet) else {
+            let Some(sheet) = pipeline.sheets.get(&k.sprite_sheet) else {
                 continue;
             };
 
@@ -426,16 +432,6 @@ impl SpritePipeline {
 
             render_pass.draw_indexed(0..mesh.num_indices, 0, 0..instances.count as u32);
         }
-    }
-}
-
-struct SpriteRenderCommand;
-
-impl<'a> RenderCommand<'a> for SpriteRenderCommand {
-    type Parameters = Res<'a, SpritePipeline>;
-
-    fn render<'r>(input: &'r mut RenderCommandInput<'a, 'r>, pipeline: &'r Self::Parameters) {
-        pipeline.render(input)
     }
 }
 
