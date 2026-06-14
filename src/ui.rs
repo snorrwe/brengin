@@ -3562,7 +3562,7 @@ impl<'a> UiRoot<'a> {
             width: width - left - right,
             height: height - top - bottom,
             padding: Some(self.0.theme.padding),
-            dir: LayoutDirection::Center,
+            dir: self.0.ui_state.layout_dir,
             bounds,
         });
 
