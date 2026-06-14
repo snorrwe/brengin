@@ -18,6 +18,7 @@ pub struct CameraSize {
     pub height: u32,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct PerspectiveCamera {
     pub aspect: f32,
     pub fovy: f32,
