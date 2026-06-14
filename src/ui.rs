@@ -2813,9 +2813,7 @@ impl<'a> Ui<'a> {
                         label,
                     });
                 });
-                self.ui_state
-                    .rect_history
-                    .resize_with(history_start, || unreachable!());
+                self.ui_state.rect_history.truncate(history_start);
             }
         } else {
             state.hovered_seconds = 0.0;
