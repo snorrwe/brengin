@@ -3544,7 +3544,6 @@ impl<'a> UiRoot<'a> {
             width,
             height,
         ]));
-        self.0.ui_state.bounds = bounds;
         let scissor = self.0.push_scissor(bounds);
 
         let old_layer = self.0.push_layer();
@@ -3556,6 +3555,16 @@ impl<'a> UiRoot<'a> {
             self.0.ui_state.layer,
             self.0.theme.background.clone(),
         );
+
+        let [left, right, top, bottom] = self.0.theme.padding.as_abs(width, height);
+
+        self.0.ui_state.bounds = layout_rect(RectLayoutDescriptor {
+            width: width - left - right,
+            height: height - top - bottom,
+            padding: Some(self.0.theme.padding),
+            dir: LayoutDirection::Center,
+            bounds,
+        });
 
         ///////////////////////
         self.0.children_content(contents);
