@@ -587,6 +587,7 @@ pub struct PanelDescriptor {
     pub height: UiCoord,
     pub horizonal: HorizontalAlignment,
     pub vertical: VerticalAlignment,
+    pub content_layout: Option<LayoutDirection>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -3562,7 +3563,7 @@ impl<'a> UiRoot<'a> {
             width: width - left - right,
             height: height - top - bottom,
             padding: Some(self.0.theme.padding),
-            dir: self.0.ui_state.layout_dir,
+            dir: desc.content_layout.unwrap_or(self.0.ui_state.layout_dir),
             bounds,
         });
 

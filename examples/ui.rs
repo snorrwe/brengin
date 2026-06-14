@@ -47,6 +47,7 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
             height: UiCoord::Percent(50),
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
+            ..Default::default()
         },
         |ui| {
             ui.grid(4, |cols| {
@@ -111,6 +112,7 @@ fn back(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
             height: UiCoord::Absolute(40),
             horizonal: HorizontalAlignment::Right,
             vertical: VerticalAlignment::Top,
+            ..Default::default()
         },
         |ui| {
             ui.horizontal_rev(None, |ui| {
@@ -130,6 +132,7 @@ fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>, cr: Res<CloseRequest>) {
             height: UiCoord::Percent(50),
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
+            ..Default::default()
         },
         |ui| {
             ui.vertical(HorizontalAlignment::Center, |ui| {
@@ -294,6 +297,7 @@ fn layout_ui(mut ctx: UiRoot) {
             height: 300.into(),
             horizonal: HorizontalAlignment::Left,
             vertical: VerticalAlignment::Top,
+            ..Default::default()
         },
         |ui| {
             ui.vertical(None, |ui| {
@@ -310,6 +314,7 @@ fn layout_ui(mut ctx: UiRoot) {
             height: 300.into(),
             horizonal: HorizontalAlignment::Left,
             vertical: VerticalAlignment::Bottom,
+            ..Default::default()
         },
         |ui| {
             ui.vertical_rev(None, |ui| {
@@ -326,6 +331,7 @@ fn layout_ui(mut ctx: UiRoot) {
             height: 300.into(),
             horizonal: HorizontalAlignment::Right,
             vertical: VerticalAlignment::Bottom,
+            ..Default::default()
         },
         |ui| {
             ui.vertical_rev(HorizontalAlignment::Right, |ui| {
@@ -342,6 +348,7 @@ fn layout_ui(mut ctx: UiRoot) {
             height: 300.into(),
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
+            ..Default::default()
         },
         |ui| {
             ui.vertical_rev(HorizontalAlignment::Center, |ui| {
@@ -361,6 +368,7 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
             height: 300.into(),
             horizonal: HorizontalAlignment::Right,
             vertical: VerticalAlignment::Bottom,
+            ..Default::default()
         },
         |ui| {
             ui.scroll_area(
@@ -392,6 +400,7 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
             height: 400.into(),
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
+            ..Default::default()
         },
         |ui| {
             ui.with_theme_override(
@@ -444,6 +453,7 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
             height: 200.into(),
             horizonal: HorizontalAlignment::Left,
             vertical: VerticalAlignment::Top,
+            ..Default::default()
         },
         |ui| {
             ui.scroll_area(
@@ -466,6 +476,7 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
             height: 200.into(),
             horizonal: HorizontalAlignment::Left,
             vertical: VerticalAlignment::Center,
+            ..Default::default()
         },
         |ui| {
             ui.scroll_area(
