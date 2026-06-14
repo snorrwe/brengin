@@ -3559,9 +3559,20 @@ impl<'a> UiRoot<'a> {
 
         let [left, right, top, bottom] = self.0.theme.padding.as_abs(width, height);
 
+        let mut content_width = width;
+        content_width -= left + right;
+        if content_width <= 0 {
+            content_width = width;
+        }
+        let mut content_height = height;
+        content_height -= top + bottom;
+        if content_height <= 0 {
+            content_height = height;
+        }
+
         self.0.ui_state.bounds = layout_rect(RectLayoutDescriptor {
-            width: width - left - right,
-            height: height - top - bottom,
+            width: content_width,
+            height: content_height,
             padding: Some(self.0.theme.padding),
             dir: desc.content_layout.unwrap_or(self.0.ui_state.layout_dir),
             bounds,
