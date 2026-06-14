@@ -590,6 +590,13 @@ pub enum Stage {
     Render = 5,
 }
 
+#[derive(Default, Debug, Clone, Copy)]
+pub struct Modifiers {
+    pub alt: bool,
+    pub ctrl: bool,
+    pub shift: bool,
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct KeyBoardInputs {
     pub(crate) next: Vec<KeyEvent>,
@@ -597,6 +604,7 @@ pub struct KeyBoardInputs {
     pub just_released: HashSet<KeyCode>,
     pub just_pressed: HashSet<KeyCode>,
     pub events: HashMap<KeyCode, KeyEvent>,
+    pub modifiers: Modifiers,
 }
 
 impl KeyBoardInputs {
@@ -606,6 +614,7 @@ impl KeyBoardInputs {
         self.events.clear();
         self.next.clear();
         self.pressed.clear();
+        self.modifiers = Modifiers::default();
     }
 
     pub fn update(&mut self) {
@@ -616,10 +625,21 @@ impl KeyBoardInputs {
             match ke.state {
                 ElementState::Pressed => {
                     if let PhysicalKey::Code(k) = ke.physical_key {
-                        if !self.pressed.contains(&k) {
+                        if self.pressed.insert(k) {
                             self.just_pressed.insert(k);
+                            match k {
+                                KeyCode::ShiftLeft | KeyCode::ShiftRight => {
+                                    self.modifiers.shift = true;
+                                }
+                                KeyCode::ControlLeft | KeyCode::ControlRight => {
+                                    self.modifiers.ctrl = true;
+                                }
+                                KeyCode::AltLeft | KeyCode::AltRight => {
+                                    self.modifiers.alt = true;
+                                }
+                                _ => {}
+                            }
                         }
-                        self.pressed.insert(k);
                         self.events.insert(k, ke);
                     }
                 }

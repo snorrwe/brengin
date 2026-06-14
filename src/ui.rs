@@ -1667,9 +1667,7 @@ impl<'a> Ui<'a> {
                 }
                 if dt != 0.0 {
                     let t;
-                    if self.keyboard.pressed.contains(&KeyCode::ShiftLeft)
-                        || self.keyboard.pressed.contains(&KeyCode::ShiftRight)
-                    {
+                    if self.keyboard.modifiers.shift {
                         self.ui_inputs.keys.insert(KeyCode::ShiftLeft);
                         self.ui_inputs.keys.insert(KeyCode::ShiftRight);
 
@@ -2139,8 +2137,22 @@ impl<'a> Ui<'a> {
                         changed = true;
                         state.cursor += 1;
                     }
-                    // TODO: ctrl + c, ctrl + v, ctrl + a, selecting with shift
-                    _ => {
+                    // TODO: ctrl + a, selecting with shift
+                    _ => 'handler: {
+                        self.ui_inputs.keys.insert(*k);
+                        if self.keyboard.modifiers.ctrl {
+                            self.ui_inputs.keys.insert(KeyCode::ControlLeft);
+                            self.ui_inputs.keys.insert(KeyCode::ControlRight);
+                            if let KeyCode::KeyC = k {
+                                // TODO: copy
+                                break 'handler;
+                            }
+                            if let KeyCode::KeyV = k {
+                                // TODO: paste
+                                break 'handler;
+                            }
+                        }
+
                         if let Some(text) = self
                             .keyboard
                             .events
