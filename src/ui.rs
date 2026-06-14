@@ -2757,7 +2757,10 @@ impl<'a> Ui<'a> {
     }
 
     pub fn tooltip(&mut self, desc: TooltipDescriptor) {
-        let bounds = self.ui_state.scissors[0];
+        let mut bounds = self.ui_state.scissors[0];
+        bounds.min_x = desc.x;
+        bounds.min_y = desc.y;
+
         let old_bounds = std::mem::replace(&mut self.ui_state.bounds, bounds);
         let old_scissor = self.push_scissor(self.ui_state.scissors[0]);
         let old_layer = std::mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER);
@@ -2765,9 +2768,6 @@ impl<'a> Ui<'a> {
         let ids = self.ui_state.widget_ids.len();
 
         self.begin_widget();
-
-        self.ui_state.bounds.min_x = desc.x;
-        self.ui_state.bounds.min_y = desc.y;
 
         ///////////////
         self.with_outline(
