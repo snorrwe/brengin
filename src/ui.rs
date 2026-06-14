@@ -2761,6 +2761,10 @@ impl<'a> Ui<'a> {
         let old_bounds = std::mem::replace(&mut self.ui_state.bounds, bounds);
         let old_scissor = self.push_scissor(self.ui_state.scissors[0]);
         let old_layer = std::mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER);
+        let history_start = self.ui_state.rect_history.len();
+        let ids = self.ui_state.widget_ids.len();
+
+        self.begin_widget();
 
         self.ui_state.bounds.min_x = desc.x;
         self.ui_state.bounds.min_y = desc.y;
@@ -2781,6 +2785,12 @@ impl<'a> Ui<'a> {
         );
         ///////////////
 
+        // tooltip should not be considered in layouting
+        let children_ids: Vec<_> = self.ui_state.widget_ids[ids..].iter().copied().collect();
+        for id in children_ids {
+            self.ui_state.bounding_boxes.remove(&id);
+        }
+        self.ui_state.rect_history.truncate(history_start);
         self.ui_state.bounds = old_bounds;
         self.ui_state.scissor_idx = old_scissor;
         self.ui_state.layer = old_layer;
@@ -2799,7 +2809,6 @@ impl<'a> Ui<'a> {
         if self.contains_mouse(id) {
             state.hovered_seconds += self.delta_time.0.as_secs_f32();
             if state.hovered_seconds > 0.8 {
-                let history_start = self.ui_state.rect_history.len();
                 let mouse = self.mouse.cursor_position;
 
                 let pos = state
@@ -2813,7 +2822,6 @@ impl<'a> Ui<'a> {
                         label,
                     });
                 });
-                self.ui_state.rect_history.truncate(history_start);
             }
         } else {
             state.hovered_seconds = 0.0;
