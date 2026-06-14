@@ -2011,6 +2011,7 @@ impl<'a> Ui<'a> {
         self.input_string_impl(InputStringDescriptor {
             content,
             password: false,
+            multiline: false,
         })
     }
 
@@ -2018,6 +2019,7 @@ impl<'a> Ui<'a> {
         self.input_string_impl(InputStringDescriptor {
             content,
             password: true,
+            multiline: false,
         })
     }
 
@@ -2123,6 +2125,19 @@ impl<'a> Ui<'a> {
                                 changed = true;
                             }
                         });
+                    }
+                    KeyCode::Enter if desc.multiline => {
+                        self.ui_inputs.keys.insert(*k);
+                        desc.content.insert_str(state.cursor, "\n");
+                        changed = true;
+                        state.cursor += 1;
+                    }
+                    // for single-line inputs use tab as a means to jump to the next input
+                    KeyCode::Tab if desc.multiline => {
+                        self.ui_inputs.keys.insert(*k);
+                        desc.content.insert_str(state.cursor, "\t");
+                        changed = true;
+                        state.cursor += 1;
                     }
                     // TODO: ctrl + c, ctrl + v, ctrl + a, selecting with shift
                     _ => {
@@ -3937,6 +3952,7 @@ pub fn align_rect(
 struct InputStringDescriptor<'a> {
     content: &'a mut String,
     password: bool,
+    multiline: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
