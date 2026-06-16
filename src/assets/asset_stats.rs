@@ -1,6 +1,6 @@
 use std::{
     any::{TypeId, type_name},
-    collections::HashMap,
+    collections::BTreeMap,
     marker::PhantomData,
     sync::atomic::Ordering,
 };
@@ -46,7 +46,7 @@ fn update_stats_system<T: 'static>(assets: Res<Assets<T>>, mut stats: ResMut<Ass
 
 #[derive(Default)]
 pub struct AssetStats {
-    pub references: HashMap<TypeId, AssetStatsEntry>,
+    pub references: BTreeMap<TypeId, AssetStatsEntry>,
 }
 
 pub struct AssetStatsPlugin<T> {
