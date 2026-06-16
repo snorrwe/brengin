@@ -1,3 +1,4 @@
+#[cfg(feature = "assets-stats")]
 pub mod asset_stats;
 
 use cecs::{Component, prelude::*};
@@ -276,7 +277,7 @@ impl<T> Default for AssetsPlugin<T> {
 
 impl<T: Component> Plugin for AssetsPlugin<T> {
     fn build(self, app: &mut crate::App) {
-        // TODO: feature flag
+        #[cfg(feature = "assets-stats")]
         app.require_plugin(asset_stats::AssetStatsPlugin::<T>::default());
 
         app.insert_resource(Assets::<T>::default());
