@@ -1,3 +1,5 @@
+pub mod asset_stats;
+
 use cecs::{Component, prelude::*};
 use std::{
     collections::HashMap,
@@ -274,8 +276,11 @@ impl<T> Default for AssetsPlugin<T> {
 
 impl<T: Component> Plugin for AssetsPlugin<T> {
     fn build(self, app: &mut crate::App) {
+        // TODO: feature flag
+        app.require_plugin(asset_stats::AssetStatsPlugin::<T>::default());
+
         app.insert_resource(Assets::<T>::default());
-        app.with_stage(crate::Stage::Update, |s| {
+        app.with_stage(crate::Stage::PostUpdate, |s| {
             s.add_system(gc_assets::<T>);
         });
     }
