@@ -3143,7 +3143,7 @@ pub struct Columns<'a> {
     ctx: NonNull<Ui<'a>>,
     cols: u32,
     /// [x start, x end, offset][cols]
-    dims: Vec<[i32; 3]>,
+    dims: smallvec::SmallVec<[[i32; 3]; 8]>,
 }
 
 impl<'a> Columns<'a> {
