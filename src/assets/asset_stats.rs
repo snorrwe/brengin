@@ -42,6 +42,8 @@ fn update_stats_system<T: 'static>(assets: Res<Assets<T>>, mut stats: ResMut<Ass
         data += d.data_references.load(Ordering::Relaxed);
         weak += d.weak_references.load(Ordering::Relaxed);
     });
+    entry.data_references = data;
+    entry.weak_references = weak;
 }
 
 #[derive(Default)]
