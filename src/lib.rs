@@ -597,6 +597,14 @@ pub struct Modifiers {
     pub shift: bool,
 }
 
+impl Modifiers {
+    pub fn clear(&mut self) {
+        self.alt = false;
+        self.ctrl = false;
+        self.shift = false;
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct KeyBoardInputs {
     pub(crate) next: Vec<KeyEvent>,
@@ -621,6 +629,7 @@ impl KeyBoardInputs {
         self.just_released.clear();
         self.just_pressed.clear();
         self.events.clear();
+        self.modifiers.clear();
         for ke in self.next.drain(..) {
             match ke.state {
                 ElementState::Pressed => {
@@ -684,10 +693,9 @@ impl MouseInputs {
         for (k, state) in self.next.iter() {
             match state {
                 ElementState::Pressed => {
-                    if !self.pressed.contains(k) {
+                    if self.pressed.insert(*k) {
                         self.just_pressed.insert(*k);
                     }
-                    self.pressed.insert(*k);
                 }
                 ElementState::Released => {
                     self.pressed.remove(k);
