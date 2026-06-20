@@ -181,8 +181,7 @@ fn load_sprite_sheet(
     assets: &mut Assets<SpriteSheet>,
 ) -> Handle<SpriteSheet> {
     let image = image::load_from_memory(bytes).expect("Failed to load spritesheet");
-    let mut sprite_sheet = SpriteSheet::from_grid(Vec2::ZERO, box_size, num_cols, image);
-    sprite_sheet.mask_color = Some(Color::from_rgb(0xFBF236));
+    let sprite_sheet = SpriteSheet::from_grid(Vec2::ZERO, box_size, num_cols, image);
 
     assets.insert(sprite_sheet)
 }

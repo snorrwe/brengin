@@ -219,7 +219,9 @@ struct RenderSpritesheetHandles(pub HashMap<AssetId, WeakHandle<SpriteSheet>>);
 pub struct SpriteRenderingData {
     pub spritesheet_gpu: wgpu::BindGroup,
     pub texture_bind_group: wgpu::BindGroup,
+    pub mask_bind_group: Option<wgpu::BindGroup>,
     pub texture: Texture,
+    pub mask: Option<Texture>,
 }
 
 struct SpriteInstances {
@@ -235,6 +237,7 @@ pub struct SpritePipeline {
     // shared
     render_pipeline: wgpu::RenderPipeline,
     sprite_sheet_layout: wgpu::BindGroupLayout,
+    default_mask_bind_group: wgpu::BindGroup,
 }
 
 impl SpritePipeline {
@@ -243,6 +246,14 @@ impl SpritePipeline {
     }
 
     pub fn add_sheet(&mut self, id: AssetId, sheet: &SpriteSheet, renderer: &GraphicsState) {
+        let mask = sheet.mask.as_ref().map(|m| {
+            Texture::from_image(renderer.device(), renderer.queue(), m, None)
+                .expect("Failed to create mask texture")
+        });
+        let mask_bind_group = mask
+            .as_ref()
+            .map(|m| texture_to_bindings(&renderer.device, m).1);
+
         let texture = Texture::from_image(renderer.device(), renderer.queue(), &sheet.image, None)
             .expect("Failed to create texture");
 
@@ -275,6 +286,8 @@ impl SpritePipeline {
                 spritesheet_gpu,
                 texture_bind_group: spritesheet_bind_group,
                 texture,
+                mask_bind_group,
+                mask,
             },
         );
     }
@@ -310,6 +323,7 @@ impl SpritePipeline {
                     label: Some("Sprite Render Pipeline Layout"),
                     bind_group_layouts: &[
                         Some(&renderer.camera_bind_group_layout),
+                        Some(&texture_bind_group_layout),
                         Some(&texture_bind_group_layout),
                         Some(&sprite_sheet_layout),
                     ],
@@ -392,12 +406,19 @@ impl SpritePipeline {
             },
         );
 
+        let texture =
+            Texture::from_rgba8(&renderer.device, &renderer.queue, &[0x0; 4], (1, 1), None)
+                .unwrap();
+
+        let (_, default_mask_bind_group) = texture_to_bindings(&renderer.device, &texture);
+
         SpritePipeline {
             sheets: Default::default(),
             meshes,
             sprite_sheet_layout,
             render_pipeline,
             instances: Default::default(),
+            default_mask_bind_group,
         }
     }
 }
@@ -425,7 +446,15 @@ impl<'a> RenderCommand<'a> for SpriteRenderCommand {
 
             render_pass.set_bind_group(0, *camera, &[]);
             render_pass.set_bind_group(1, &sheet.texture_bind_group, &[]);
-            render_pass.set_bind_group(2, &sheet.spritesheet_gpu, &[]);
+            match sheet.mask_bind_group.as_ref() {
+                Some(bg) => {
+                    render_pass.set_bind_group(2, bg, &[]);
+                }
+                None => {
+                    render_pass.set_bind_group(2, &pipeline.default_mask_bind_group, &[]);
+                }
+            }
+            render_pass.set_bind_group(3, &sheet.spritesheet_gpu, &[]);
             render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
             render_pass.set_vertex_buffer(1, instances.instance_gpu.slice(..));
             render_pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);

@@ -31,8 +31,7 @@ pub struct SpriteSheetGpu {
     pub box_size: [f32; 2],
     pub size: [f32; 2],
     pub num_cols: u32,
-    /// rgb color to mask by instances
-    pub mask_color: u32,
+    pub _pad: u32,
 }
 
 pub struct SpriteSheet {
@@ -45,9 +44,8 @@ pub struct SpriteSheet {
     pub image: DynamicImage,
     /// Size of the entire sheet
     pub size: Vec2,
-    /// Color to mask by each instance's color.
-    /// Transparent black is not supported
-    pub mask_color: Option<Color>,
+    /// Binary image with the same dimensions as image
+    pub mask: Option<DynamicImage>,
 }
 
 fn lerp(a: f32, b: f32, t: f32) -> f32 {
@@ -68,7 +66,7 @@ impl SpriteSheet {
             num_cols,
             size: Vec2::new(image.width() as f32, image.height() as f32),
             image,
-            mask_color: None,
+            mask: None,
         }
     }
 
@@ -78,7 +76,7 @@ impl SpriteSheet {
             box_size: self.box_size.to_array(),
             num_cols: self.num_cols,
             size: self.size.to_array(),
-            mask_color: self.mask_color.map(|c| c.0 >> 8).unwrap_or(0),
+            _pad: 0,
         }
     }
 

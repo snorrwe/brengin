@@ -14,16 +14,19 @@ var<uniform> camera: Camera;
 var texture: texture_2d<f32>;
 @group(1) @binding(1)
 var texture_sampler: sampler;
+@group(2) @binding(0)
+var mask: texture_2d<f32>;
+@group(2) @binding(1)
+var mask_sampler: sampler;
 
 struct SpriteSheet {
     padding: vec2<f32>,
     box_size: vec2<f32>,
     image_size: vec2<f32>,
     num_cols: u32,
-    mask_color: u32,
 }
 
-@group(2) @binding(0)
+@group(3) @binding(0)
 var<uniform> sprite_sheet: SpriteSheet;
 
 struct Vertex {
@@ -118,10 +121,6 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
     out.color = parse_rgb(instance.color_flip >> 8);
-    let mask = parse_rgb(sprite_sheet.mask_color);
-    if dot(mask, mask) != 0 {
-        out.mask_oklab = linear_srgb_to_oklab(mask);
-    }
 
     let row: u32 = instance.sprite_index / sprite_sheet.num_cols;
     let col: u32 = instance.sprite_index - sprite_sheet.num_cols * row;
@@ -156,12 +155,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if color.a < 0.2 {
         discard;
     }
-    // mask the color with the instance color
-    if dot(in.mask_oklab, in.mask_oklab) != 0 {
-        let color_oklab = linear_srgb_to_oklab(color.rgb);
-        let t = length(color_oklab - in.mask_oklab) / length(in.mask_oklab);
-        let rgb = lerp_vec3(in.color, color.rgb, vec3(t));
-        color = vec4<f32>(rgb, color.a);
+
+    let mask = textureSample(mask, mask_sampler, in.uv);
+    if mask.x > 0.5 {
+        color = vec4(in.color, color.a);
     }
+
     return color;
 }
