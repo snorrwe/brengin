@@ -157,9 +157,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     let mask = textureSample(mask, mask_sampler, in.uv);
-    if mask.r > 0.5 {
-        color = vec4(in.color, color.a) * mask.a;
-    }
-
-    return color;
+    let mask_alpha = mask.r;
+    return vec4(mix(color.rgb, in.color, mask_alpha), color.a);
 }
