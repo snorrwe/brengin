@@ -145,6 +145,11 @@ impl Transform {
         self.pos + self.rot * (pos * self.scale)
     }
 
+    /// Apply the transform to the point in reverse
+    pub fn inverse_point(&self, pos: Vec3) -> Vec3 {
+        self.rot.inverse() * (pos - self.pos) / self.scale
+    }
+
     pub fn from_scale(scale: Vec3) -> Self {
         Self {
             scale,
