@@ -132,15 +132,6 @@ impl Transform {
         glam::Mat4::from_scale_rotation_translation(self.scale, self.rot, self.pos)
     }
 
-    pub fn inverse(&self) -> Self {
-        debug_assert!(self.rot.is_normalized());
-        Self {
-            pos: -self.pos,
-            scale: 1.0 / self.scale,
-            rot: self.rot.conjugate(),
-        }
-    }
-
     pub fn transform_point(&self, pos: Vec3) -> Vec3 {
         self.pos + self.rot * (pos * self.scale)
     }
