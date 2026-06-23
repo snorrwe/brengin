@@ -622,7 +622,7 @@ impl KeyBoardInputs {
         self.events.clear();
         self.next.clear();
         self.pressed.clear();
-        self.modifiers = Modifiers::default();
+        self.modifiers.clear();
     }
 
     pub fn update(&mut self) {
