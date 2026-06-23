@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use cecs::prelude::*;
 use glam::{Quat, Vec3};
 
