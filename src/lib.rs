@@ -629,25 +629,12 @@ impl KeyBoardInputs {
         self.just_released.clear();
         self.just_pressed.clear();
         self.events.clear();
-        self.modifiers.clear();
         for ke in self.next.drain(..) {
             match ke.state {
                 ElementState::Pressed => {
                     if let PhysicalKey::Code(k) = ke.physical_key {
                         if self.pressed.insert(k) {
                             self.just_pressed.insert(k);
-                            match k {
-                                KeyCode::ShiftLeft | KeyCode::ShiftRight => {
-                                    self.modifiers.shift = true;
-                                }
-                                KeyCode::ControlLeft | KeyCode::ControlRight => {
-                                    self.modifiers.ctrl = true;
-                                }
-                                KeyCode::AltLeft | KeyCode::AltRight => {
-                                    self.modifiers.alt = true;
-                                }
-                                _ => {}
-                            }
                         }
                         self.events.insert(k, ke);
                     }
@@ -659,6 +646,22 @@ impl KeyBoardInputs {
                         self.events.insert(k, ke);
                     }
                 }
+            }
+        }
+        self.modifiers.clear();
+        for k in [KeyCode::ShiftLeft, KeyCode::ShiftRight] {
+            if self.pressed.contains(&k) {
+                self.modifiers.shift = true;
+            }
+        }
+        for k in [KeyCode::ControlLeft, KeyCode::ControlRight] {
+            if self.pressed.contains(&k) {
+                self.modifiers.ctrl = true;
+            }
+        }
+        for k in [KeyCode::AltLeft, KeyCode::AltRight] {
+            if self.pressed.contains(&k) {
+                self.modifiers.alt = true;
             }
         }
     }
