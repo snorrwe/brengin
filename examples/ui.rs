@@ -74,9 +74,16 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                                         );
                                     },
                                     |ui, _| {
-                                        ui.allocate_area(128.into(), 128.into(), |ui| {
-                                            ui.label(format!("col - {col} row - {row}"));
-                                        });
+                                        ui.allocate_area(
+                                            brengin::ui::AreaDescriptor {
+                                                width: 128.into(),
+                                                height: 128.into(),
+                                                scroll_on_overflow: false,
+                                            },
+                                            |ui| {
+                                                ui.label(format!("col - {col} row - {row}"));
+                                            },
+                                        );
                                     },
                                 );
                             });

@@ -2677,8 +2677,11 @@ impl<'a> Ui<'a> {
 
     pub fn allocate_area(
         &mut self,
-        width: UiCoord,
-        height: UiCoord,
+        AreaDescriptor {
+            width,
+            height,
+            scroll_on_overflow: _,
+        }: AreaDescriptor,
         contents: impl FnMut(&mut Self),
     ) {
         let WidgetInfo { id, .. } = self.begin_widget();
@@ -2694,11 +2697,14 @@ impl<'a> Ui<'a> {
         self.ui_state.bounds.offset_x(bounds.min_x - min_x);
         self.ui_state.bounds.offset_y(bounds.min_y - min_y);
 
+        let scissor = self.push_scissor(self.ui_state.bounds);
+
         let history_start = self.ui_state.rect_history.len();
 
         self.children_content(contents);
 
         self.ui_state.bounds = bounds;
+        self.ui_state.scissor_idx = scissor;
 
         let bounds = self.history_bounding_rect(history_start);
         self.submit_rect(id, bounds, self.theme.padding);
@@ -4048,4 +4054,11 @@ fn gc_wants_focus_state_system(mut memory: ResMut<UiMemory>, state: Res<UiState>
     memory
         .0
         .retain(|(id, t), _| t != &TypeId::of::<WantsFocusState>() || ids.contains(id));
+}
+
+#[derive(Debug, Default)]
+pub struct AreaDescriptor {
+    pub width: UiCoord,
+    pub height: UiCoord,
+    pub scroll_on_overflow: bool,
 }
