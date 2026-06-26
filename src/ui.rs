@@ -2697,17 +2697,15 @@ impl<'a> Ui<'a> {
         self.ui_state.bounds.offset_x(bounds.min_x - min_x);
         self.ui_state.bounds.offset_y(bounds.min_y - min_y);
 
-        let scissor = self.push_scissor(self.ui_state.bounds);
-
-        let history_start = self.ui_state.rect_history.len();
+        let target_bounds = self.ui_state.bounds;
+        let scissor = self.push_scissor(target_bounds);
 
         self.children_content(contents);
 
         self.ui_state.bounds = bounds;
         self.ui_state.scissor_idx = scissor;
 
-        let bounds = self.history_bounding_rect(history_start);
-        self.submit_rect(id, bounds, self.theme.padding);
+        self.submit_rect(id, target_bounds, self.theme.padding);
     }
 
     /// Add a margin around the inner contents
