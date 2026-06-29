@@ -53,6 +53,11 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
 }
 
 impl SpriteSheet {
+    pub fn with_mask(mut self, mask: impl Into<Option<DynamicImage>>) -> Self {
+        self.mask = mask.into();
+        self
+    }
+
     #[deprecated = "Use from_grid instead"]
     pub fn from_image(padding: Vec2, box_size: Vec2, num_cols: u32, image: DynamicImage) -> Self {
         Self::from_grid(padding, box_size, num_cols, image)
