@@ -3205,6 +3205,20 @@ impl<'a> Columns<'a> {
         ctx.ui_state.layer = layer;
     }
 
+    pub fn label(&mut self, col: u32, contents: impl Into<String>) {
+        let contents = contents.into();
+        self.column(col, move |ui| {
+            ui.label(contents);
+        });
+    }
+
+    pub fn label_span(&mut self, span: impl RangeBounds<usize>, contents: impl Into<String>) {
+        let contents = contents.into();
+        self.span(span, move |ui| {
+            ui.label(contents);
+        });
+    }
+
     /// Call after each row in the grid to ensure that rows align correctly.
     pub fn end_row(&mut self) {
         let offset = self.dims.iter().map(|x| x[2]).max().unwrap_or(0);
