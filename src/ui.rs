@@ -3151,12 +3151,12 @@ pub struct Columns<'a> {
 }
 
 impl<'a> Columns<'a> {
-    pub fn column(&mut self, i: u32, contents: impl FnMut(&mut Ui)) {
+    pub fn column(&mut self, i: u32, contents: impl FnOnce(&mut Ui)) {
         assert!(i < self.cols);
         self.span(i as usize..=i as usize, contents);
     }
 
-    pub fn span(&mut self, span: impl RangeBounds<usize>, mut contents: impl FnMut(&mut Ui)) {
+    pub fn span(&mut self, span: impl RangeBounds<usize>, contents: impl FnOnce(&mut Ui)) {
         // setup
         let ctx = unsafe { self.ctx.as_mut() };
         let start = match span.start_bound() {
