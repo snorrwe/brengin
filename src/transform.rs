@@ -355,17 +355,19 @@ unsafe fn update_children_transforms_recursive(
     parent_tr: &Transform,
     child_id: EntityId,
 ) {
-    let Some((transform, global_tr, children)) = qchildren.fetch_unsafe(child_id) else {
-        // child may have been despawned
-        return;
-    };
-    (*global_tr).0 = parent_tr * &*transform;
-    let global_tr = &*global_tr;
-    if let Some(children) = children {
-        let children = (&*children).0.as_slice();
-        children.iter().for_each(|child_id| {
-            update_children_transforms_recursive(qchildren, &global_tr.0, *child_id);
-        });
+    unsafe {
+        let Some((transform, global_tr, children)) = qchildren.fetch_unsafe(child_id) else {
+            // child may have been despawned
+            return;
+        };
+        (*global_tr).0 = parent_tr * &*transform;
+        let global_tr = &*global_tr;
+        if let Some(children) = children {
+            let children = (&*children).0.as_slice();
+            children.iter().for_each(|child_id| {
+                update_children_transforms_recursive(qchildren, &global_tr.0, *child_id);
+            });
+        }
     }
 }
 
