@@ -2280,7 +2280,6 @@ impl<'a> Ui<'a> {
     pub fn with_outline(
         &mut self,
         OutlineDescriptor {
-            fill_color,
             outline_color,
             outline_radius,
         }: OutlineDescriptor,
@@ -2312,7 +2311,10 @@ impl<'a> Ui<'a> {
         // a lot of transparent pixels
         self.color_rect_from_rect_with_outline(
             rect,
-            fill_color,
+            match self.theme().context_background {
+                ThemeEntry::Color(color) => color,
+                ThemeEntry::Image(_) => self.theme().secondary_color,
+            },
             layer,
             outline_color,
             outline_radius,
@@ -2772,10 +2774,6 @@ impl<'a> Ui<'a> {
         ///////////////
         self.with_outline(
             OutlineDescriptor {
-                fill_color: match self.theme().context_background {
-                    ThemeEntry::Color(color) => color,
-                    ThemeEntry::Image(_) => self.theme().secondary_color,
-                },
                 outline_color: Color::BLACK,
                 outline_radius: 1,
             },
@@ -3985,7 +3983,6 @@ struct InputStringDescriptor<'a> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct OutlineDescriptor {
-    pub fill_color: Color,
     pub outline_color: Color,
     pub outline_radius: u32,
 }
@@ -3993,7 +3990,6 @@ pub struct OutlineDescriptor {
 impl Default for OutlineDescriptor {
     fn default() -> Self {
         Self {
-            fill_color: Color::TRANSPARENT_BLACK,
             outline_color: Color::BLACK,
             outline_radius: 1,
         }
