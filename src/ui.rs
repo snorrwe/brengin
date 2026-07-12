@@ -777,7 +777,7 @@ impl<'a> Ui<'a> {
     pub fn horizontal(
         &mut self,
         vertical_alignment: impl Into<Option<VerticalAlignment>>,
-        contents: impl FnMut(&mut Self),
+        contents: impl FnOnce(&mut Self),
     ) {
         self._with_layout(
             contents,
@@ -788,7 +788,7 @@ impl<'a> Ui<'a> {
     pub fn horizontal_rev(
         &mut self,
         vertical_alignment: impl Into<Option<VerticalAlignment>>,
-        contents: impl FnMut(&mut Self),
+        contents: impl FnOnce(&mut Self),
     ) {
         self._with_layout(
             contents,
@@ -799,7 +799,7 @@ impl<'a> Ui<'a> {
     pub fn vertical(
         &mut self,
         horizontal_alignment: impl Into<Option<HorizontalAlignment>>,
-        contents: impl FnMut(&mut Self),
+        contents: impl FnOnce(&mut Self),
     ) {
         self._with_layout(
             contents,
@@ -814,7 +814,7 @@ impl<'a> Ui<'a> {
     pub fn vertical_rev(
         &mut self,
         horizontal_alignment: impl Into<Option<HorizontalAlignment>>,
-        contents: impl FnMut(&mut Self),
+        contents: impl FnOnce(&mut Self),
     ) {
         self._with_layout(
             contents,
@@ -826,7 +826,7 @@ impl<'a> Ui<'a> {
         );
     }
 
-    fn _with_layout(&mut self, contents: impl FnMut(&mut Self), layout: LayoutDirection) {
+    fn _with_layout(&mut self, contents: impl FnOnce(&mut Self), layout: LayoutDirection) {
         let WidgetInfo { id, .. } = self.begin_widget();
         let history_start = self.ui_state.rect_history.len();
         let bounds = self.ui_state.bounds;
@@ -841,7 +841,7 @@ impl<'a> Ui<'a> {
 
     /// If `hide` is true, then the inner contents are not rendered
     /// Useful for keeping the Id stack consistent
-    pub fn hidden(&mut self, hide: bool, mut contents: impl FnMut(&mut Self)) {
+    pub fn hidden(&mut self, hide: bool, contents: impl FnOnce(&mut Self)) {
         let _id = self.begin_widget();
         if !hide {
             self.push_child();
@@ -865,7 +865,7 @@ impl<'a> Ui<'a> {
         rect
     }
 
-    pub fn grid<'b>(&mut self, columns: u32, mut contents: impl FnMut(&mut Columns) + 'b)
+    pub fn grid<'b>(&mut self, columns: u32, contents: impl FnOnce(&mut Columns) + 'b)
     where
         'a: 'b,
     {
@@ -1069,7 +1069,7 @@ impl<'a> Ui<'a> {
         (handle.clone(), shape)
     }
 
-    pub fn with_theme(&mut self, theme: Theme, mut contents: impl FnMut(&mut Self)) {
+    pub fn with_theme(&mut self, theme: Theme, contents: impl FnOnce(&mut Self)) {
         let t = std::mem::replace(&mut *self.theme, theme);
 
         ///////////////////////
@@ -1079,11 +1079,7 @@ impl<'a> Ui<'a> {
         *self.theme = t;
     }
 
-    pub fn with_theme_override(
-        &mut self,
-        theme: ThemeOverride,
-        mut contents: impl FnMut(&mut Self),
-    ) {
+    pub fn with_theme_override(&mut self, theme: ThemeOverride, contents: impl FnOnce(&mut Self)) {
         let theme = theme.apply(&mut self.theme);
 
         ///////////////////////
@@ -1634,7 +1630,7 @@ impl<'a> Ui<'a> {
         self.ui_state.bounding_boxes.insert(id, control_box);
     }
 
-    pub fn scroll_area(&mut self, desc: ScrollDescriptor, contents: impl FnMut(&mut Self)) {
+    pub fn scroll_area(&mut self, desc: ScrollDescriptor, contents: impl FnOnce(&mut Self)) {
         let WidgetInfo { id, is_hovered, .. } = self.begin_widget();
         let width = desc
             .width
@@ -1816,7 +1812,7 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub fn drag_source(&mut self, mut contents: impl FnMut(&mut Self, &DragState)) -> DragResponse {
+    pub fn drag_source(&mut self, contents: impl FnOnce(&mut Self, &DragState)) -> DragResponse {
         let WidgetInfo {
             id,
             is_hovered,
@@ -1926,13 +1922,13 @@ impl<'a> Ui<'a> {
         l
     }
 
-    pub fn on_next_layer(&mut self, mut contents: impl FnMut(&mut Self)) {
+    pub fn on_next_layer(&mut self, contents: impl FnOnce(&mut Self)) {
         let l = self.push_layer();
         contents(self);
         self.ui_state.layer = l;
     }
 
-    pub fn drop_target(&mut self, mut contents: impl FnMut(&mut Self, DropState)) -> DropResponse {
+    pub fn drop_target(&mut self, contents: impl FnOnce(&mut Self, DropState)) -> DropResponse {
         let WidgetInfo { id, is_hovered, .. } = self.begin_widget();
         let old_bounds = self.ui_state.bounds;
         let bg_layer = self.push_layer();
@@ -2288,7 +2284,7 @@ impl<'a> Ui<'a> {
             outline_color,
             outline_radius,
         }: OutlineDescriptor,
-        content: impl FnMut(&mut Self),
+        content: impl FnOnce(&mut Self),
     ) {
         let WidgetInfo { id, .. } = self.begin_widget();
         let last_layer = self.push_layer();
@@ -2345,7 +2341,7 @@ impl<'a> Ui<'a> {
     fn context_menu_from_response<'b>(
         &'b mut self,
         resp: Response<()>,
-        mut context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
+        context_menu: impl FnOnce(&mut Self, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
         let parent_id = resp.id;
         let contains_mouse = self.contains_mouse(parent_id);
@@ -2629,8 +2625,8 @@ impl<'a> Ui<'a> {
 
     pub fn context_menu<'b>(
         &'b mut self,
-        contents: impl FnMut(&mut Self) + 'b,
-        context_menu: impl FnMut(&mut Self, &mut ContextMenuState) + 'b,
+        contents: impl FnOnce(&mut Self) + 'b,
+        context_menu: impl FnOnce(&mut Self, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
         let WidgetInfo { id, is_hovered, .. } = self.begin_widget();
 
@@ -2682,7 +2678,7 @@ impl<'a> Ui<'a> {
             height,
             scroll_on_overflow: _,
         }: AreaDescriptor,
-        contents: impl FnMut(&mut Self),
+        contents: impl FnOnce(&mut Self),
     ) {
         let WidgetInfo { id, .. } = self.begin_widget();
         let bounds = self.ui_state.bounds;
@@ -2709,7 +2705,7 @@ impl<'a> Ui<'a> {
     }
 
     /// Add a margin around the inner contents
-    pub fn margin(&mut self, m: Padding, contents: impl FnMut(&mut Self)) {
+    pub fn margin(&mut self, m: Padding, contents: impl FnOnce(&mut Self)) {
         let WidgetInfo { id, .. } = self.begin_widget();
         let bounds = self.ui_state.bounds;
         self.ui_state.bounds = layout_rect(RectLayoutDescriptor {
@@ -2731,7 +2727,7 @@ impl<'a> Ui<'a> {
     }
 
     /// Add background to the widget. If background is None, then the Theme background is used
-    pub fn background(&mut self, background: Option<ThemeEntry>, contents: impl FnMut(&mut Self)) {
+    pub fn background(&mut self, background: Option<ThemeEntry>, contents: impl FnOnce(&mut Self)) {
         let WidgetInfo { id, .. } = self.begin_widget();
         let history_start = self.ui_state.rect_history.len();
         let layer = self.push_layer();
@@ -2752,7 +2748,7 @@ impl<'a> Ui<'a> {
         self.submit_rect(id, bounds, self.theme.padding);
     }
 
-    fn children_content(&mut self, mut contents: impl FnMut(&mut Self)) {
+    fn children_content(&mut self, contents: impl FnOnce(&mut Self)) {
         let layer = self.push_layer();
         self.push_child();
         contents(self);
@@ -2800,7 +2796,7 @@ impl<'a> Ui<'a> {
         self.ui_state.layer = old_layer;
     }
 
-    pub fn with_tooltip(&mut self, contents: impl FnMut(&mut Self), label: &str) {
+    pub fn with_tooltip(&mut self, contents: impl FnOnce(&mut Self), label: &str) {
         let WidgetInfo { id, .. } = self.begin_widget();
         let history_start = self.ui_state.rect_history.len();
         self.children_content(contents);
@@ -3124,7 +3120,7 @@ impl<T> Response<T> {
     pub fn context_menu<'a, 'b>(
         &self,
         ui: &'b mut Ui<'a>,
-        context_menu: impl FnMut(&mut Ui<'a>, &mut ContextMenuState) + 'b,
+        context_menu: impl FnOnce(&mut Ui<'a>, &mut ContextMenuState) + 'b,
     ) -> ContextMenuResponse<'b, 'a> {
         ui.context_menu_from_response(self.map_unit(), context_menu)
     }
@@ -3437,7 +3433,7 @@ impl WindowAllocator {
 }
 
 impl<'a> UiRoot<'a> {
-    pub fn window(&mut self, desc: WindowDescriptor, mut contents: impl FnMut(&mut Ui)) {
+    pub fn window(&mut self, desc: WindowDescriptor, contents: impl FnOnce(&mut Ui)) {
         let mut allocator = std::mem::take(&mut self.0.ui_state.window_allocator);
         let old_bounds = self.0.ui_state.bounds;
         let state: &mut WindowState = self
@@ -3558,7 +3554,7 @@ impl<'a> UiRoot<'a> {
         self.0.ui_state.window_allocator = allocator;
     }
 
-    pub fn panel(&mut self, desc: PanelDescriptor, contents: impl FnMut(&mut Ui)) {
+    pub fn panel(&mut self, desc: PanelDescriptor, contents: impl FnOnce(&mut Ui)) {
         let width = desc.width.as_abolute(self.0.ui_state.bounds.width());
         let height = desc.height.as_abolute(self.0.ui_state.bounds.height());
 
@@ -3645,7 +3641,7 @@ impl<'a> UiRoot<'a> {
         &mut self.0.theme
     }
 
-    pub fn with_theme(&mut self, theme: Theme, mut contents: impl FnMut(&mut Self)) {
+    pub fn with_theme(&mut self, theme: Theme, contents: impl FnOnce(&mut Self)) {
         let t = std::mem::replace(&mut *self.0.theme, theme);
 
         ///////////////////////
@@ -3655,11 +3651,7 @@ impl<'a> UiRoot<'a> {
         *self.0.theme = t;
     }
 
-    pub fn with_theme_override(
-        &mut self,
-        theme: ThemeOverride,
-        mut contents: impl FnMut(&mut Self),
-    ) {
+    pub fn with_theme_override(&mut self, theme: ThemeOverride, contents: impl FnOnce(&mut Self)) {
         let theme = theme.apply(&mut self.0.theme);
 
         ///////////////////////
@@ -3670,7 +3662,7 @@ impl<'a> UiRoot<'a> {
     }
 
     /// key should be a unique index for each empty call in an application
-    pub fn empty(&mut self, key: i32, contents: impl FnMut(&mut Ui)) {
+    pub fn empty(&mut self, key: i32, contents: impl FnOnce(&mut Ui)) {
         let old_bounds = self.0.ui_state.bounds;
         self.0.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[1, key]));
         let scissor = self.0.push_scissor(old_bounds);
