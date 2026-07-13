@@ -872,13 +872,7 @@ impl<'a> Ui<'a> {
         let WidgetInfo { id, .. } = self.begin_widget();
         let cols = columns as i32;
         let history_start = self.ui_state.rect_history.len();
-        let bounds = self.ui_state.bounds;
-
-        let [left, right, top, bottom] = self.theme.padding.as_abs(bounds.width(), bounds.height());
-        self.ui_state.bounds.min_x += left;
-        self.ui_state.bounds.min_y += top;
-        self.ui_state.bounds.max_x -= right;
-        self.ui_state.bounds.max_y -= bottom;
+        let bounds = self.padd_bounds();
 
         let width = (self.ui_state.bounds.width() / cols + 1) as i32;
 
@@ -1831,7 +1825,7 @@ impl<'a> Ui<'a> {
             is_hovered,
             is_active,
         } = self.begin_widget();
-        let old_bounds = self.ui_state.bounds;
+        let old_bounds = self.padd_bounds();
 
         let mut state = self
             .remove_memory::<DragState>(id)
@@ -2290,6 +2284,19 @@ impl<'a> Ui<'a> {
         }
     }
 
+    /// apply padding to the current bounds and return the original
+    fn padd_bounds(&mut self) -> UiRect {
+        let bounds = self.ui_state.bounds;
+
+        let [left, right, top, bottom] = self.theme.padding.as_abs(bounds.width(), bounds.height());
+        self.ui_state.bounds.min_x += left;
+        self.ui_state.bounds.min_y += top;
+        self.ui_state.bounds.max_x -= right;
+        self.ui_state.bounds.max_y -= bottom;
+
+        bounds
+    }
+
     pub fn with_outline(
         &mut self,
         OutlineDescriptor {
@@ -2302,11 +2309,13 @@ impl<'a> Ui<'a> {
         let last_layer = self.push_layer();
         let layer = self.push_layer();
         let history_start = self.ui_state.rect_history.len();
-        let bounds = self.ui_state.bounds;
+        let bounds = self.padd_bounds();
 
         let r = outline_radius as i32;
         self.ui_state.bounds.min_x += r;
         self.ui_state.bounds.min_y += r;
+        // apply padding to the children content too
+        self.padd_bounds();
         //////////////////
         self.children_content(content);
         //////////////////
@@ -2696,7 +2705,7 @@ impl<'a> Ui<'a> {
         contents: impl FnOnce(&mut Self),
     ) {
         let WidgetInfo { id, .. } = self.begin_widget();
-        let bounds = self.ui_state.bounds;
+        let bounds = self.padd_bounds();
 
         let width = width.as_abolute(bounds.width());
         let height = height.as_abolute(bounds.height());
@@ -2722,7 +2731,7 @@ impl<'a> Ui<'a> {
     /// Add a margin around the inner contents
     pub fn margin(&mut self, m: Padding, contents: impl FnOnce(&mut Self)) {
         let WidgetInfo { id, .. } = self.begin_widget();
-        let bounds = self.ui_state.bounds;
+        let bounds = self.padd_bounds();
         self.ui_state.bounds = layout_rect(RectLayoutDescriptor {
             width: bounds.width(),
             height: bounds.height(),
