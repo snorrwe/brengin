@@ -1877,11 +1877,9 @@ impl<'a> Ui<'a> {
         let last_scissor = self.ui_state.scissor_idx;
         let layer = self.ui_state.layer;
         if is_being_dragged {
-            // Ensure that the widget is rendered on screen by pushing a new scissor that holds the
-            // widget.
-            // Only do this for the dragged widget, otherwise a lot of redundant scissors are
-            // created.
-            self.push_scissor(self.ui_state.bounds);
+            // when dragging, the widget may move out of its original scissor
+            // since the widget is rendered on top of everything else, just use full-screen scissor
+            self.ui_state.scissor_idx = 0;
             self.ui_state.layer = DRAG_LAYER;
         }
         self.ui_state.layer += 1;
