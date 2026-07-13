@@ -873,10 +873,23 @@ impl<'a> Ui<'a> {
         let cols = columns as i32;
         let history_start = self.ui_state.rect_history.len();
         let bounds = self.ui_state.bounds;
-        let width = (bounds.width() / cols + 1) as i32;
+
+        let [left, right, top, bottom] = self.theme.padding.as_abs(bounds.width(), bounds.height());
+        self.ui_state.bounds.min_x += left;
+        self.ui_state.bounds.min_y += top;
+        self.ui_state.bounds.max_x -= right;
+        self.ui_state.bounds.max_y -= bottom;
+
+        let width = (self.ui_state.bounds.width() / cols + 1) as i32;
 
         let dims = (0..cols as i32)
-            .map(|i| [bounds.min_x + i * width, bounds.min_x + (i + 1) * width, 0])
+            .map(|i| {
+                [
+                    self.ui_state.bounds.min_x + i * width,
+                    self.ui_state.bounds.min_x + (i + 1) * width,
+                    0,
+                ]
+            })
             .collect();
 
         let mut cols = Columns {
