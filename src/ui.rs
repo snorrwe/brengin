@@ -1757,12 +1757,8 @@ impl<'a> Ui<'a> {
 
         // compute the area of the scroll. Area = content bounds - viewport, so only the overlap is
         // counted
-        state.scroll_width = children_bounds
-            .width()
-            .saturating_sub(width.saturating_sub(line_height as i32 + scroll_bar_size));
-        state.scroll_height = children_bounds
-            .height()
-            .saturating_sub(height.saturating_sub(line_height as i32 + scroll_bar_size));
+        state.scroll_width = children_bounds.width();
+        state.scroll_height = children_bounds.height();
         let mut state = *state;
 
         if desc.width.is_some() {
