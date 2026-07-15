@@ -1544,7 +1544,13 @@ impl<'a> Ui<'a> {
             max_x: scissor_bounds.max_x,
             max_y: scissor_bounds.max_y,
         };
-        self.color_rect_from_rect(bounds, 0xFF0000FF.into(), layer);
+        self.color_rect_from_rect_with_outline(
+            bounds,
+            self.theme.primary_color,
+            layer,
+            self.theme.secondary_color,
+            1,
+        );
         self.ui_state.bounding_boxes.insert(id, bounds);
 
         // pip
@@ -1577,7 +1583,7 @@ impl<'a> Ui<'a> {
             max_x: scissor_bounds.max_x,
             max_y: y + scroll_bar_width,
         };
-        self.color_rect_from_rect(control_box, 0xFF0AA0FF.into(), layer + 1);
+        self.color_rect_from_rect(control_box, self.theme.secondary_color, layer + 1);
         self.ui_state.bounding_boxes.insert(id, control_box);
     }
 
@@ -1601,7 +1607,13 @@ impl<'a> Ui<'a> {
             max_x: scissor_bounds.max_x,
             max_y: scissor_bounds.max_y,
         };
-        self.color_rect_from_rect(bounds, 0xaaFF00FF.into(), layer);
+        self.color_rect_from_rect_with_outline(
+            bounds,
+            self.theme.primary_color,
+            layer,
+            self.theme.secondary_color,
+            1,
+        );
         self.ui_state.bounding_boxes.insert(id, bounds);
 
         // pip
@@ -1633,7 +1645,7 @@ impl<'a> Ui<'a> {
             max_x: x + scroll_bar_height,
             max_y: scissor_bounds.max_y,
         };
-        self.color_rect_from_rect(control_box, 0xFF0AA0FF.into(), layer + 1);
+        self.color_rect_from_rect(control_box, self.theme.secondary_color, layer + 1);
         self.ui_state.bounding_boxes.insert(id, control_box);
     }
 
@@ -1750,6 +1762,8 @@ impl<'a> Ui<'a> {
         self.children_content(contents);
         ///////////////////////
         let children_bounds = self.history_bounding_rect(history_start);
+        self.ui_state.layer = layer;
+        self.ui_state.scissor_idx = scissor_idx;
 
         let scroll_bar_size = self.theme.scroll_bar_size as i32;
 
@@ -1785,9 +1799,6 @@ impl<'a> Ui<'a> {
         self.insert_memory(id, state);
         self.ui_state.bounds = old_bounds;
         self.submit_rect(id, scissor_bounds, self.theme.padding);
-
-        self.ui_state.layer = layer;
-        self.ui_state.scissor_idx = scissor_idx;
     }
 
     fn history_bounding_rect(&self, history_start: usize) -> UiRect {
