@@ -1762,6 +1762,9 @@ impl<'a> Ui<'a> {
         self.children_content(contents);
         ///////////////////////
         let children_bounds = self.history_bounding_rect(history_start);
+        self.ui_state
+            .rect_history
+            .resize_with(history_start, || unreachable!());
         self.ui_state.layer = layer;
         self.ui_state.scissor_idx = scissor_idx;
 
@@ -3550,31 +3553,30 @@ impl<'a> UiRoot<'a> {
         ///////////////////////
         ///////////////////////
         // Content
-        let history_start = self.0.ui_state.rect_history.len();
+        let history = std::mem::take(&mut self.0.ui_state.rect_history);
         {
             self.0.push_scissor(bounds);
-            let mut bounds = bounds;
-            bounds.shrink_x(padding);
-            bounds.shrink_y(padding);
-            self.0.ui_state.bounds = bounds;
+            let mut content_bounds = bounds;
+            content_bounds.shrink_x(2 * padding);
+            content_bounds.shrink_y(2 * padding);
+            self.0.ui_state.bounds = content_bounds;
             self.0.ui_state.layer = WINDOW_LAYER + 2;
-            self.0.children_content(|ui| {
-                contents(ui);
-            });
+            self.0.children_content(contents);
         }
         ///////////////////////
         self.0.ui_state.layer = layer;
         self.0.ui_state.bounds = old_bounds;
         self.0.ui_state.scissor_idx = scissor;
 
-        let r = self.0.history_bounding_rect(history_start);
+        let child_history = std::mem::replace(&mut self.0.ui_state.rect_history, history);
+        let children_bounds = bounding_rect(&child_history);
 
         let state: &mut WindowState = self.0.ui_state.windows.get_mut(desc.name).unwrap();
-        let size = r.size();
+        let size = children_bounds.size();
         if size != state.content_size {
             state.content_size = size;
-            state.size = state.content_size;
-            state.size.y = (state.size.y).max(5) + self.0.theme.window_title_height as i32;
+            state.size = size;
+            state.size.y = (size.y).max(5) + self.0.theme.window_title_height as i32;
         }
         self.0.ui_state.window_allocator = allocator;
     }
