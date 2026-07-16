@@ -4089,5 +4089,6 @@ fn gc_wants_focus_state_system(mut memory: ResMut<UiMemory>, state: Res<UiState>
 pub struct AreaDescriptor {
     pub width: UiCoord,
     pub height: UiCoord,
+    /// TODO: this is currently a placeholder and has no actual function
     pub scroll_on_overflow: bool,
 }
