@@ -3591,24 +3591,12 @@ impl<'a> UiRoot<'a> {
             }
             ///////////////////////
             // Resize box
-            const MIN_SIZE: i32 = 10;
-            let mut drag_bounds = UiRect {
-                min_x: children_bounds.max_x,
-                min_y: children_bounds.max_y,
+            const SIZE: i32 = 10;
+            let drag_bounds = UiRect {
+                min_x: window_bounds.max_x - SIZE,
+                min_y: window_bounds.max_y - SIZE,
                 ..window_bounds
             };
-            if drag_bounds.width() < MIN_SIZE {
-                drag_bounds.min_x = drag_bounds.max_x - MIN_SIZE;
-            }
-            if drag_bounds.height() < MIN_SIZE {
-                drag_bounds.min_y = drag_bounds.max_y - MIN_SIZE;
-            }
-            if drag_bounds.width() < drag_bounds.height() {
-                drag_bounds.min_y = drag_bounds.max_y - MIN_SIZE;
-            }
-            if drag_bounds.height() < drag_bounds.width() {
-                drag_bounds.min_x = drag_bounds.max_x - MIN_SIZE;
-            }
             let WidgetInfo {
                 id: drag_id,
                 is_active,
