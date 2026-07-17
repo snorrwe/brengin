@@ -643,6 +643,9 @@ impl<'a> Ui<'a> {
                 self.ui_state.scissors.push(actual_scissor);
             }
             None => {
+                // TODO:
+                // technically we could leave the scissor_idx alone and not push anything here
+                // but that causes a crash which I don't have a cpaacity to debug
                 self.ui_state.scissors.push(current_scissor);
             }
         }
