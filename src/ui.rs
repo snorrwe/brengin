@@ -401,6 +401,8 @@ impl From<Handle<DynamicImage>> for ThemeEntry {
 pub struct Theme {
     pub background: ThemeEntry,
     pub window_background: ThemeEntry,
+    pub window_title_color: Color,
+    pub window_outline_color: Color,
     pub primary_color: Color,
     pub secondary_color: Color,
     pub button_default: ThemeEntry,
@@ -428,6 +430,8 @@ impl Default for Theme {
     fn default() -> Self {
         Theme {
             window_background: 0x0395d5ff.into(),
+            window_outline_color: 0x0395d5ff.into(),
+            window_title_color: 0xcdd6f4ff.into(),
             background: 0x04a5e5ff.into(),
             context_background: 0x02a3e3ff.into(),
             primary_color: 0xcdd6f4ff.into(),
@@ -488,6 +492,8 @@ impl UiState {
 pub struct ThemeOverride {
     pub background: Option<ThemeEntry>,
     pub window_background: Option<ThemeEntry>,
+    pub window_title_color: Option<Color>,
+    pub window_outline_color: Option<Color>,
     pub primary_color: Option<Color>,
     pub secondary_color: Option<Color>,
     pub button_default: Option<ThemeEntry>,
@@ -519,6 +525,8 @@ impl ThemeOverride {
                 }
             };
         }
+        apply!(window_title_color);
+        apply!(window_outline_color);
         apply!(background);
         apply!(window_background);
         apply!(primary_color);
@@ -3603,6 +3611,16 @@ impl<'a> UiRoot<'a> {
                 max_y: bounds.min_y + height + padding * 2,
                 ..bounds
             };
+            ui.color_rect_with_outline(
+                title_bounds.min_x,
+                title_bounds.min_y,
+                width + padding * 2,
+                height + title_bounds.height() + padding * 2,
+                Color::TRANSPARENT_BLACK,
+                2,
+                ui.theme.window_outline_color,
+                WINDOW_LAYER,
+            );
             ui.theme_rect(
                 bounds.min_x,
                 bounds.min_y,
@@ -3645,7 +3663,7 @@ impl<'a> UiRoot<'a> {
                 }
             }
             ui.submit_rect(title_id, title_bounds, ui.theme.padding);
-            ui.color_rect_from_rect(title_bounds, Color::from_rgb(0x00ffff), WINDOW_LAYER);
+            ui.color_rect_from_rect(title_bounds, ui.theme.window_title_color, WINDOW_LAYER);
             ///////////////////////
             ///////////////////////
             // Content
