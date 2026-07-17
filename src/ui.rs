@@ -700,9 +700,7 @@ impl<'a> Ui<'a> {
             }
         }
         if is_hovered {
-            self.color_rect_from_rect(drag_bounds, Color::from_rgb(0xFF0000), CONTEXT_LAYER);
-        } else {
-            self.color_rect_from_rect(drag_bounds, Color::from_rgb(0xEE4400), CONTEXT_LAYER);
+            self.color_rect_from_rect(drag_bounds, self.theme.primary_color, CONTEXT_LAYER);
         }
         self.ui_state.bounding_boxes.insert(drag_id, drag_bounds);
         ///////////////////////
