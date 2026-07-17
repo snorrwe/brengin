@@ -3462,6 +3462,9 @@ impl WindowAllocator {
 
 impl<'a> UiRoot<'a> {
     pub fn window(&mut self, desc: WindowDescriptor, contents: impl FnOnce(&mut Ui)) {
+        self.0.push_child();
+        self.0.begin_widget();
+
         let mut allocator = std::mem::take(&mut self.0.ui_state.window_allocator);
         let old_bounds = self.0.ui_state.bounds;
         let state: &mut WindowState = self
@@ -3502,20 +3505,24 @@ impl<'a> UiRoot<'a> {
         self.0.ui_state.root_hash = fnv_1a(desc.name.as_bytes());
         let scissor = self.0.ui_state.scissor_idx;
 
-        let layer = self.0.ui_state.layer;
-        self.0.ui_state.layer = WINDOW_LAYER;
-        // window background
-        self.0.theme_rect(
-            bounds.min_x,
-            bounds.min_y,
-            width + padding * 2,
-            height + padding * 2,
-            WINDOW_LAYER,
-            self.theme().window_background.clone(),
-        );
-        ///////////////////////
-        // Title
         self.0.children_content(|ui| {
+            ui.ui_state.layer = WINDOW_LAYER;
+            // window background
+            let window_bounds = UiRect {
+                max_x: bounds.min_x + width + padding * 2,
+                max_y: bounds.min_y + height + padding * 2,
+                ..bounds
+            };
+            ui.theme_rect(
+                bounds.min_x,
+                bounds.min_y,
+                width + padding * 2,
+                height + padding * 2,
+                WINDOW_LAYER,
+                ui.theme().window_background.clone(),
+            );
+            ///////////////////////
+            // Title
             ui.ui_state.bounds = title_bounds;
             ui.push_scissor(title_bounds);
             ui.label(desc.name);
@@ -3549,36 +3556,86 @@ impl<'a> UiRoot<'a> {
             }
             ui.submit_rect(title_id, title_bounds, ui.theme.padding);
             ui.color_rect_from_rect(title_bounds, Color::from_rgb(0x00ffff), WINDOW_LAYER);
+            ///////////////////////
+            ///////////////////////
+            // Content
+            let history = std::mem::take(&mut ui.ui_state.rect_history);
+            {
+                ui.push_scissor(bounds);
+                let mut content_bounds = bounds;
+                content_bounds.shrink_x(2 * padding);
+                content_bounds.shrink_y(2 * padding);
+                ui.ui_state.bounds = content_bounds;
+                ui.ui_state.layer = WINDOW_LAYER + 2;
+                ui.children_content(contents);
+            }
+            let child_history = std::mem::replace(&mut ui.ui_state.rect_history, history);
+            let children_bounds = bounding_rect(&child_history);
+            let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
+            let size = children_bounds.size();
+            if size != state.content_size {
+                state.content_size = size;
+                state.size = size;
+                state.size.y = (size.y).max(5) + ui.theme.window_title_height as i32;
+            }
+            ///////////////////////
+            // Resize box
+            const MIN_SIZE: i32 = 10;
+            let mut drag_bounds = UiRect {
+                min_x: children_bounds.max_x,
+                min_y: children_bounds.max_y,
+                ..window_bounds
+            };
+            if drag_bounds.width() < MIN_SIZE {
+                drag_bounds.min_x = drag_bounds.max_x - MIN_SIZE;
+            }
+            if drag_bounds.height() < MIN_SIZE {
+                drag_bounds.min_y = drag_bounds.max_y - MIN_SIZE;
+            }
+            if drag_bounds.width() < drag_bounds.height() {
+                drag_bounds.min_y = drag_bounds.max_y - MIN_SIZE;
+            }
+            if drag_bounds.height() < drag_bounds.width() {
+                drag_bounds.min_x = drag_bounds.max_x - MIN_SIZE;
+            }
+            let WidgetInfo {
+                id: drag_id,
+                is_active,
+                ..
+            } = ui.begin_widget();
+            if is_active {
+                if ui.mouse_down() {
+                    ui.set_active(drag_id);
+                }
+                let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
+
+                let drag_start = state.drag_start;
+
+                let offset = IVec2::new(
+                    (ui.mouse.cursor_position.x - drag_start.x) as i32,
+                    (ui.mouse.cursor_position.y - drag_start.y) as i32,
+                );
+
+                let drag_anchor = state.drag_anchor;
+                state.size = drag_anchor + offset;
+            } else {
+                if !ui.is_anything_active() && ui.contains_mouse(drag_id) && ui.mouse_down() {
+                    let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
+                    state.drag_start = ui.mouse.cursor_position;
+                    state.drag_anchor = state.size;
+                    ui.set_active(drag_id);
+                }
+            }
+            ui.ui_state.scissor_idx = scissor;
+            ui.color_rect_from_rect(drag_bounds, Color::from_rgb(0xFF0000), CONTEXT_LAYER);
+            ui.submit_rect(drag_id, drag_bounds, None);
+            ///////////////////////
         });
         ///////////////////////
-        ///////////////////////
-        // Content
-        let history = std::mem::take(&mut self.0.ui_state.rect_history);
-        {
-            self.0.push_scissor(bounds);
-            let mut content_bounds = bounds;
-            content_bounds.shrink_x(2 * padding);
-            content_bounds.shrink_y(2 * padding);
-            self.0.ui_state.bounds = content_bounds;
-            self.0.ui_state.layer = WINDOW_LAYER + 2;
-            self.0.children_content(contents);
-        }
-        ///////////////////////
-        self.0.ui_state.layer = layer;
         self.0.ui_state.bounds = old_bounds;
-        self.0.ui_state.scissor_idx = scissor;
 
-        let child_history = std::mem::replace(&mut self.0.ui_state.rect_history, history);
-        let children_bounds = bounding_rect(&child_history);
-
-        let state: &mut WindowState = self.0.ui_state.windows.get_mut(desc.name).unwrap();
-        let size = children_bounds.size();
-        if size != state.content_size {
-            state.content_size = size;
-            state.size = size;
-            state.size.y = (size.y).max(5) + self.0.theme.window_title_height as i32;
-        }
         self.0.ui_state.window_allocator = allocator;
+        self.0.pop_child();
     }
 
     pub fn panel(&mut self, desc: PanelDescriptor, contents: impl FnOnce(&mut Ui)) {
