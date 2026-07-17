@@ -3613,7 +3613,7 @@ impl<'a> UiRoot<'a> {
             let WidgetInfo {
                 id: drag_id,
                 is_active,
-                ..
+                is_hovered,
             } = ui.begin_widget();
             if is_active {
                 if ui.mouse_down() {
@@ -3631,7 +3631,7 @@ impl<'a> UiRoot<'a> {
                 let drag_anchor = state.drag_anchor;
                 state.size = drag_anchor + offset;
             } else {
-                if !ui.is_anything_active() && ui.contains_mouse(drag_id) && ui.mouse_down() {
+                if !ui.is_anything_active() && is_hovered && ui.mouse_down() {
                     let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
                     state.drag_start = ui.mouse.cursor_position;
                     state.drag_anchor = state.size;
@@ -3639,7 +3639,11 @@ impl<'a> UiRoot<'a> {
                 }
             }
             ui.ui_state.scissor_idx = scissor;
-            ui.color_rect_from_rect(drag_bounds, Color::from_rgb(0xFF0000), CONTEXT_LAYER);
+            if is_hovered {
+                ui.color_rect_from_rect(drag_bounds, Color::from_rgb(0xFF0000), CONTEXT_LAYER);
+            } else {
+                ui.color_rect_from_rect(drag_bounds, Color::from_rgb(0xEE4400), CONTEXT_LAYER);
+            }
             ui.submit_rect(drag_id, drag_bounds, None);
             ///////////////////////
         });
