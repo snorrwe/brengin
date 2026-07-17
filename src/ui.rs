@@ -632,14 +632,38 @@ fn shaping_gc_system(
 }
 
 impl<'a> Ui<'a> {
-    fn window_decorators(&mut self, window_bounds: UiRect, desc: &WindowDescriptor) {
+    fn window_resize(
+        &mut self,
+        window_bounds: UiRect,
+        desc: &WindowDescriptor,
+        horizontal: bool,
+        vertical: bool,
+    ) {
+        debug_assert!(horizontal || vertical);
+        const SIZE: i32 = 10;
         ///////////////////////
         // Resize box
-        const SIZE: i32 = 10;
         let drag_bounds = UiRect {
-            min_x: window_bounds.max_x - SIZE,
-            min_y: window_bounds.max_y - SIZE,
-            ..window_bounds
+            min_x: if horizontal {
+                window_bounds.max_x - SIZE
+            } else {
+                window_bounds.min_x
+            },
+            min_y: if vertical {
+                window_bounds.max_y - SIZE
+            } else {
+                window_bounds.min_y
+            },
+            max_x: if horizontal {
+                window_bounds.max_x
+            } else {
+                window_bounds.max_x - SIZE
+            },
+            max_y: if vertical {
+                window_bounds.max_y
+            } else {
+                window_bounds.max_y - SIZE
+            },
         };
         let WidgetInfo {
             id: drag_id,
@@ -654,10 +678,16 @@ impl<'a> Ui<'a> {
 
             let drag_start = state.drag_start;
 
-            let offset = IVec2::new(
+            let mut offset = IVec2::new(
                 (self.mouse.cursor_position.x - drag_start.x) as i32,
                 (self.mouse.cursor_position.y - drag_start.y) as i32,
             );
+            if !horizontal {
+                offset.x = 0;
+            }
+            if !vertical {
+                offset.y = 0;
+            }
 
             let drag_anchor = state.drag_anchor;
             state.size = drag_anchor + offset;
@@ -676,6 +706,12 @@ impl<'a> Ui<'a> {
         }
         self.ui_state.bounding_boxes.insert(drag_id, drag_bounds);
         ///////////////////////
+    }
+
+    fn window_decorators(&mut self, window_bounds: UiRect, desc: &WindowDescriptor) {
+        self.window_resize(window_bounds, desc, false, true);
+        self.window_resize(window_bounds, desc, true, false);
+        self.window_resize(window_bounds, desc, true, true);
     }
 
     /// returns the last scissor_idx
