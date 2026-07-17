@@ -632,6 +632,52 @@ fn shaping_gc_system(
 }
 
 impl<'a> Ui<'a> {
+    fn window_decorators(&mut self, window_bounds: UiRect, desc: &WindowDescriptor) {
+        ///////////////////////
+        // Resize box
+        const SIZE: i32 = 10;
+        let drag_bounds = UiRect {
+            min_x: window_bounds.max_x - SIZE,
+            min_y: window_bounds.max_y - SIZE,
+            ..window_bounds
+        };
+        let WidgetInfo {
+            id: drag_id,
+            is_active,
+            is_hovered,
+        } = self.begin_widget();
+        if is_active {
+            if self.mouse_down() {
+                self.set_active(drag_id);
+            }
+            let state: &mut WindowState = self.ui_state.windows.get_mut(desc.name).unwrap();
+
+            let drag_start = state.drag_start;
+
+            let offset = IVec2::new(
+                (self.mouse.cursor_position.x - drag_start.x) as i32,
+                (self.mouse.cursor_position.y - drag_start.y) as i32,
+            );
+
+            let drag_anchor = state.drag_anchor;
+            state.size = drag_anchor + offset;
+        } else {
+            if !self.is_anything_active() && is_hovered && self.mouse_down() {
+                let state: &mut WindowState = self.ui_state.windows.get_mut(desc.name).unwrap();
+                state.drag_start = self.mouse.cursor_position;
+                state.drag_anchor = state.size;
+                self.set_active(drag_id);
+            }
+        }
+        if is_hovered {
+            self.color_rect_from_rect(drag_bounds, Color::from_rgb(0xFF0000), CONTEXT_LAYER);
+        } else {
+            self.color_rect_from_rect(drag_bounds, Color::from_rgb(0xEE4400), CONTEXT_LAYER);
+        }
+        self.ui_state.bounding_boxes.insert(drag_id, drag_bounds);
+        ///////////////////////
+    }
+
     /// returns the last scissor_idx
     pub fn push_scissor(&mut self, scissor_bounds: UiRect) -> u32 {
         let res = self.ui_state.scissor_idx;
@@ -3590,49 +3636,7 @@ impl<'a> UiRoot<'a> {
                 state.size.y = (size.y).max(5) + ui.theme.window_title_height as i32;
             }
             ui.ui_state.scissor_idx = scissor;
-            ///////////////////////
-            // Resize box
-            const SIZE: i32 = 10;
-            let drag_bounds = UiRect {
-                min_x: window_bounds.max_x - SIZE,
-                min_y: window_bounds.max_y - SIZE,
-                ..window_bounds
-            };
-            let WidgetInfo {
-                id: drag_id,
-                is_active,
-                is_hovered,
-            } = ui.begin_widget();
-            if is_active {
-                if ui.mouse_down() {
-                    ui.set_active(drag_id);
-                }
-                let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
-
-                let drag_start = state.drag_start;
-
-                let offset = IVec2::new(
-                    (ui.mouse.cursor_position.x - drag_start.x) as i32,
-                    (ui.mouse.cursor_position.y - drag_start.y) as i32,
-                );
-
-                let drag_anchor = state.drag_anchor;
-                state.size = drag_anchor + offset;
-            } else {
-                if !ui.is_anything_active() && is_hovered && ui.mouse_down() {
-                    let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
-                    state.drag_start = ui.mouse.cursor_position;
-                    state.drag_anchor = state.size;
-                    ui.set_active(drag_id);
-                }
-            }
-            if is_hovered {
-                ui.color_rect_from_rect(drag_bounds, Color::from_rgb(0xFF0000), CONTEXT_LAYER);
-            } else {
-                ui.color_rect_from_rect(drag_bounds, Color::from_rgb(0xEE4400), CONTEXT_LAYER);
-            }
-            ui.ui_state.bounding_boxes.insert(drag_id, drag_bounds);
-            ///////////////////////
+            ui.window_decorators(window_bounds, &desc);
         });
         ///////////////////////
         self.0.ui_state.bounds = old_bounds;
