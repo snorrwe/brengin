@@ -635,8 +635,17 @@ impl<'a> Ui<'a> {
     /// returns the last scissor_idx
     pub fn push_scissor(&mut self, scissor_bounds: UiRect) -> u32 {
         let res = self.ui_state.scissor_idx;
+        let current_scissor = self.ui_state.scissors[res as usize];
+
         self.ui_state.scissor_idx = self.ui_state.scissors.len() as u32;
-        self.ui_state.scissors.push(scissor_bounds);
+        match scissor_bounds.intersection(current_scissor) {
+            Some(actual_scissor) => {
+                self.ui_state.scissors.push(actual_scissor);
+            }
+            None => {
+                self.ui_state.scissors.push(current_scissor);
+            }
+        }
         res
     }
 
@@ -3274,7 +3283,6 @@ fn begin_frame(
     };
     ui.bounds = b;
     ui.viewport = b;
-    let b = ui.bounds;
     ui.scissors.clear();
     ui.scissors.push(b);
     ui.scissor_idx = 0;
@@ -3561,6 +3569,7 @@ impl<'a> UiRoot<'a> {
             // Content
             let history = std::mem::take(&mut ui.ui_state.rect_history);
             {
+                ui.ui_state.scissor_idx = scissor;
                 ui.push_scissor(bounds);
                 let mut content_bounds = bounds;
                 content_bounds.shrink_x(2 * padding);
