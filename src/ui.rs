@@ -3589,6 +3589,7 @@ impl<'a> UiRoot<'a> {
                 state.size = size;
                 state.size.y = (size.y).max(5) + ui.theme.window_title_height as i32;
             }
+            ui.ui_state.scissor_idx = scissor;
             ///////////////////////
             // Resize box
             const SIZE: i32 = 10;
@@ -3625,7 +3626,6 @@ impl<'a> UiRoot<'a> {
                     ui.set_active(drag_id);
                 }
             }
-            ui.ui_state.scissor_idx = scissor;
             if is_hovered {
                 ui.color_rect_from_rect(drag_bounds, Color::from_rgb(0xFF0000), CONTEXT_LAYER);
             } else {
