@@ -1289,10 +1289,9 @@ impl<'a> Ui<'a> {
         if let Some(i) = self.ui_state.id_stack.last_mut() {
             *i = index;
         }
-        let mut is_hovered = self.is_hovered(id);
-        if self.contains_mouse(id) {
+        let is_hovered = self.contains_mouse(id);
+        if is_hovered {
             self.set_hovered(id);
-            is_hovered = true;
         }
         WidgetInfo {
             id,
@@ -3473,9 +3472,6 @@ impl WindowAllocator {
 
 impl<'a> UiRoot<'a> {
     pub fn window(&mut self, desc: WindowDescriptor, contents: impl FnOnce(&mut Ui)) {
-        self.0.push_child();
-        self.0.begin_widget();
-
         let mut allocator = std::mem::take(&mut self.0.ui_state.window_allocator);
         let old_bounds = self.0.ui_state.bounds;
         let state: &mut WindowState = self
@@ -3514,6 +3510,9 @@ impl<'a> UiRoot<'a> {
         };
 
         self.0.ui_state.root_hash = fnv_1a(desc.name.as_bytes());
+        self.0.push_child();
+        self.0.begin_widget();
+
         let scissor = self.0.ui_state.scissor_idx;
 
         self.0.children_content(|ui| {
@@ -3644,7 +3643,7 @@ impl<'a> UiRoot<'a> {
             } else {
                 ui.color_rect_from_rect(drag_bounds, Color::from_rgb(0xEE4400), CONTEXT_LAYER);
             }
-            ui.submit_rect(drag_id, drag_bounds, None);
+            ui.ui_state.bounding_boxes.insert(drag_id, drag_bounds);
             ///////////////////////
         });
         ///////////////////////
