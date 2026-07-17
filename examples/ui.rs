@@ -23,6 +23,7 @@ enum MenuState {
     Buttons,
     ImageGrid,
     Layout,
+    Windows,
 }
 
 #[derive(clap_derive::Parser)]
@@ -155,6 +156,9 @@ fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>, cr: Res<CloseRequest>) {
                 }
                 if ui.button("Layout").inner.pressed {
                     *state = MenuState::Layout;
+                }
+                if ui.button("Windows").inner.pressed {
+                    *state = MenuState::Windows;
                 }
                 if ui.button("Exit").inner.pressed {
                     cr.request_close();
@@ -516,6 +520,19 @@ fn setup(mut cmd: Commands) {
         .insert_bundle(transform_bundle(transform::Transform::default()));
 }
 
+fn windows_ui(mut ui: UiRoot) {
+    ui.window(
+        brengin::ui::WindowDescriptor {
+            name: "1",
+            show_title: true,
+            ..Default::default()
+        },
+        |ui| {
+            ui.label("hi");
+        },
+    );
+}
+
 async fn game(args: Args) {
     let mut app = App::default();
     app.insert_resource(Label(Default::default()));
@@ -544,6 +561,11 @@ async fn game(args: Args) {
             SystemStage::new("buttons-ui")
                 .with_should_run(|state: Res<MenuState>| MenuState::Layout == *state)
                 .with_system(layout_ui),
+        );
+        s.add_nested_stage(
+            SystemStage::new("buttons-ui")
+                .with_should_run(|state: Res<MenuState>| MenuState::Windows == *state)
+                .with_system(windows_ui),
         );
         s.add_system(menu);
         s.add_system(dnd_ui);
