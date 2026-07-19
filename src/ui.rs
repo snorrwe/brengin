@@ -1638,9 +1638,9 @@ impl<'a> Ui<'a> {
 
         // bar
         let bounds = UiRect {
-            min_x: scissor_bounds.max_x - scroll_bar_width,
+            min_x: scissor_bounds.max_x + 1,
             min_y: scissor_bounds.min_y,
-            max_x: scissor_bounds.max_x,
+            max_x: scissor_bounds.max_x + scroll_bar_width + 1,
             max_y: scissor_bounds.max_y,
         };
         self.color_rect_from_rect_with_outline(
@@ -1655,7 +1655,8 @@ impl<'a> Ui<'a> {
         // pip
         let t = parent_state.ty;
         let id = self.current_id();
-        let mut y = scissor_bounds.min_y + (scissor_bounds.height() as f32 * t) as i32;
+        let mut y =
+            scissor_bounds.min_y + ((scissor_bounds.height() - scroll_bar_width) as f32 * t) as i32;
         if is_active {
             self.set_active(id);
             if self.mouse_up() {
@@ -1675,11 +1676,10 @@ impl<'a> Ui<'a> {
                 self.set_active(id);
             }
         }
-        let x = scissor_bounds.max_x.saturating_sub(scroll_bar_width);
         let control_box = UiRect {
-            min_x: x,
+            min_x: scissor_bounds.max_x,
             min_y: y,
-            max_x: scissor_bounds.max_x,
+            max_x: scissor_bounds.max_x + scroll_bar_width,
             max_y: y + scroll_bar_width,
         };
         self.color_rect_from_rect(control_box, self.theme.secondary_color, layer + 1);
@@ -1702,9 +1702,9 @@ impl<'a> Ui<'a> {
         // bar
         let bounds = UiRect {
             min_x: scissor_bounds.min_x,
-            min_y: scissor_bounds.max_y - scroll_bar_height,
+            min_y: scissor_bounds.max_y + 1,
             max_x: scissor_bounds.max_x,
-            max_y: scissor_bounds.max_y,
+            max_y: scissor_bounds.max_y + 1 + scroll_bar_height,
         };
         self.color_rect_from_rect_with_outline(
             bounds,
@@ -1718,7 +1718,8 @@ impl<'a> Ui<'a> {
         // pip
         let t = parent_state.tx;
         let id = self.current_id();
-        let mut x = scissor_bounds.min_x + (scissor_bounds.width() as f32 * t) as i32;
+        let mut x =
+            scissor_bounds.min_x + ((scissor_bounds.width() - scroll_bar_height) as f32 * t) as i32;
         if is_active {
             self.set_active(id);
             if self.mouse_up() {
@@ -1740,15 +1741,16 @@ impl<'a> Ui<'a> {
         }
         let control_box = UiRect {
             min_x: x,
-            min_y: scissor_bounds.max_y - scroll_bar_height,
+            min_y: scissor_bounds.max_y,
             max_x: x + scroll_bar_height,
-            max_y: scissor_bounds.max_y,
+            max_y: scissor_bounds.max_y + scroll_bar_height,
         };
         self.color_rect_from_rect(control_box, self.theme.secondary_color, layer + 1);
         self.ui_state.bounding_boxes.insert(id, control_box);
     }
 
     pub fn scroll_area(&mut self, desc: ScrollDescriptor, contents: impl FnOnce(&mut Self)) {
+        let scroll_bar_size = self.theme.scroll_bar_size as i32;
         let WidgetInfo { id, is_hovered, .. } = self.begin_widget();
         let width = desc
             .width
@@ -1777,15 +1779,23 @@ impl<'a> Ui<'a> {
         self.insert_memory(id, state);
 
         let old_bounds = self.ui_state.bounds;
+
         let scissor_bounds = layout_rect(RectLayoutDescriptor {
-            width,
-            height,
+            width: width - scroll_bar_size,
+            height: height - scroll_bar_size,
             padding: None,
-            dir: self.ui_state.layout_dir,
+            dir: LayoutDirection::LeftRight(VerticalAlignment::Top),
             bounds: old_bounds,
         });
 
-        let mut bounds = scissor_bounds;
+        let mut bounds = layout_rect(RectLayoutDescriptor {
+            width: width,
+            height: height,
+            padding: None,
+            dir: LayoutDirection::LeftRight(VerticalAlignment::Top),
+            bounds: old_bounds,
+        });
+        let area_bounds = bounds;
         bounds.offset_x(-offset_x as i32);
         bounds.offset_y(-offset_y as i32);
 
@@ -1837,8 +1847,6 @@ impl<'a> Ui<'a> {
         self.ui_state.layer = layer;
         self.ui_state.scissor_idx = scissor_idx;
 
-        let scroll_bar_size = self.theme.scroll_bar_size as i32;
-
         let p_horizontal = self.theme.padding.horizonal(bounds.width());
         let p_vertical = self.theme.padding.vertical(bounds.height());
         let state = self.get_memory_mut::<ScrollState>(id).unwrap();
@@ -1846,9 +1854,9 @@ impl<'a> Ui<'a> {
         // compute the area of the scroll. Area = content bounds - viewport, so only the overlap is
         // counted
         state.scroll_width =
-            (children_bounds.width() - width + scroll_bar_size + p_horizontal).max(0);
+            (children_bounds.width() - width + p_horizontal + scroll_bar_size).max(0);
         state.scroll_height =
-            (children_bounds.height() - height + scroll_bar_size + p_vertical).max(0);
+            (children_bounds.height() - height + p_vertical + scroll_bar_size).max(0);
         let mut state = *state;
 
         if desc.width.is_some() {
@@ -1857,24 +1865,14 @@ impl<'a> Ui<'a> {
                 // prevent overlap
                 scissor_bounds.max_x -= scroll_bar_size;
             }
-            self.horizontal_scroll_bar(
-                &scissor_bounds,
-                scroll_bar_size,
-                CONTEXT_LAYER - 1,
-                &mut state,
-            );
+            self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_size, layer, &mut state);
         }
         if desc.height.is_some() {
-            self.vertical_scroll_bar(
-                &scissor_bounds,
-                scroll_bar_size,
-                CONTEXT_LAYER - 1,
-                &mut state,
-            );
+            self.vertical_scroll_bar(&scissor_bounds, scroll_bar_size, layer, &mut state);
         }
         self.insert_memory(id, state);
         self.ui_state.bounds = old_bounds;
-        self.submit_rect(id, scissor_bounds, self.theme.padding);
+        self.submit_rect(id, area_bounds, self.theme.padding);
     }
 
     fn update_scroll_state(
