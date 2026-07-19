@@ -61,7 +61,7 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                                         ui.with_tooltip(
                                             |ui| {
                                                 ui.margin(
-                                                    brengin::ui::Padding::vertical(10),
+                                                    brengin::ui::Padding::from_vertical(10),
                                                     |ui| {
                                                         ui.button(ButtonDescriptor::Image {
                                                             image: ui_state.boid.clone(),
@@ -93,7 +93,7 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                         for col in [0, 1] {
                             let c = col * 2;
                             cols.span(c..=c + 1, |ui| {
-                                ui.margin(brengin::ui::Padding::vertical(10), |ui| {
+                                ui.margin(brengin::ui::Padding::from_vertical(10), |ui| {
                                     ui.button(ButtonDescriptor::Image {
                                         image: ui_state.boid.clone(),
                                         width: UiCoord::Percent(50),

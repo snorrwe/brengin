@@ -1762,48 +1762,18 @@ impl<'a> Ui<'a> {
 
         let line_height = self.theme.font_size + self.theme.text_padding;
 
-        'scroll_handler: {
-            if is_hovered {
-                self.set_scrolling(id);
-            }
-            if self.is_scrolling(id) {
-                let mut dt = 0.0;
-                for ds in self.mouse.scroll.iter() {
-                    // TODO: insert mouse events into ui_inputs
-                    match ds {
-                        MouseScrollDelta::LineDelta(_, dy) => {
-                            dt -= *dy / line_height as f32;
-                        }
-                        MouseScrollDelta::PixelDelta(physical_position) => {
-                            dt -= physical_position.y as f32;
-                        }
-                    }
-                }
-                if dt != 0.0 {
-                    let t;
-                    if self.keyboard.modifiers.shift {
-                        self.ui_inputs.keys.insert(KeyCode::ShiftLeft);
-                        self.ui_inputs.keys.insert(KeyCode::ShiftRight);
+        self.update_scroll_state(desc, id, is_hovered, &mut state, line_height);
 
-                        if desc.width.is_none() {
-                            break 'scroll_handler;
-                        }
-                        t = &mut state.tx;
-                    } else {
-                        if desc.height.is_none() {
-                            break 'scroll_handler;
-                        }
-                        t = &mut state.ty;
-                    }
-                    *t += dt;
-                    // TODO: animation at edge?
-                    *t = t.clamp(0.0, 1.0);
-                }
-            }
+        // reset the tick to 0 if the content does not need scrolling (w/h == 0)
+        let offset_x = state.tx * state.scroll_width as f32;
+        if offset_x == 0.0 {
+            state.tx = 0.0;
+        }
+        let offset_y = state.ty * state.scroll_height as f32;
+        if offset_y == 0.0 {
+            state.ty = 0.0;
         }
 
-        let offset_x = state.tx * state.scroll_width as f32;
-        let offset_y = state.ty * state.scroll_height as f32;
         self.insert_memory(id, state);
 
         let old_bounds = self.ui_state.bounds;
@@ -1869,12 +1839,16 @@ impl<'a> Ui<'a> {
 
         let scroll_bar_size = self.theme.scroll_bar_size as i32;
 
+        let p_horizontal = self.theme.padding.horizonal(bounds.width());
+        let p_vertical = self.theme.padding.vertical(bounds.height());
         let state = self.get_memory_mut::<ScrollState>(id).unwrap();
 
         // compute the area of the scroll. Area = content bounds - viewport, so only the overlap is
         // counted
-        state.scroll_width = children_bounds.width();
-        state.scroll_height = children_bounds.height();
+        state.scroll_width =
+            (children_bounds.width() - width + scroll_bar_size + p_horizontal).max(0);
+        state.scroll_height =
+            (children_bounds.height() - height + scroll_bar_size + p_vertical).max(0);
         let mut state = *state;
 
         if desc.width.is_some() {
@@ -1901,6 +1875,53 @@ impl<'a> Ui<'a> {
         self.insert_memory(id, state);
         self.ui_state.bounds = old_bounds;
         self.submit_rect(id, scissor_bounds, self.theme.padding);
+    }
+
+    fn update_scroll_state(
+        &mut self,
+        desc: ScrollDescriptor,
+        id: UiId,
+        is_hovered: bool,
+        state: &mut ScrollState,
+        line_height: u16,
+    ) {
+        if is_hovered {
+            self.set_scrolling(id);
+        }
+        if self.is_scrolling(id) {
+            let mut dt = 0.0;
+            for ds in self.mouse.scroll.iter() {
+                // TODO: insert mouse events into ui_inputs
+                match ds {
+                    MouseScrollDelta::LineDelta(_, dy) => {
+                        dt -= *dy / line_height as f32;
+                    }
+                    MouseScrollDelta::PixelDelta(physical_position) => {
+                        dt -= physical_position.y as f32;
+                    }
+                }
+            }
+            if dt != 0.0 {
+                let t;
+                if self.keyboard.modifiers.shift {
+                    self.ui_inputs.keys.insert(KeyCode::ShiftLeft);
+                    self.ui_inputs.keys.insert(KeyCode::ShiftRight);
+
+                    if desc.width.is_none() {
+                        return;
+                    }
+                    t = &mut state.tx;
+                } else {
+                    if desc.height.is_none() {
+                        return;
+                    }
+                    t = &mut state.ty;
+                }
+                *t += dt;
+                // TODO: animation at edge?
+                *t = t.clamp(0.0, 1.0);
+            }
+        }
     }
 
     fn history_bounding_rect(&self, history_start: usize) -> UiRect {
@@ -3072,7 +3093,7 @@ impl Padding {
         }
     }
 
-    pub fn horizontal(c: impl Into<UiCoord>) -> Self {
+    pub fn from_horizontal(c: impl Into<UiCoord>) -> Self {
         let c = c.into();
         Padding {
             left: Some(c),
@@ -3081,13 +3102,26 @@ impl Padding {
         }
     }
 
-    pub fn vertical(c: impl Into<UiCoord>) -> Self {
+    pub fn horizonal(self, max_horizontal: i32) -> i32 {
+        self.left.map(|c| c.as_abolute(max_horizontal)).unwrap_or(0)
+            + self
+                .right
+                .map(|c| c.as_abolute(max_horizontal))
+                .unwrap_or(0)
+    }
+
+    pub fn from_vertical(c: impl Into<UiCoord>) -> Self {
         let c = c.into();
         Padding {
             top: Some(c),
             bottom: Some(c),
             ..Default::default()
         }
+    }
+
+    pub fn vertical(self, max_vertical: i32) -> i32 {
+        self.top.map(|c| c.as_abolute(max_vertical)).unwrap_or(0)
+            + self.bottom.map(|c| c.as_abolute(max_vertical)).unwrap_or(0)
     }
 
     /// return left,right,top,bottom
