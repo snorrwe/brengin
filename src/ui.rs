@@ -83,13 +83,8 @@ impl Plugin for UiPlugin {
                     })
                     .with_system(draw_bounding_boxes),
             )
-            .add_system(submit_frame_color_rects.after(draw_bounding_boxes))
             .add_system(submit_frame_texture_rects)
-            .add_system(
-                submit_rects_barrier
-                    .after(submit_frame_texture_rects)
-                    .after(submit_frame_color_rects),
-            )
+            .add_system(submit_rects_barrier.after(submit_frame_texture_rects))
             .add_system(update_ids)
             .add_system(gc_bounding_boxes.after(draw_bounding_boxes))
             .add_system(shaping_gc_system)
@@ -3414,41 +3409,6 @@ fn begin_frame(
     ui.scissor_idx = 0;
     ui.layer = 0;
     next_inputs.0.clear();
-}
-
-// preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
-// GC if too many
-// most frames should have the same items
-fn submit_frame_color_rects(
-    mut ui: ResMut<UiState>,
-    mut cmd: Commands,
-    mut color_rect_q: Query<(&mut ColorRectRequests, &mut UiScissor, EntityId)>,
-) {
-    let mut color_rects = std::mem::take(&mut ui.color_rects);
-    color_rects.sort_unstable_by_key(|r| r.scissor);
-
-    let mut buffers_reused = 0;
-    let mut rects_consumed = 0;
-    for (g, (rects, sc, _id)) in
-        (color_rects.chunk_by(|a, b| a.scissor == b.scissor)).zip(color_rect_q.iter_mut())
-    {
-        buffers_reused += 1;
-        rects_consumed += g.len();
-        rects.0.clear();
-        rects.0.extend_from_slice(g);
-        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
-    }
-    for (_, _, id) in color_rect_q.iter().skip(buffers_reused) {
-        cmd.delete(id);
-    }
-    for g in color_rects[rects_consumed..].chunk_by(|a, b| a.scissor == b.scissor) {
-        cmd.spawn().insert_bundle((
-            ColorRectRequests(g.to_vec()),
-            UiScissor(ui.scissors[g[0].scissor as usize]),
-        ));
-    }
-    ui.color_rects = color_rects;
-    ui.color_rects.clear();
 }
 
 // preserve the buffers by zipping together a query with the chunks, spawn new if not enough,

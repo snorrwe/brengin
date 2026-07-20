@@ -3,7 +3,6 @@ use std::mem::size_of;
 use crate::renderer::{
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, texture,
 };
-use crate::ui::submit_rects_barrier;
 use crate::wgpu::include_wgsl;
 use cecs::prelude::*;
 use wgpu::util::DeviceExt as _;
@@ -203,47 +202,62 @@ fn setup_renderer(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
     cmd.insert_resource(pipeline);
 }
 
-fn update_instances(
-    mut q: Query<(
-        EntityId,
-        &ColorRectRequests,
-        Option<&mut RectInstanceBuffer>,
+// preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
+// GC if too many
+// most frames should have the same items
+fn update_instances<'a>(
+    mut ui: ResMut<super::UiState>,
+    mut cmd: Commands,
+    mut color_rect_q: QuerySet<(
+        Query<
+            'a,
+            (
+                &mut ColorRectRequests,
+                &mut UiScissor,
+                EntityId,
+                Option<&mut RectInstanceBuffer>,
+            ),
+        >,
+        Query<
+            'a,
+            (
+                EntityId,
+                &ColorRectRequests,
+                Option<&mut RectInstanceBuffer>,
+            ),
+        >,
     )>,
     renderer: Res<GraphicsState>,
-    mut cmd: Commands,
 ) {
+    let mut color_rects = std::mem::take(&mut ui.color_rects);
     // TODO: retain buffer
     let mut buff = Vec::new();
     let w = renderer.size().x as f32;
     let h = renderer.size().y as f32;
-    for (id, rects, buffer) in q.iter_mut() {
-        buff.clear();
-        buff.reserve(rects.0.len());
-        buff.extend(rects.0.iter().map(|rect| {
-            let ww = rect.w as f32 * 0.5;
-            let hh = rect.h as f32 * 0.5;
-            // flip y
-            let y = h - rect.y as f32;
-            // switch order of layers, lower layers are in the front
-            // remap to 0..1
-            let layer = (0xFFFF - rect.layer) as f32 / (0xFFFF as f32);
-            let outline_radius = rect.outline_radius as f32;
-            let outline_x = outline_radius / rect.w as f32;
-            let outline_y = outline_radius / rect.h as f32;
-            DrawRectInstance {
-                x: (rect.x as f32 + ww) / w,
-                y: (y - hh) / h,
-                // w: ww / w,
-                w: (rect.w as f32 + outline_radius * 2.0) / w,
-                h: (rect.h as f32 + outline_radius * 2.0) / h,
-                layer,
-                color: rect.color,
-                outline_x,
-                outline_y,
-                outline_color: rect.outline_color,
-            }
-        }));
 
+    let mut buffers_reused = 0;
+    let mut rects_consumed = 0;
+    color_rects.sort_unstable_by_key(|r| r.scissor);
+
+    fn make_buffer(buff: &[u8], renderer: &GraphicsState) -> wgpu::Buffer {
+        renderer
+            .device()
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("Rect Instance Buffer")),
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                contents: buff,
+            })
+    }
+
+    for (g, (rects, sc, id, buffer)) in
+        (color_rects.chunk_by(|a, b| a.scissor == b.scissor)).zip(color_rect_q.q0_mut().iter_mut())
+    {
+        buffers_reused += 1;
+        rects_consumed += g.len();
+        rects.0.clear();
+        rects.0.extend_from_slice(g);
+        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
+        update_rect_instances(&mut buff, w, h, rects);
         match buffer {
             Some(buffer) if rects.0.len() <= buffer.capacity => {
                 renderer.queue().write_buffer(
@@ -254,14 +268,7 @@ fn update_instances(
                 buffer.len = buff.len();
             }
             _ => {
-                let buffer =
-                    renderer
-                        .device()
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some(&format!("Rect Instance Buffer {}", id)),
-                            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                            contents: bytemuck::cast_slice(buff.as_slice()),
-                        });
+                let buffer = make_buffer(bytemuck::cast_slice(buff.as_slice()), &renderer);
                 cmd.entity(id).insert(RectInstanceBuffer {
                     buffer,
                     len: rects.0.len(),
@@ -270,6 +277,59 @@ fn update_instances(
             }
         }
     }
+    for (_, _, id, _) in color_rect_q.q0().iter().skip(buffers_reused) {
+        cmd.delete(id);
+    }
+    for g in color_rects[rects_consumed..].chunk_by(|a, b| a.scissor == b.scissor) {
+        let rects = ColorRectRequests(g.to_vec());
+        let scissor = UiScissor(ui.scissors[g[0].scissor as usize]);
+        update_rect_instances(&mut buff, w, h, &rects);
+        let buffer = make_buffer(bytemuck::cast_slice(buff.as_slice()), &renderer);
+        cmd.spawn().insert_bundle((
+            RectInstanceBuffer {
+                buffer,
+                len: rects.0.len(),
+                capacity: rects.0.len(),
+            },
+            rects,
+            scissor,
+        ));
+    }
+    ui.color_rects = color_rects;
+}
+
+fn update_rect_instances<'a, 'b>(
+    buff: &'a mut Vec<DrawRectInstance>,
+    w: f32,
+    h: f32,
+    rects: &'b ColorRectRequests,
+) {
+    buff.clear();
+    buff.reserve(rects.0.len());
+    buff.extend(rects.0.iter().map(|rect| {
+        let ww = rect.w as f32 * 0.5;
+        let hh = rect.h as f32 * 0.5;
+        // flip y
+        let y = h - rect.y as f32;
+        // switch order of layers, lower layers are in the front
+        // remap to 0..1
+        let layer = (0xFFFF - rect.layer) as f32 / (0xFFFF as f32);
+        let outline_radius = rect.outline_radius as f32;
+        let outline_x = outline_radius / rect.w as f32;
+        let outline_y = outline_radius / rect.h as f32;
+        DrawRectInstance {
+            x: (rect.x as f32 + ww) / w,
+            y: (y - hh) / h,
+            // w: ww / w,
+            w: (rect.w as f32 + outline_radius * 2.0) / w,
+            h: (rect.h as f32 + outline_radius * 2.0) / h,
+            layer,
+            color: rect.color,
+            outline_x,
+            outline_y,
+            outline_color: rect.outline_color,
+        }
+    }));
 }
 
 pub struct UiColorRectPlugin;
@@ -283,7 +343,7 @@ impl Plugin for UiColorRectPlugin {
         ));
         app.add_startup_system(setup_renderer);
         app.with_stage(crate::Stage::PostUpdate, |s| {
-            s.add_system(update_instances.after(submit_rects_barrier));
+            s.add_system(update_instances);
         });
     }
 }
