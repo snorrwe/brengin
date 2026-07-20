@@ -3,6 +3,7 @@ use std::mem::size_of;
 use crate::renderer::{
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, texture,
 };
+use crate::ui::submit_rects_barrier;
 use crate::wgpu::include_wgsl;
 use cecs::prelude::*;
 use wgpu::util::DeviceExt as _;
@@ -281,8 +282,8 @@ impl Plugin for UiColorRectPlugin {
             RenderPass::Ui,
         ));
         app.add_startup_system(setup_renderer);
-        app.with_stage(crate::Stage::Update, |s| {
-            s.add_system(update_instances);
+        app.with_stage(crate::Stage::PostUpdate, |s| {
+            s.add_system(update_instances.after(submit_rects_barrier));
         });
     }
 }

@@ -6,6 +6,7 @@ use crate::renderer::texture::Texture;
 use crate::renderer::{
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, texture,
 };
+use crate::ui::submit_rects_barrier;
 use crate::wgpu::include_wgsl;
 use cecs::prelude::*;
 use image::DynamicImage;
@@ -325,8 +326,9 @@ impl Plugin for UiTextureRectPlugin {
             RenderPass::Ui,
         ));
         app.add_startup_system(setup_renderer);
-        app.with_stage(crate::Stage::Update, |s| {
-            s.add_system(update_instances).add_system(extract_textures);
+        app.with_stage(crate::Stage::PostUpdate, |s| {
+            s.add_system(update_instances.after(submit_rects_barrier))
+                .add_system(extract_textures);
         });
         app.insert_resource(UiTextureReferences::default());
         app.with_stage(crate::Stage::PostUpdate, |s| {

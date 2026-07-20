@@ -86,6 +86,12 @@ impl Plugin for UiPlugin {
             .add_system(submit_frame_color_rects.after(draw_bounding_boxes))
             .add_system(submit_frame_text_rects.after(draw_bounding_boxes))
             .add_system(submit_frame_texture_rects)
+            .add_system(
+                submit_rects_barrier
+                    .after(submit_frame_texture_rects)
+                    .after(submit_frame_text_rects)
+                    .after(submit_frame_color_rects),
+            )
             .add_system(update_ids)
             .add_system(gc_bounding_boxes.after(draw_bounding_boxes))
             .add_system(shaping_gc_system)
@@ -4239,4 +4245,10 @@ pub struct AreaDescriptor {
     pub height: UiCoord,
     /// TODO: this is currently a placeholder and has no actual function
     pub scroll_on_overflow: bool,
+}
+
+/// Updating the buffers in the pipeline submodules has to happen after the submissions by the UI
+/// But they have to happen in the same schedule because I can't have a stage between these systems
+fn submit_rects_barrier(mut world: WorldAccess) {
+    let _ = world.world_mut().apply_commands().map_err(drop);
 }
