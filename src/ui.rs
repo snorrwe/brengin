@@ -27,7 +27,7 @@ use cecs::{prelude::*, query};
 use glam::IVec2;
 use image::DynamicImage;
 use text_rect_pipeline::DrawTextRect;
-use textured_rect_pipeline::{DrawTextureRect, TextureRectRequests};
+use textured_rect_pipeline::DrawTextureRect;
 use winit::{
     dpi::PhysicalPosition,
     event::{MouseButton, MouseScrollDelta},
@@ -35,7 +35,7 @@ use winit::{
 };
 
 use {
-    color_rect_pipeline::{ColorRectRequests, DrawColorRect},
+    color_rect_pipeline::DrawColorRect,
     rect::UiRect,
     text::{OwnedTypeFace, TextDrawResponse},
 };
@@ -83,8 +83,6 @@ impl Plugin for UiPlugin {
                     })
                     .with_system(draw_bounding_boxes),
             )
-            .add_system(submit_frame_texture_rects)
-            .add_system(submit_rects_barrier.after(submit_frame_texture_rects))
             .add_system(update_ids)
             .add_system(gc_bounding_boxes.after(draw_bounding_boxes))
             .add_system(shaping_gc_system)
@@ -3411,41 +3409,6 @@ fn begin_frame(
     next_inputs.0.clear();
 }
 
-// preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
-// GC if too many
-// most frames should have the same items
-fn submit_frame_texture_rects(
-    mut ui: ResMut<UiState>,
-    mut cmd: Commands,
-    mut texture_rect_q: Query<(&mut TextureRectRequests, &mut UiScissor, EntityId)>,
-) {
-    let mut textured_rects = std::mem::take(&mut ui.texture_rects);
-    textured_rects.sort_unstable_by_key(|r| r.scissor);
-
-    let mut buffers_reused = 0;
-    let mut rects_consumed = 0;
-    for (g, (rects, sc, _id)) in
-        (textured_rects.chunk_by_mut(|a, b| a.scissor == b.scissor)).zip(texture_rect_q.iter_mut())
-    {
-        buffers_reused += 1;
-        rects_consumed += g.len();
-        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
-        rects.0.clear();
-        rects.0.extend(g.iter_mut().map(|x| std::mem::take(x)));
-    }
-    for (_, _, id) in texture_rect_q.iter().skip(buffers_reused) {
-        cmd.delete(id);
-    }
-    for g in textured_rects[rects_consumed..].chunk_by_mut(|a, b| a.scissor == b.scissor) {
-        cmd.spawn().insert_bundle((
-            UiScissor(ui.scissors[g[0].scissor as usize]),
-            TextureRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
-        ));
-    }
-    ui.texture_rects = textured_rects;
-    ui.texture_rects.clear();
-}
-
 pub struct Ui<'a> {
     ids: Res<'a, UiIds>,
     next_ids: ResMut<'a, NextUiIds>,
@@ -4168,10 +4131,4 @@ pub struct AreaDescriptor {
     pub height: UiCoord,
     /// TODO: this is currently a placeholder and has no actual function
     pub scroll_on_overflow: bool,
-}
-
-/// Updating the buffers in the pipeline submodules has to happen after the submissions by the UI
-/// But they have to happen in the same schedule because I can't have a stage between these systems
-fn submit_rects_barrier(mut world: WorldAccess) {
-    let _ = world.world_mut().apply_commands().map_err(drop);
 }

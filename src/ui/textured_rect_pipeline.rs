@@ -6,7 +6,6 @@ use crate::renderer::texture::Texture;
 use crate::renderer::{
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, texture,
 };
-use crate::ui::submit_rects_barrier;
 use crate::wgpu::include_wgsl;
 use cecs::prelude::*;
 use image::DynamicImage;
@@ -246,15 +245,19 @@ fn setup_renderer(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
 }
 
 fn update_instances(
-    q: Query<(&TextureRectRequests, &UiScissor)>,
     renderer: Res<GraphicsState>,
     mut pipeline: ResMut<UiTexturePipeline>,
+    mut ui: ResMut<super::UiState>,
+    mut cmd: Commands,
+    mut texture_rect_q: Query<(&mut TextureRectRequests, &mut UiScissor, EntityId)>,
 ) {
-    // TODO: retain buffer
-    let w = renderer.size().x as f32;
-    let h = renderer.size().y as f32;
-    let mut instances = HashMap::<(AssetId, UiScissor), Vec<DrawRectInstance>>::default();
-    for (rects, scissor) in q.iter() {
+    fn update_draw_instances(
+        w: f32,
+        h: f32,
+        instances: &mut HashMap<(u64, UiScissor), Vec<DrawRectInstance>>,
+        rects: &TextureRectRequests,
+        scissor: &UiScissor,
+    ) {
         for rect in rects.0.iter() {
             let half_w = rect.w as f32 * 0.5;
             let half_h = rect.h as f32 * 0.5;
@@ -277,6 +280,36 @@ fn update_instances(
                 .push(instance);
         }
     }
+    // TODO: retain buffer
+    let w = renderer.size().x as f32;
+    let h = renderer.size().y as f32;
+    let mut instances = HashMap::<(AssetId, UiScissor), Vec<DrawRectInstance>>::default();
+
+    let mut textured_rects = std::mem::take(&mut ui.texture_rects);
+    textured_rects.sort_unstable_by_key(|r| r.scissor);
+
+    let mut buffers_reused = 0;
+    let mut rects_consumed = 0;
+    for (g, (rects, sc, _id)) in
+        (textured_rects.chunk_by_mut(|a, b| a.scissor == b.scissor)).zip(texture_rect_q.iter_mut())
+    {
+        buffers_reused += 1;
+        rects_consumed += g.len();
+        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
+        rects.0.clear();
+        rects.0.extend(g.iter_mut().map(|x| std::mem::take(x)));
+        update_draw_instances(w, h, &mut instances, rects, sc);
+    }
+    for (_, _, id) in texture_rect_q.iter().skip(buffers_reused) {
+        cmd.delete(id);
+    }
+    for g in textured_rects[rects_consumed..].chunk_by_mut(|a, b| a.scissor == b.scissor) {
+        cmd.spawn().insert_bundle((
+            UiScissor(ui.scissors[g[0].scissor as usize]),
+            TextureRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
+        ));
+    }
+    ui.texture_rects = textured_rects;
 
     // FIXME: retain buffers or do a smarter gc
     pipeline.instances.clear();
@@ -327,8 +360,7 @@ impl Plugin for UiTextureRectPlugin {
         ));
         app.add_startup_system(setup_renderer);
         app.with_stage(crate::Stage::PostUpdate, |s| {
-            s.add_system(update_instances.after(submit_rects_barrier))
-                .add_system(extract_textures);
+            s.add_system(update_instances).add_system(extract_textures);
         });
         app.insert_resource(UiTextureReferences::default());
         app.with_stage(crate::Stage::PostUpdate, |s| {
