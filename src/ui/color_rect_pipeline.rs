@@ -12,7 +12,7 @@ use crate::Plugin;
 use super::UiScissor;
 
 #[derive(Default, Clone, Debug)]
-pub struct RectRequests(pub Vec<DrawColorRect>);
+pub struct ColorRectRequests(pub Vec<DrawColorRect>);
 
 struct RectInstanceBuffer {
     buffer: wgpu::Buffer,
@@ -203,7 +203,11 @@ fn setup_renderer(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
 }
 
 fn update_instances(
-    mut q: Query<(EntityId, &RectRequests, Option<&mut RectInstanceBuffer>)>,
+    mut q: Query<(
+        EntityId,
+        &ColorRectRequests,
+        Option<&mut RectInstanceBuffer>,
+    )>,
     renderer: Res<GraphicsState>,
     mut cmd: Commands,
 ) {
@@ -271,7 +275,7 @@ pub struct UiColorRectPlugin;
 
 impl Plugin for UiColorRectPlugin {
     fn build(self, app: &mut crate::App) {
-        app.insert_resource(RectRequests::default());
+        app.insert_resource(ColorRectRequests::default());
 
         app.add_plugin(RenderCommandPlugin::<RectRenderCommand>::new(
             RenderPass::Ui,

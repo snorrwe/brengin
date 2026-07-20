@@ -35,7 +35,7 @@ use winit::{
 };
 
 use {
-    color_rect_pipeline::{DrawColorRect, RectRequests},
+    color_rect_pipeline::{ColorRectRequests, DrawColorRect},
     rect::UiRect,
     text::{OwnedTypeFace, TextDrawResponse},
 };
@@ -3418,7 +3418,7 @@ fn begin_frame(
 fn submit_frame_color_rects(
     mut ui: ResMut<UiState>,
     mut cmd: Commands,
-    mut color_rect_q: Query<(&mut RectRequests, &mut UiScissor, EntityId)>,
+    mut color_rect_q: Query<(&mut ColorRectRequests, &mut UiScissor, EntityId)>,
 ) {
     let mut color_rects = std::mem::take(&mut ui.color_rects);
     color_rects.sort_unstable_by_key(|r| r.scissor);
@@ -3439,7 +3439,7 @@ fn submit_frame_color_rects(
     }
     for g in color_rects[rects_consumed..].chunk_by(|a, b| a.scissor == b.scissor) {
         cmd.spawn().insert_bundle((
-            RectRequests(g.to_vec()),
+            ColorRectRequests(g.to_vec()),
             UiScissor(ui.scissors[g[0].scissor as usize]),
         ));
     }
