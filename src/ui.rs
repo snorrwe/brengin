@@ -3483,7 +3483,7 @@ fn submit_frame_texture_rects(
         ));
     }
     ui.texture_rects = textured_rects;
-    ui.text_rects.clear();
+    ui.texture_rects.clear();
 }
 
 pub struct Ui<'a> {
