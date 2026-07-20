@@ -6,7 +6,6 @@ use crate::renderer::texture::Texture;
 use crate::renderer::{
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, texture,
 };
-use crate::ui::submit_rects_barrier;
 use crate::wgpu::include_wgsl;
 use cecs::prelude::*;
 
@@ -256,16 +255,22 @@ fn setup_renderer(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
     cmd.insert_resource(pipeline);
 }
 
+// preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
+// GC if too many
+// most frames should have the same items
+//
 fn update_instances(
-    q: Query<(&TextRectRequests, &UiScissor)>,
     renderer: Res<GraphicsState>,
     mut pipeline: ResMut<TextPipeline>,
+    mut ui: ResMut<super::UiState>,
+    mut cmd: Commands,
+    mut q: Query<(&mut TextRectRequests, &mut UiScissor, EntityId)>,
 ) {
     // TODO: retain buffer
     let w = renderer.size().x as f32;
     let h = renderer.size().y as f32;
     let mut instances = HashMap::<(AssetId, UiScissor), Vec<DrawRectInstance>>::default();
-    for (rects, scissor) in q.iter() {
+    let mut update_gpu_instances = |rects: &TextRectRequests, scissor| {
         for rect in rects.0.iter() {
             let ww = rect.w as f32 * 0.5;
             let hh = rect.h as f32 * 0.5;
@@ -284,11 +289,38 @@ fn update_instances(
                 color: rect.color,
             };
             instances
-                .entry((rect.shaping.id(), *scissor))
+                .entry((rect.shaping.id(), scissor))
                 .or_default()
                 .push(instance);
         }
+    };
+
+    let mut buffers_reused = 0;
+    let mut rects_consumed = 0;
+    // take the buffer so the borrow checker isn't panicking
+    let mut text_rects = std::mem::take(&mut ui.text_rects);
+    text_rects.sort_unstable_by_key(|r| r.scissor);
+    for (g, (rects, sc, _id)) in
+        (text_rects.chunk_by_mut(|a, b| a.scissor == b.scissor)).zip(q.iter_mut())
+    {
+        buffers_reused += 1;
+        rects_consumed += g.len();
+        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
+        rects.0.clear();
+        rects.0.extend(g.iter_mut().map(|x| std::mem::take(x)));
+        update_gpu_instances(rects, *sc);
     }
+    for (_, _, id) in q.iter().skip(buffers_reused) {
+        cmd.delete(id);
+    }
+    for g in text_rects[rects_consumed..].chunk_by_mut(|a, b| a.scissor == b.scissor) {
+        let scissor = UiScissor(ui.scissors[g[0].scissor as usize]);
+        let mut requests = TextRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect());
+        update_gpu_instances(&mut requests, scissor);
+        cmd.spawn().insert_bundle((scissor, requests));
+    }
+    // restore the buffer
+    ui.text_rects = text_rects;
 
     // FIXME: retain buffers or do a smarter gc
     pipeline.instances.clear();
@@ -343,9 +375,11 @@ impl Plugin for UiTextRectPlugin {
         ));
         app.add_startup_system(setup_renderer);
         app.insert_resource(UiTextureReferences::default());
+        app.with_stage(crate::Stage::PreUpdate, |s| {
+            s.add_system(gc_text_textures);
+        });
         app.with_stage(crate::Stage::PostUpdate, |s| {
-            s.add_system(gc_text_textures.after(extract_shaping_results))
-                .add_system(update_instances.after(submit_rects_barrier))
+            s.add_system(update_instances)
                 .add_system(extract_shaping_results);
         });
     }

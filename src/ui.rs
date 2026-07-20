@@ -26,7 +26,7 @@ use std::{
 use cecs::{prelude::*, query};
 use glam::IVec2;
 use image::DynamicImage;
-use text_rect_pipeline::{DrawTextRect, TextRectRequests};
+use text_rect_pipeline::DrawTextRect;
 use textured_rect_pipeline::{DrawTextureRect, TextureRectRequests};
 use winit::{
     dpi::PhysicalPosition,
@@ -84,12 +84,10 @@ impl Plugin for UiPlugin {
                     .with_system(draw_bounding_boxes),
             )
             .add_system(submit_frame_color_rects.after(draw_bounding_boxes))
-            .add_system(submit_frame_text_rects.after(draw_bounding_boxes))
             .add_system(submit_frame_texture_rects)
             .add_system(
                 submit_rects_barrier
                     .after(submit_frame_texture_rects)
-                    .after(submit_frame_text_rects)
                     .after(submit_frame_color_rects),
             )
             .add_system(update_ids)
@@ -3451,41 +3449,6 @@ fn submit_frame_color_rects(
     }
     ui.color_rects = color_rects;
     ui.color_rects.clear();
-}
-
-// preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
-// GC if too many
-// most frames should have the same items
-fn submit_frame_text_rects(
-    mut ui: ResMut<UiState>,
-    mut cmd: Commands,
-    mut text_rect_q: Query<(&mut TextRectRequests, &mut UiScissor, EntityId)>,
-) {
-    let mut text_rects = std::mem::take(&mut ui.text_rects);
-    text_rects.sort_unstable_by_key(|r| r.scissor);
-
-    let mut buffers_reused = 0;
-    let mut rects_consumed = 0;
-    for (g, (rects, sc, _id)) in
-        (text_rects.chunk_by_mut(|a, b| a.scissor == b.scissor)).zip(text_rect_q.iter_mut())
-    {
-        buffers_reused += 1;
-        rects_consumed += g.len();
-        *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
-        rects.0.clear();
-        rects.0.extend(g.iter_mut().map(|x| std::mem::take(x)));
-    }
-    for (_, _, id) in text_rect_q.iter().skip(buffers_reused) {
-        cmd.delete(id);
-    }
-    for g in text_rects[rects_consumed..].chunk_by_mut(|a, b| a.scissor == b.scissor) {
-        cmd.spawn().insert_bundle((
-            UiScissor(ui.scissors[g[0].scissor as usize]),
-            TextRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect()),
-        ));
-    }
-    ui.text_rects = text_rects;
-    ui.text_rects.clear();
 }
 
 // preserve the buffers by zipping together a query with the chunks, spawn new if not enough,
