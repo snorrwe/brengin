@@ -2522,6 +2522,7 @@ impl<'a> Ui<'a> {
             let history_start = self.ui_state.rect_history.len();
             let old_layer = std::mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
             let old_bounds = self.ui_state.bounds;
+            let old_scissor = std::mem::replace(&mut self.ui_state.scissor_idx, 0);
 
             let outline_size = 2;
             let [p_left, p_right, p_top, p_bot] = self
@@ -2622,6 +2623,7 @@ impl<'a> Ui<'a> {
                 .resize_with(history_start, || unreachable!());
             self.ui_state.scissor_idx = scissor;
             self.ui_state.layer = old_layer;
+            self.ui_state.scissor_idx = old_scissor;
             self.ui_state.bounds = old_bounds;
         } else {
             if contains_mouse
@@ -2683,6 +2685,7 @@ impl<'a> Ui<'a> {
             let history_start = self.ui_state.rect_history.len();
             let old_layer = std::mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
             let old_bounds = self.ui_state.bounds;
+            let old_scissor = std::mem::replace(&mut self.ui_state.scissor_idx, 0);
 
             let outline_size = 2;
             let [p_left, p_right, p_top, p_bot] = self
@@ -2769,6 +2772,7 @@ impl<'a> Ui<'a> {
                 .resize_with(history_start, || unreachable!());
             self.ui_state.scissor_idx = scissor;
             self.ui_state.layer = old_layer;
+            self.ui_state.scissor_idx = old_scissor;
             self.ui_state.bounds = old_bounds;
         }
 
