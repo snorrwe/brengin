@@ -466,10 +466,7 @@ fn render_system(mut world: WorldAccess) {
                             load: wgpu::LoadOp::Clear(1.0),
                             store: StoreOp::Store,
                         }),
-                        stencil_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(0),
-                            store: StoreOp::Store,
-                        }),
+                        stencil_ops: None,
                     }),
                     ..Default::default()
                 });
