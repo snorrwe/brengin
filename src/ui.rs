@@ -3469,6 +3469,9 @@ pub struct WindowDescriptor<'a> {
     pub pos: Option<IVec2>,
     /// Initial window size
     pub size: Option<IVec2>,
+    /// Show the close button.
+    /// On press returns [WindowResponse::close_requested]
+    pub close_btn: bool,
 }
 
 impl<'a> Default for WindowDescriptor<'a> {
@@ -3478,6 +3481,7 @@ impl<'a> Default for WindowDescriptor<'a> {
             show_title: true,
             pos: None,
             size: None,
+            close_btn: false,
         }
     }
 }
@@ -3507,8 +3511,16 @@ impl WindowAllocator {
     }
 }
 
+pub struct WindowResponse {
+    pub close_requested: bool,
+}
+
 impl<'a> UiRoot<'a> {
-    pub fn window(&mut self, desc: WindowDescriptor, contents: impl FnOnce(&mut Ui)) {
+    pub fn window(
+        &mut self,
+        desc: WindowDescriptor,
+        contents: impl FnOnce(&mut Ui),
+    ) -> WindowResponse {
         let mut allocator = mem::take(&mut self.0.ui_state.window_allocator);
         let old_bounds = self.0.ui_state.bounds;
         let state: &mut WindowState = self
@@ -3552,6 +3564,8 @@ impl<'a> UiRoot<'a> {
 
         let scissor = self.0.ui_state.scissor_idx;
 
+        let mut close_requested = false;
+
         self.0.children_content(|ui| {
             ui.ui_state.layer = WINDOW_LAYER;
             // window background
@@ -3581,7 +3595,7 @@ impl<'a> UiRoot<'a> {
             ///////////////////////
             // Title
             if desc.show_title {
-                window_title(&desc, title_bounds, ui);
+                close_requested = window_title(&desc, title_bounds, ui);
             }
             ///////////////////////
             ///////////////////////
@@ -3616,6 +3630,8 @@ impl<'a> UiRoot<'a> {
 
         self.0.ui_state.window_allocator = allocator;
         self.0.pop_child();
+
+        WindowResponse { close_requested }
     }
 
     pub fn panel(&mut self, desc: PanelDescriptor, contents: impl FnOnce(&mut Ui)) {
@@ -3741,10 +3757,10 @@ impl<'a> UiRoot<'a> {
     }
 }
 
-fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'_>) {
+/// Return true if close was requested
+fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'_>) -> bool {
     ui.ui_state.bounds = title_bounds;
     ui.push_scissor(title_bounds);
-    ui.label(desc.name);
     let WidgetInfo {
         id: title_id,
         is_active,
@@ -3773,8 +3789,20 @@ fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'
             ui.set_active(title_id);
         }
     }
+    let mut request_close = false;
+    ui.horizontal(VerticalAlignment::Center, |ui| {
+        ui.label(desc.name);
+        if desc.close_btn {
+            ui.horizontal_rev(VerticalAlignment::Center, |ui| {
+                request_close = ui.button("X").pressed();
+            });
+        }
+    });
+
     ui.submit_rect(title_id, title_bounds, ui.theme.padding);
     ui.color_rect_from_rect(title_bounds, ui.theme.window_title_color, WINDOW_LAYER);
+
+    request_close
 }
 
 unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
