@@ -56,7 +56,7 @@ fn update_camera_aspect(
 
 impl PerspectiveCamera {
     pub fn perspective(&self) -> Mat4 {
-        Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar)
+        glam::camera::rh::proj::directx::perspective(self.fovy, self.aspect, self.znear, self.zfar)
     }
 }
 
@@ -106,7 +106,7 @@ fn update_view_projections(
     mut q: Query<(&GlobalTransform, &PerspectiveCamera, &mut CameraUniform)>,
 ) {
     for (GlobalTransform(tr), cam, uni) in q.iter_mut() {
-        let look_at = Mat4::look_to_rh(tr.pos, -tr.local_z(), tr.local_y());
+        let look_at = glam::camera::rh::view::look_to_mat4(tr.pos, -tr.local_z(), tr.local_y());
 
         uni.view = look_at;
         uni.view_inv = uni.view.inverse();
