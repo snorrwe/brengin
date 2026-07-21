@@ -3580,39 +3580,7 @@ impl<'a> UiRoot<'a> {
             );
             ///////////////////////
             // Title
-            ui.ui_state.bounds = title_bounds;
-            ui.push_scissor(title_bounds);
-            ui.label(desc.name);
-            let WidgetInfo {
-                id: title_id,
-                is_active,
-                ..
-            } = ui.begin_widget();
-            if is_active {
-                if ui.mouse_down() {
-                    ui.set_active(title_id);
-                }
-                let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
-
-                let drag_anchor = state.drag_anchor;
-                let drag_start = state.drag_start;
-
-                let offset = IVec2::new(
-                    (ui.mouse.cursor_position.x - drag_start.x) as i32,
-                    (ui.mouse.cursor_position.y - drag_start.y) as i32,
-                );
-
-                state.pos = drag_anchor + offset;
-            } else {
-                if !ui.is_anything_active() && ui.contains_mouse(title_id) && ui.mouse_down() {
-                    let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
-                    state.drag_start = ui.mouse.cursor_position;
-                    state.drag_anchor = state.pos;
-                    ui.set_active(title_id);
-                }
-            }
-            ui.submit_rect(title_id, title_bounds, ui.theme.padding);
-            ui.color_rect_from_rect(title_bounds, ui.theme.window_title_color, WINDOW_LAYER);
+            window_title(&desc, title_bounds, ui);
             ///////////////////////
             ///////////////////////
             // Content
@@ -3769,6 +3737,42 @@ impl<'a> UiRoot<'a> {
         self.0.ui_state.bounds = old_bounds;
         self.0.ui_state.scissor_idx = scissor;
     }
+}
+
+fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'_>) {
+    ui.ui_state.bounds = title_bounds;
+    ui.push_scissor(title_bounds);
+    ui.label(desc.name);
+    let WidgetInfo {
+        id: title_id,
+        is_active,
+        ..
+    } = ui.begin_widget();
+    if is_active {
+        if ui.mouse_down() {
+            ui.set_active(title_id);
+        }
+        let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
+
+        let drag_anchor = state.drag_anchor;
+        let drag_start = state.drag_start;
+
+        let offset = IVec2::new(
+            (ui.mouse.cursor_position.x - drag_start.x) as i32,
+            (ui.mouse.cursor_position.y - drag_start.y) as i32,
+        );
+
+        state.pos = drag_anchor + offset;
+    } else {
+        if !ui.is_anything_active() && ui.contains_mouse(title_id) && ui.mouse_down() {
+            let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
+            state.drag_start = ui.mouse.cursor_position;
+            state.drag_anchor = state.pos;
+            ui.set_active(title_id);
+        }
+    }
+    ui.submit_rect(title_id, title_bounds, ui.theme.padding);
+    ui.color_rect_from_rect(title_bounds, ui.theme.window_title_color, WINDOW_LAYER);
 }
 
 unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
