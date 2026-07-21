@@ -7,7 +7,7 @@
   };
 
   outputs =
-    inputs@{
+    {
       self,
       nixpkgs,
       rust-overlay,
@@ -30,6 +30,7 @@
           libxkbcommon
           libGL
           udev
+          dbus
 
           vulkan-loader
           vulkan-extension-layer

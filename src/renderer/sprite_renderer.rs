@@ -338,7 +338,7 @@ impl SpritePipeline {
                     vertex: wgpu::VertexState {
                         module: &shader,
                         entry_point: Some("vs_main"),
-                        buffers: &[Vertex::desc(), SpriteInstanceRaw::desc()],
+                        buffers: &[Some(Vertex::desc()), Some(SpriteInstanceRaw::desc())],
                         compilation_options: Default::default(),
                     },
                     fragment: Some(wgpu::FragmentState {

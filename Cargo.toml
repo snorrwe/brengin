@@ -21,11 +21,11 @@ fastrand = "2.3.0"
 glam = { version = "0.33.1", features = ["bytemuck"] }
 image = { version = "0.25.9", default-features = false, features = ["png"] }
 smallvec = "1.15.1"
-wgpu = "29.0.1"
+wgpu = "30.0.0"
 winit = "0.30"
 kira = { version = "0.12", optional = true }
 instant = { version = "0.1.13", features = [] }
-pollster = "0.4.0"
+pollster = "1.0.1"
 parking_lot = "0.12.5"
 rustybuzz = "0.20.1"
 tiny-skia = "0.12.0"

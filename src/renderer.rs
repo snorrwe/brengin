@@ -130,6 +130,7 @@ impl GraphicsState {
                 power_preference: wgpu::PowerPreference::default(),
                 force_fallback_adapter: false,
                 compatible_surface: Some(&surface),
+                apply_limit_buckets: false,
             })
             .await
             .expect("Failed to create adapter");
@@ -167,6 +168,7 @@ impl GraphicsState {
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             // TODO: configure
             desired_maximum_frame_latency: 2,
+            color_space: wgpu::SurfaceColorSpace::Auto,
         };
         surface.configure(&device, &config);
 
@@ -486,7 +488,7 @@ fn render_system(mut world: WorldAccess) {
             }
 
             state.queue.submit(std::iter::once(encoder.finish()));
-            output.present();
+            state.queue.present(output);
 
             Ok(())
         },
