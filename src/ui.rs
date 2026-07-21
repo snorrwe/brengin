@@ -3580,7 +3580,9 @@ impl<'a> UiRoot<'a> {
             );
             ///////////////////////
             // Title
-            window_title(&desc, title_bounds, ui);
+            if desc.show_title {
+                window_title(&desc, title_bounds, ui);
+            }
             ///////////////////////
             ///////////////////////
             // Content
