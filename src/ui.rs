@@ -445,7 +445,7 @@ impl Default for Theme {
             font_size: 12,
             padding: Padding::splat(5),
             scroll_bar_size: 12,
-            window_title_height: 24,
+            window_title_height: 32,
             font: Default::default(),
             window_padding: 4,
         }
