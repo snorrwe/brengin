@@ -84,7 +84,6 @@ impl Plugin for UiPlugin {
                     .with_system(draw_bounding_boxes),
             )
             .add_system(update_ids)
-            .add_system(gc_bounding_boxes.after(draw_bounding_boxes))
             .add_system(shaping_gc_system)
             .add_system(update_ui_inputs.after(update_ids))
             .add_system(gc_wants_focus_state_system);
@@ -286,6 +285,23 @@ impl NextUiIdSet {
     }
 }
 
+#[derive(Default)]
+struct NextBoundingBoxes(HashMap<UiId, UiRect>);
+
+impl NextBoundingBoxes {
+    pub fn insert(&mut self, k: UiId, v: UiRect) {
+        self.0.insert(k, v);
+    }
+
+    pub fn remove(&mut self, k: &UiId) {
+        self.0.remove(k);
+    }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+}
+
 /// UI context object. Use this to builder your user interface
 pub struct UiState {
     /// Stack of parents in the UI tree
@@ -304,7 +320,10 @@ pub struct UiState {
     /// Layers go from back to front
     layer: u16,
 
-    bounding_boxes: HashMap<UiId, UiRect>,
+    /// used for writing
+    next_bounding_boxes: NextBoundingBoxes,
+    /// used for reading
+    last_bounding_boxes: HashMap<UiId, UiRect>,
 
     rect_history: Vec<UiRect>,
 
@@ -318,11 +337,6 @@ pub struct UiState {
     fallback_font: OwnedTypeFace,
 
     window_allocator: WindowAllocator,
-}
-
-fn gc_bounding_boxes(mut state: ResMut<UiState>) {
-    let ids: HashSet<_> = state.widget_ids.iter().copied().collect();
-    state.bounding_boxes.retain(|k, _| ids.contains(k));
 }
 
 #[derive(Debug, Clone, Default)]
@@ -466,7 +480,8 @@ impl UiState {
             bounds: Default::default(),
             viewport: Default::default(),
             layer: 0,
-            bounding_boxes: Default::default(),
+            next_bounding_boxes: Default::default(),
+            last_bounding_boxes: Default::default(),
             rect_history: Default::default(),
             root_hash: 0,
             layout_dir: LayoutDirection::TopDown(HorizontalAlignment::Left),
@@ -707,7 +722,9 @@ impl<'a> Ui<'a> {
         if is_hovered {
             self.color_rect_from_rect(drag_bounds, self.theme.primary_color, CONTEXT_LAYER);
         }
-        self.ui_state.bounding_boxes.insert(drag_id, drag_bounds);
+        self.ui_state
+            .next_bounding_boxes
+            .insert(drag_id, drag_bounds);
         ///////////////////////
     }
 
@@ -851,7 +868,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn widget_bounds(&self, id: UiId) -> Option<UiRect> {
-        let mut bbox = *self.ui_state.bounding_boxes.get(&id)?;
+        let mut bbox = *self.ui_state.last_bounding_boxes.get(&id)?;
         if let Some(scissor) = self
             .ui_state
             .scissors
@@ -1330,7 +1347,7 @@ impl<'a> Ui<'a> {
         self.ui_state.bounds.min_x = self.ui_state.bounds.min_x.min(self.ui_state.bounds.max_x);
         self.ui_state.bounds.min_y = self.ui_state.bounds.min_y.min(self.ui_state.bounds.max_y);
 
-        self.ui_state.bounding_boxes.insert(id, rect);
+        self.ui_state.next_bounding_boxes.insert(id, rect);
         self.ui_state.rect_history.push(rect);
     }
 
@@ -1647,7 +1664,7 @@ impl<'a> Ui<'a> {
             self.theme.secondary_color,
             1,
         );
-        self.ui_state.bounding_boxes.insert(id, bounds);
+        self.ui_state.next_bounding_boxes.insert(id, bounds);
 
         // pip
         let t = parent_state.ty;
@@ -1680,7 +1697,7 @@ impl<'a> Ui<'a> {
             max_y: y + scroll_bar_width,
         };
         self.color_rect_from_rect(control_box, self.theme.secondary_color, layer + 1);
-        self.ui_state.bounding_boxes.insert(id, control_box);
+        self.ui_state.next_bounding_boxes.insert(id, control_box);
     }
 
     fn horizontal_scroll_bar(
@@ -1710,7 +1727,7 @@ impl<'a> Ui<'a> {
             self.theme.secondary_color,
             1,
         );
-        self.ui_state.bounding_boxes.insert(id, bounds);
+        self.ui_state.next_bounding_boxes.insert(id, bounds);
 
         // pip
         let t = parent_state.tx;
@@ -1743,7 +1760,7 @@ impl<'a> Ui<'a> {
             max_y: scissor_bounds.max_y + scroll_bar_height,
         };
         self.color_rect_from_rect(control_box, self.theme.secondary_color, layer + 1);
-        self.ui_state.bounding_boxes.insert(id, control_box);
+        self.ui_state.next_bounding_boxes.insert(id, control_box);
     }
 
     pub fn scroll_area(&mut self, desc: ScrollDescriptor, contents: impl FnOnce(&mut Self)) {
@@ -2931,7 +2948,7 @@ impl<'a> Ui<'a> {
         // tooltip should not be considered in layouting
         let children_ids: Vec<_> = self.ui_state.widget_ids[ids..].iter().copied().collect();
         for id in children_ids {
-            self.ui_state.bounding_boxes.remove(&id);
+            self.ui_state.next_bounding_boxes.remove(&id);
         }
         self.ui_state.rect_history.truncate(history_start);
         self.ui_state.bounds = old_bounds;
@@ -3385,6 +3402,8 @@ fn begin_frame(
     window_size: Res<crate::renderer::WindowSize>,
     mut next_inputs: ResMut<NextUiInputs>,
 ) {
+    let ui = &mut *ui;
+
     ui.layout_dir = LayoutDirection::TopDown(HorizontalAlignment::Left);
     ui.root_hash = 0;
     ui.id_stack.clear();
@@ -3394,6 +3413,8 @@ fn begin_frame(
     ui.color_rects.clear();
     ui.text_rects.clear();
     ui.texture_rects.clear();
+    std::mem::swap(&mut ui.next_bounding_boxes.0, &mut ui.last_bounding_boxes);
+    ui.next_bounding_boxes.clear();
     let b = UiRect {
         min_x: 0,
         min_y: 0,
@@ -3892,7 +3913,8 @@ fn bounding_rect(history: &[UiRect]) -> UiRect {
 fn draw_bounding_boxes(mut ui: UiRoot) {
     let mut boxes: Vec<_> =
         ui.0.ui_state
-            .bounding_boxes
+            .next_bounding_boxes
+            .0
             .iter()
             .map(|(k, v)| (*k, *v))
             .collect();
