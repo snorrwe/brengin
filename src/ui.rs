@@ -17,7 +17,7 @@ use std::{
     any::TypeId,
     collections::{HashMap, HashSet},
     hash::Hash,
-    i32,
+    i32, mem,
     ops::{Deref, DerefMut, RangeBounds},
     ptr::NonNull,
     time::Duration,
@@ -48,7 +48,7 @@ pub struct UiDebug {
 pub struct UiPlugin;
 
 fn update_ui_inputs(mut inputs: ResMut<UiInputs>, mut next: ResMut<NextUiInputs>) {
-    *inputs = std::mem::take(&mut next.0);
+    *inputs = mem::take(&mut next.0);
 }
 
 impl Plugin for UiPlugin {
@@ -944,7 +944,7 @@ impl<'a> Ui<'a> {
         let WidgetInfo { id, .. } = self.begin_widget();
         let history_start = self.ui_state.rect_history.len();
         let bounds = self.ui_state.bounds;
-        let layout = std::mem::replace(&mut self.ui_state.layout_dir, layout);
+        let layout = mem::replace(&mut self.ui_state.layout_dir, layout);
         ///////////////////////
         self.children_content(contents);
         ///////////////////////
@@ -1191,7 +1191,7 @@ impl<'a> Ui<'a> {
     }
 
     pub fn with_theme(&mut self, theme: Theme, contents: impl FnOnce(&mut Self)) {
-        let t = std::mem::replace(&mut *self.theme, theme);
+        let t = mem::replace(&mut *self.theme, theme);
 
         ///////////////////////
         contents(self);
@@ -2006,7 +2006,7 @@ impl<'a> Ui<'a> {
             }
         }
 
-        let history = std::mem::take(&mut self.ui_state.rect_history);
+        let history = mem::take(&mut self.ui_state.rect_history);
         self.ui_state.bounds = layout_rect(RectLayoutDescriptor {
             width: state.content_rect.width(),
             height: state.content_rect.height(),
@@ -2032,7 +2032,7 @@ impl<'a> Ui<'a> {
         ///////////////////////
         self.ui_state.layer = layer;
         self.ui_state.bounds = old_bounds;
-        let child_history = std::mem::replace(&mut self.ui_state.rect_history, history);
+        let child_history = mem::replace(&mut self.ui_state.rect_history, history);
         let mut content_bounds = bounding_rect(&child_history);
 
         if is_active {
@@ -2520,9 +2520,9 @@ impl<'a> Ui<'a> {
         state.open = self.has_context_menu(parent_id);
         if state.open {
             let history_start = self.ui_state.rect_history.len();
-            let old_layer = std::mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
+            let old_layer = mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
             let old_bounds = self.ui_state.bounds;
-            let old_scissor = std::mem::replace(&mut self.ui_state.scissor_idx, 0);
+            let old_scissor = mem::replace(&mut self.ui_state.scissor_idx, 0);
 
             let outline_size = 2;
             let [p_left, p_right, p_top, p_bot] = self
@@ -2559,7 +2559,7 @@ impl<'a> Ui<'a> {
                 bounds.offset_y(-bounds.min_y);
             }
 
-            let original_bounds = std::mem::replace(&mut self.ui_state.bounds, bounds);
+            let original_bounds = mem::replace(&mut self.ui_state.bounds, bounds);
 
             let scissor = self.push_scissor(UiRect {
                 min_x: bounds.min_x - p_horizontal - outline_size,
@@ -2683,9 +2683,9 @@ impl<'a> Ui<'a> {
         let mut selected = None;
         if state.open {
             let history_start = self.ui_state.rect_history.len();
-            let old_layer = std::mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
+            let old_layer = mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
             let old_bounds = self.ui_state.bounds;
-            let old_scissor = std::mem::replace(&mut self.ui_state.scissor_idx, 0);
+            let old_scissor = mem::replace(&mut self.ui_state.scissor_idx, 0);
 
             let outline_size = 2;
             let [p_left, p_right, p_top, p_bot] = self
@@ -2701,7 +2701,7 @@ impl<'a> Ui<'a> {
             bounds.max_x = self.ui_state.scissors[0].max_x - p_horizontal - outline_size;
             bounds.max_y = self.ui_state.scissors[0].max_y - p_vertical - outline_size;
 
-            let new_bounds = std::mem::replace(&mut self.ui_state.bounds, bounds);
+            let new_bounds = mem::replace(&mut self.ui_state.bounds, bounds);
 
             let scissor = self.push_scissor(UiRect {
                 min_x: bounds.min_x - p_horizontal - outline_size,
@@ -2929,9 +2929,9 @@ impl<'a> Ui<'a> {
         bounds.min_x = desc.x;
         bounds.min_y = desc.y;
 
-        let old_bounds = std::mem::replace(&mut self.ui_state.bounds, bounds);
+        let old_bounds = mem::replace(&mut self.ui_state.bounds, bounds);
         let old_scissor = self.push_scissor(self.ui_state.scissors[0]);
-        let old_layer = std::mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER);
+        let old_layer = mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER);
         let history_start = self.ui_state.rect_history.len();
         let ids = self.ui_state.widget_ids.len();
 
@@ -2968,7 +2968,7 @@ impl<'a> Ui<'a> {
 
         self.submit_rect(id, bounds, self.theme.padding);
 
-        let mut state = std::mem::take(self.get_memory_or_default::<TooltipState>(id));
+        let mut state = mem::take(self.get_memory_or_default::<TooltipState>(id));
 
         if self.contains_mouse(id) {
             state.hovered_seconds += self.delta_time.0.as_secs_f32();
@@ -3417,7 +3417,7 @@ fn begin_frame(
     ui.color_rects.clear();
     ui.text_rects.clear();
     ui.texture_rects.clear();
-    std::mem::swap(&mut ui.next_bounding_boxes.0, &mut ui.last_bounding_boxes);
+    mem::swap(&mut ui.next_bounding_boxes.0, &mut ui.last_bounding_boxes);
     ui.next_bounding_boxes.clear();
     let b = UiRect {
         min_x: 0,
@@ -3509,7 +3509,7 @@ impl WindowAllocator {
 
 impl<'a> UiRoot<'a> {
     pub fn window(&mut self, desc: WindowDescriptor, contents: impl FnOnce(&mut Ui)) {
-        let mut allocator = std::mem::take(&mut self.0.ui_state.window_allocator);
+        let mut allocator = mem::take(&mut self.0.ui_state.window_allocator);
         let old_bounds = self.0.ui_state.bounds;
         let state: &mut WindowState = self
             .0
@@ -3616,7 +3616,7 @@ impl<'a> UiRoot<'a> {
             ///////////////////////
             ///////////////////////
             // Content
-            let history = std::mem::take(&mut ui.ui_state.rect_history);
+            let history = mem::take(&mut ui.ui_state.rect_history);
             {
                 ui.ui_state.scissor_idx = scissor;
                 ui.push_scissor(bounds);
@@ -3627,7 +3627,7 @@ impl<'a> UiRoot<'a> {
                 ui.ui_state.layer = WINDOW_LAYER + 2;
                 ui.children_content(contents);
             }
-            let child_history = std::mem::replace(&mut ui.ui_state.rect_history, history);
+            let child_history = mem::replace(&mut ui.ui_state.rect_history, history);
             let children_bounds = bounding_rect(&child_history);
             let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
             let size = children_bounds.size();
@@ -3734,7 +3734,7 @@ impl<'a> UiRoot<'a> {
     }
 
     pub fn with_theme(&mut self, theme: Theme, contents: impl FnOnce(&mut Self)) {
-        let t = std::mem::replace(&mut *self.0.theme, theme);
+        let t = mem::replace(&mut *self.0.theme, theme);
 
         ///////////////////////
         contents(self);
