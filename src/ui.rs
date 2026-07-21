@@ -3618,6 +3618,8 @@ impl<'a> UiRoot<'a> {
             // Content
             let history = mem::take(&mut ui.ui_state.rect_history);
             {
+                // push_scissor will clip the scissor to its parent scissor so we need to restore
+                // the index before calling it
                 ui.ui_state.scissor_idx = scissor;
                 ui.push_scissor(bounds);
                 let mut content_bounds = bounds;
