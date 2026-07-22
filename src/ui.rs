@@ -408,35 +408,6 @@ impl From<Handle<DynamicImage>> for ThemeEntry {
     }
 }
 
-#[derive(Clone)]
-pub struct Theme {
-    pub background: ThemeEntry,
-    pub window_background: ThemeEntry,
-    pub window_title_color: Color,
-    pub window_outline_color: Color,
-    pub primary_color: Color,
-    pub secondary_color: Color,
-    pub button_default: ThemeEntry,
-    pub button_hovered: Option<ThemeEntry>,
-    pub button_pressed: Option<ThemeEntry>,
-    /// if unavailable, then fall back to primary_color
-    pub button_text_color: Option<Color>,
-
-    pub context_background: ThemeEntry,
-
-    pub drop_target_default: ThemeEntry,
-    pub drop_target_hovered: Option<ThemeEntry>,
-
-    pub text_padding: u16,
-    pub font_size: u16,
-    pub scroll_bar_size: u16,
-    pub window_title_height: u8,
-    pub font: Handle<OwnedTypeFace>,
-    pub window_padding: u8,
-
-    pub padding: Padding,
-}
-
 impl Default for Theme {
     fn default() -> Self {
         Theme {
@@ -500,67 +471,63 @@ impl UiState {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct ThemeOverride {
-    pub background: Option<ThemeEntry>,
-    pub window_background: Option<ThemeEntry>,
-    pub window_title_color: Option<Color>,
-    pub window_outline_color: Option<Color>,
-    pub primary_color: Option<Color>,
-    pub secondary_color: Option<Color>,
-    pub button_default: Option<ThemeEntry>,
-    pub button_hovered: Option<Option<ThemeEntry>>,
-    pub button_pressed: Option<Option<ThemeEntry>>,
-    pub button_text_color: Option<Option<Color>>,
-
-    pub context_background: Option<ThemeEntry>,
-
-    pub drop_target_default: Option<ThemeEntry>,
-    pub drop_target_hovered: Option<Option<ThemeEntry>>,
-
-    pub text_padding: Option<u16>,
-    pub font_size: Option<u16>,
-    pub padding: Option<Padding>,
-    pub scroll_bar_size: Option<u16>,
-    pub window_title_height: Option<u8>,
-    pub font: Option<Handle<OwnedTypeFace>>,
-    pub window_padding: Option<u8>,
-}
-
-impl ThemeOverride {
-    /// The returned ThemeOverride will revert the effects of this apply
-    pub fn apply(mut self, theme: &mut Theme) -> Self {
-        macro_rules! apply {
-            ($field: ident) => {
-                if let Some(x) = self.$field.take() {
-                    self.$field = Some(std::mem::replace(&mut theme.$field, x));
-                }
-            };
+/// Macro to generate Theme and ThemeOverride
+macro_rules! theme {
+    ($($name: ident : $ty: ty, $with: ident,)*) => {
+        #[derive(Clone)]
+        pub struct Theme {
+            $($name: $ty),*
         }
-        apply!(window_title_color);
-        apply!(window_outline_color);
-        apply!(background);
-        apply!(window_background);
-        apply!(primary_color);
-        apply!(secondary_color);
-        apply!(button_default);
-        apply!(button_hovered);
-        apply!(button_pressed);
-        apply!(button_text_color);
-        apply!(context_background);
-        apply!(drop_target_default);
-        apply!(drop_target_hovered);
-        apply!(text_padding);
-        apply!(font_size);
-        apply!(padding);
-        apply!(scroll_bar_size);
-        apply!(window_title_height);
-        apply!(font);
-        apply!(window_padding);
 
-        self
-    }
+        #[derive(Default, Clone)]
+        pub struct ThemeOverride {
+            $($name: Option<$ty>),*
+        }
+
+        impl ThemeOverride {
+            $(
+            pub fn $with(mut self, value: $ty) -> Self {
+                self.$name = Some(value);
+                self
+            }
+            )*
+
+            /// The returned ThemeOverride will revert the effects of this apply
+            pub fn apply(mut self, theme: &mut Theme) -> Self {
+                $(
+                if let Some(x) = self.$name.take() {
+                    self.$name = Some(std::mem::replace(&mut theme.$name, x));
+                }
+                )*
+
+                self
+            }
+        }
+    };
 }
+
+theme!(
+    background: ThemeEntry, with_background,
+    window_background: ThemeEntry, with_window_background,
+    window_title_color: Color, with_window_title_color,
+    window_outline_color: Color, with_window_outline_color,
+    primary_color: Color, with_primary_color,
+    secondary_color: Color, with_secondary_color,
+    button_default: ThemeEntry, with_button_default,
+    button_hovered: Option<ThemeEntry>, with_button_hovered,
+    button_pressed: Option<ThemeEntry>, with_button_pressed,
+    button_text_color: Option<Color>, with_button_text_color,
+    context_background: ThemeEntry, with_context_background,
+    drop_target_default: ThemeEntry, with_drop_target_default,
+    drop_target_hovered: Option<ThemeEntry>, with_drop_target_hovered,
+    text_padding: u16, with_text_padding,
+    font_size: u16, with_font_size,
+    padding: Padding, with_padding,
+    scroll_bar_size: u16, with_scroll_bar_size,
+    window_title_height: u8, with_window_title_height,
+    font: Handle<OwnedTypeFace>, with_font,
+    window_padding: u8, with_window_padding,
+);
 
 #[derive(Debug, Clone, Copy)]
 pub enum LayoutDirection {
