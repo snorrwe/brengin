@@ -486,8 +486,8 @@ macro_rules! theme {
 
         impl ThemeOverride {
             $(
-            pub fn $with(mut self, value: $ty) -> Self {
-                self.$name = Some(value);
+            pub fn $with(mut self, value: impl Into<Option<$ty>>) -> Self {
+                self.$name = value.into();
                 self
             }
             )*
