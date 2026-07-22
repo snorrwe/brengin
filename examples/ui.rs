@@ -415,10 +415,7 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
         },
         |ui| {
             ui.with_theme_override(
-                brengin::ui::ThemeOverride {
-                    font_size: Some(24),
-                    ..Default::default()
-                },
+                brengin::ui::ThemeOverride::default().with_font_size(24),
                 |ui| {
                     ui.label("My panel is centered!!");
                 },
