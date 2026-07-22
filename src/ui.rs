@@ -476,12 +476,12 @@ macro_rules! theme {
     ($($name: ident : $ty: ty, $with: ident,)*) => {
         #[derive(Clone)]
         pub struct Theme {
-            $($name: $ty),*
+            $(pub $name: $ty),*
         }
 
         #[derive(Default, Clone)]
         pub struct ThemeOverride {
-            $($name: Option<$ty>),*
+            $(pub $name: Option<$ty>),*
         }
 
         impl ThemeOverride {
