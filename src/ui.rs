@@ -3757,14 +3757,19 @@ fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'
         }
     }
     let mut request_close = false;
-    ui.horizontal(VerticalAlignment::Center, |ui| {
-        ui.label(desc.name);
-        if desc.close_btn {
-            ui.horizontal_rev(VerticalAlignment::Center, |ui| {
-                request_close = ui.button("X").pressed();
+    ui.with_theme_override(
+        ThemeOverride::default().with_padding(Padding::from_horizontal(8)),
+        |ui| {
+            ui.horizontal(VerticalAlignment::Center, |ui| {
+                ui.label(desc.name);
+                if desc.close_btn {
+                    ui.horizontal_rev(VerticalAlignment::Center, |ui| {
+                        request_close = ui.button("X").pressed();
+                    });
+                }
             });
-        }
-    });
+        },
+    );
 
     ui.submit_rect(title_id, title_bounds, ui.theme.padding);
     ui.color_rect_from_rect(title_bounds, ui.theme.window_title_color, WINDOW_LAYER);
