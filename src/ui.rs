@@ -1658,10 +1658,9 @@ impl<'a> Ui<'a> {
             }
         }
         let control_box = UiRect {
-            min_x: scissor_bounds.max_x,
             min_y: y,
-            max_x: scissor_bounds.max_x + scroll_bar_width,
             max_y: y + scroll_bar_width,
+            ..bounds
         };
         self.color_rect_from_rect(control_box, self.theme.secondary_color, layer + 1);
         self.ui_state.next_bounding_boxes.insert(id, control_box);
@@ -1722,9 +1721,8 @@ impl<'a> Ui<'a> {
         }
         let control_box = UiRect {
             min_x: x,
-            min_y: scissor_bounds.max_y,
             max_x: x + scroll_bar_height,
-            max_y: scissor_bounds.max_y + scroll_bar_height,
+            ..bounds
         };
         self.color_rect_from_rect(control_box, self.theme.secondary_color, layer + 1);
         self.ui_state.next_bounding_boxes.insert(id, control_box);
