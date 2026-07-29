@@ -2889,7 +2889,7 @@ impl<'a> Ui<'a> {
         self.ui_state.layer = layer;
     }
 
-    pub fn tooltip(&mut self, desc: TooltipDescriptor) {
+    pub fn tooltip(&mut self, desc: TooltipDescriptor) -> UiRect {
         let mut bounds = self.ui_state.scissors[0];
         bounds.min_x = desc.x;
         bounds.min_y = desc.y;
@@ -2919,10 +2919,14 @@ impl<'a> Ui<'a> {
         for id in children_ids {
             self.ui_state.next_bounding_boxes.remove(&id);
         }
+        let bounds = self.history_bounding_rect(history_start);
+
         self.ui_state.rect_history.truncate(history_start);
         self.ui_state.bounds = old_bounds;
         self.ui_state.scissor_idx = old_scissor;
         self.ui_state.layer = old_layer;
+
+        bounds
     }
 
     pub fn with_tooltip(&mut self, contents: impl FnOnce(&mut Self), label: &str) {
