@@ -2889,7 +2889,7 @@ impl<'a> Ui<'a> {
         self.ui_state.layer = layer;
     }
 
-    pub fn tooltip(&mut self, desc: TooltipDescriptor) -> UiRect {
+    pub fn tooltip(&mut self, desc: TooltipDescriptor) -> Response<()> {
         let mut bounds = self.ui_state.scissors[0];
         bounds.min_x = desc.x;
         bounds.min_y = desc.y;
@@ -2900,7 +2900,7 @@ impl<'a> Ui<'a> {
         let history_start = self.ui_state.rect_history.len();
         let ids = self.ui_state.widget_ids.len();
 
-        self.begin_widget();
+        let WidgetInfo { id, is_hovered, .. }: WidgetInfo = self.begin_widget();
 
         ///////////////
         self.with_outline(
@@ -2926,7 +2926,13 @@ impl<'a> Ui<'a> {
         self.ui_state.scissor_idx = old_scissor;
         self.ui_state.layer = old_layer;
 
-        bounds
+        Response {
+            hovered: is_hovered,
+            active: false,
+            rect: bounds,
+            inner: (),
+            id,
+        }
     }
 
     pub fn with_tooltip(&mut self, contents: impl FnOnce(&mut Self), label: &str) {
