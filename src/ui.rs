@@ -3707,9 +3707,9 @@ impl<'a> UiRoot<'a> {
     }
 
     /// key should be a unique index for each empty call in an application
-    pub fn empty(&mut self, key: i32, contents: impl FnOnce(&mut Ui)) {
+    pub fn empty(&mut self, contents: impl FnOnce(&mut Ui)) {
+        self.0.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[0xdeadbeefu32; 4]));
         let old_bounds = self.0.ui_state.bounds;
-        self.0.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[1, key]));
         let scissor = self.0.push_scissor(old_bounds);
         let old_layer = self.0.push_layer();
 
