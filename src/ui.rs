@@ -1229,6 +1229,7 @@ impl<'a> Ui<'a> {
         let mut text_y = 0;
         let mut line_height = 0;
         let text_rects = self.ui_state.text_rects.len();
+        let line_x = self.theme.text_padding as i32;
         for line in label.split('\n') {
             if line.is_empty() {
                 text_y += line_height;
@@ -1239,11 +1240,11 @@ impl<'a> Ui<'a> {
             let pic = &e.texture;
             let line_width = pic.width() as i32;
             line_height = pic.height() as i32;
-            w = w.max(line_width);
+            w = w.max(line_width + line_x);
             h += line_height;
 
             self.text_rect(
-                0,
+                line_x,
                 text_y,
                 line_width,
                 line_height,
