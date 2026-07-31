@@ -528,6 +528,16 @@ fn windows_ui(mut ui: UiRoot) {
             ui.label("hi");
         },
     );
+    ui.window(
+        brengin::ui::WindowDescriptor {
+            name: "2",
+            show_title: true,
+            ..Default::default()
+        },
+        |ui| {
+            ui.label("hi again");
+        },
+    );
 }
 
 async fn game(args: Args) {
