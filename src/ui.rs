@@ -3593,7 +3593,7 @@ impl<'a> UiRoot<'a> {
             let children_bounds = bounding_rect(&child_history);
             let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
             let size = children_bounds.size();
-            if size != state.content_size {
+            if size.x > state.content_size.x || size.y > state.content_size.y {
                 state.content_size = size;
                 state.size = size;
                 state.size.y = (size.y).max(5) + ui.theme.window_title_height as i32;
