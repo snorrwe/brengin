@@ -1,5 +1,6 @@
 export CARGO_PROFILE_RELEASE_DEBUG := "true"
 export RUST_LOG := "warn,brengin=debug"
+export WAYLAND_DISPLAY := ""
 
 _default:
     @just --list
