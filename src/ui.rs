@@ -1531,6 +1531,13 @@ impl<'a> Ui<'a> {
                     }
                 }
             };
+            this.color_rect_from_rect_with_outline(
+                rect,
+                Color::TRANSPARENT_BLACK,
+                layer,
+                Color::BLACK,
+                1,
+            );
             this.theme_rect(
                 rect.min_x,
                 rect.min_y,
