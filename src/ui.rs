@@ -1296,18 +1296,25 @@ impl<'a> Ui<'a> {
             .map(|p| p.as_abs(self.ui_state.bounds.width(), self.ui_state.bounds.height()))
             .unwrap_or_default();
 
+        let rect_original = rect;
+        let mut rect_inflated = rect;
+        rect_inflated.min_x -= p_left;
+        rect_inflated.max_x += p_right;
+        rect_inflated.min_y -= p_top;
+        rect_inflated.max_y += p_bot;
+
         match self.ui_state.layout_dir {
             LayoutDirection::TopDown(_) => {
-                self.ui_state.bounds.min_y = rect.max_y + p_bot;
+                self.ui_state.bounds.min_y = rect_inflated.max_y;
             }
             LayoutDirection::LeftRight(_) => {
-                self.ui_state.bounds.min_x = rect.max_x + p_right;
+                self.ui_state.bounds.min_x = rect_inflated.max_x;
             }
             LayoutDirection::BottomUp(_) => {
-                self.ui_state.bounds.max_y = rect.min_y - p_top;
+                self.ui_state.bounds.max_y = rect_inflated.min_y;
             }
             LayoutDirection::RightLeft(_) => {
-                self.ui_state.bounds.max_x = rect.min_x - p_left;
+                self.ui_state.bounds.max_x = rect_inflated.min_x;
             }
             LayoutDirection::Center => { /*noop*/ }
         }
@@ -1315,8 +1322,9 @@ impl<'a> Ui<'a> {
         self.ui_state.bounds.min_x = self.ui_state.bounds.min_x.min(self.ui_state.bounds.max_x);
         self.ui_state.bounds.min_y = self.ui_state.bounds.min_y.min(self.ui_state.bounds.max_y);
 
-        self.ui_state.next_bounding_boxes.insert(id, rect);
-        self.ui_state.rect_history.push(rect);
+        // these are considered during interactions, no padding is added
+        self.ui_state.next_bounding_boxes.insert(id, rect_original);
+        self.ui_state.rect_history.push(rect_original);
     }
 
     pub fn begin_widget(&mut self) -> WidgetInfo {
@@ -2399,13 +2407,13 @@ impl<'a> Ui<'a> {
 
     /// apply padding to the current bounds and return the original
     fn padd_bounds(&mut self) -> UiRect {
+        self.padd_bounds_impl(self.theme.padding)
+    }
+
+    fn padd_bounds_impl(&mut self, padding: Padding) -> UiRect {
         let bounds = self.ui_state.bounds;
 
-        let [left, right, top, bottom] = self.theme.padding.as_abs(bounds.width(), bounds.height());
-        self.ui_state.bounds.min_x += left;
-        self.ui_state.bounds.min_y += top;
-        self.ui_state.bounds.max_x -= right;
-        self.ui_state.bounds.max_y -= bottom;
+        self.ui_state.bounds = padded_rect(padding, bounds);
 
         bounds
     }
@@ -2848,23 +2856,30 @@ impl<'a> Ui<'a> {
     /// Add a margin around the inner contents
     pub fn margin(&mut self, m: Padding, contents: impl FnOnce(&mut Self)) {
         let WidgetInfo { id, .. } = self.begin_widget();
-        let bounds = self.padd_bounds();
+        let original_bounds = self.padd_bounds_impl(m);
+        let bounds = self.ui_state.bounds;
         self.ui_state.bounds = layout_rect(RectLayoutDescriptor {
             width: bounds.width(),
             height: bounds.height(),
             padding: Some(m),
-            dir: self.ui_state.layout_dir,
-            bounds,
+            dir: LayoutDirection::Center,
+            bounds: original_bounds,
         });
 
         let history_start = self.ui_state.rect_history.len();
 
         self.children_content(contents);
 
-        self.ui_state.bounds = bounds;
+        self.ui_state.bounds = original_bounds;
 
-        let bounds = self.history_bounding_rect(history_start);
-        self.submit_rect(id, bounds, m);
+        let mut bounds = self.history_bounding_rect(history_start);
+        let [left, right, top, bottom] =
+            m.as_abs(original_bounds.width(), original_bounds.height());
+        bounds.min_x -= left;
+        bounds.max_x += right;
+        bounds.min_y -= top;
+        bounds.max_y += bottom;
+        self.submit_rect(id, bounds, None);
     }
 
     /// Add background to the widget. If background is None, then the Theme background is used
@@ -4181,4 +4196,17 @@ pub struct AreaDescriptor {
     pub height: UiCoord,
     /// TODO: this is currently a placeholder and has no actual function
     pub scroll_on_overflow: bool,
+}
+
+fn padded_rect(padding: Padding, mut bounds: UiRect) -> UiRect {
+    let [left, right, top, bottom] = padding.as_abs(bounds.width(), bounds.height());
+    bounds.min_x += left;
+    bounds.min_y += top;
+    bounds.max_x -= right;
+    bounds.max_y -= bottom;
+
+    bounds.min_x = bounds.min_x.min(bounds.max_x);
+    bounds.min_y = bounds.min_y.min(bounds.max_y);
+
+    bounds
 }
