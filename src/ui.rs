@@ -4141,6 +4141,24 @@ pub enum WrapperSize {
     Size(UiCoord),
 }
 
+impl WrapperSize {
+    /// Returns `true` if the wrapper size is [`Content`].
+    ///
+    /// [`Content`]: WrapperSize::Content
+    #[must_use]
+    pub fn is_content(&self) -> bool {
+        matches!(self, Self::Content)
+    }
+
+    pub fn as_size(&self) -> Option<UiCoord> {
+        if let Self::Size(v) = self {
+            Some(*v)
+        } else {
+            None
+        }
+    }
+}
+
 pub struct ButtonDescriptor<'a> {
     pub payload: ButtonDescriptorPayload<'a>,
     pub width: WrapperSize,
