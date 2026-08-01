@@ -150,4 +150,11 @@ impl Color {
         let a = self.as_rgba();
         [a[0], a[1], a[2]]
     }
+
+    pub fn with_alpha(mut self, alpha: u8) -> Self {
+        // zero alpha, then add the input
+        self.0 &= !0xff;
+        self.0 |= alpha as u32;
+        self
+    }
 }
