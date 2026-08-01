@@ -19,6 +19,13 @@ var texture: texture_2d<f32>;
 @group(0) @binding(1)
 var texture_sampler: sampler;
 
+fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
+    let cutoff = c <= vec3<f32>(0.04045);
+    let low = c / 12.92;
+    let high = pow((c + 0.055) / 1.055, vec3<f32>(2.4));
+    return select(high, low, cutoff);
+}
+
 @vertex
 fn vs_main(
     model: Vertex,
@@ -27,12 +34,13 @@ fn vs_main(
     var out: VertexOutput;
     let c = instance.color;
     let xywh = instance.xywh;
-    out.color = vec4<f32>(
+    // input colors are sRGB, the surface encodes on write
+    let rgb = vec3<f32>(
         f32((c >> 24) & 0xFF) / 255.0,
         f32((c >> 16) & 0xFF) / 255.0,
         f32((c >> 8) & 0xFF) / 255.0,
-        f32(c & 0xFF) / 255.0,
     );
+    out.color = vec4<f32>(srgb_to_linear(rgb), f32(c & 0xFF) / 255.0);
 
     let u = f32(model.vertex_index & 1);
     var v = f32((model.vertex_index >> 1) & 1);

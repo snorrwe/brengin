@@ -157,10 +157,19 @@ impl GraphicsState {
             .await
             .unwrap();
 
+        let caps = surface.get_capabilities(&adapter);
+        // shaders write linear colors, let the surface encode them
+        let format = caps
+            .formats
+            .iter()
+            .copied()
+            .find(|f| f.is_srgb())
+            .unwrap_or(caps.formats[0]);
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface.get_capabilities(&adapter).formats[0],
-            view_formats: vec![surface.get_capabilities(&adapter).formats[0]],
+            format,
+            view_formats: vec![format],
             width: size.x.max(1),
             height: size.y.max(1),
             // TODO: configure
