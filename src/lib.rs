@@ -309,7 +309,8 @@ impl ApplicationHandler for RunningApp {
         let RunningApp::Initialized {
             game_world,
             render_stage,
-            ..
+            game_thread,
+            enabled,
         } = self
         else {
             return;
@@ -378,6 +379,14 @@ impl ApplicationHandler for RunningApp {
                     .map(|CloseRequestRx { rx }| rx.try_recv().is_ok())
                     .unwrap_or(false)
                 {
+                    // stop the game thread before terminating the event loop
+                    // otherwise the renderer might try to render during the shutdown process
+                    // causing crashes
+                    enabled.store(false, std::sync::atomic::Ordering::Release);
+                    let game_thread = std::mem::replace(game_thread, std::thread::spawn(|| {}));
+                    let _ = game_thread.join().inspect_err(|err| {
+                        eprintln!("Failed to join game thread: {err:?}");
+                    });
                     event_loop.exit();
                     return;
                 }
