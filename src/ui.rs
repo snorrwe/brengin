@@ -1387,39 +1387,39 @@ impl<'a> Ui<'a> {
     }
 
     pub fn button<'b>(&'b mut self, desc: impl Into<ButtonDescriptor<'b>>) -> ButtonResponse {
-        fn _button(this: &mut Ui, label: ButtonDescriptor) -> ButtonResponse {
+        fn _button(ui: &mut Ui, label: ButtonDescriptor) -> ButtonResponse {
             let WidgetInfo {
                 id,
                 is_hovered,
                 is_active,
-            } = this.begin_widget();
-            let layer = this.ui_state.layer;
+            } = ui.begin_widget();
+            let layer = ui.ui_state.layer;
 
             let mut pressed = false;
-            let mut bg_color = this.theme.button_default.clone();
+            let mut bg_color = ui.theme.button_default.clone();
             if is_active {
-                bg_color = this
+                bg_color = ui
                     .theme
                     .button_pressed
                     .as_ref()
-                    .unwrap_or(&this.theme.button_default)
+                    .unwrap_or(&ui.theme.button_default)
                     .clone();
-                this.set_active(id);
-                if this.mouse_up() {
+                ui.set_active(id);
+                if ui.mouse_up() {
                     if is_hovered {
                         pressed = true;
                     }
-                    this.set_not_active(id);
+                    ui.set_not_active(id);
                 }
-            } else if this.is_top_hovered(id) {
-                bg_color = this
+            } else if ui.is_top_hovered(id) {
+                bg_color = ui
                     .theme
                     .button_hovered
                     .as_ref()
-                    .unwrap_or(&this.theme.button_default)
+                    .unwrap_or(&ui.theme.button_default)
                     .clone();
-                if !this.is_anything_dragged() && this.mouse_down() {
-                    this.set_active(id);
+                if !ui.is_anything_dragged() && ui.mouse_down() {
+                    ui.set_active(id);
                 }
             }
 
@@ -1428,16 +1428,13 @@ impl<'a> Ui<'a> {
                 let mut w = 0;
                 let mut h = 0;
                 let mut text_y = 0;
-                let text_color = this
-                    .theme
-                    .button_text_color
-                    .unwrap_or(this.theme.primary_color);
+                let text_color = ui.theme.button_text_color.unwrap_or(ui.theme.primary_color);
 
-                let text_rect_idx = this.ui_state.text_rects.len();
+                let text_rect_idx = ui.ui_state.text_rects.len();
 
                 for line in label.split('\n').filter(|l| !l.is_empty()) {
                     let (handle, e) =
-                        this.shape_and_draw_line(line.to_owned(), this.theme.font_size as u32);
+                        ui.shape_and_draw_line(line.to_owned(), ui.theme.font_size as u32);
                     let pic = &e.texture;
                     let line_width = pic.width() as i32;
                     let line_height = pic.height() as i32;
@@ -1446,7 +1443,7 @@ impl<'a> Ui<'a> {
                     let mut delta = 0;
                     if !is_active {
                         // add a shadow
-                        this.text_rect(
+                        ui.text_rect(
                             0,
                             text_y + 1,
                             line_width,
@@ -1461,7 +1458,7 @@ impl<'a> Ui<'a> {
                         delta = 1
                     }
                     w = w.max(line_width + delta);
-                    this.text_rect(
+                    ui.text_rect(
                         delta,
                         text_y + delta,
                         line_width,
@@ -1473,14 +1470,14 @@ impl<'a> Ui<'a> {
                     text_y += line_height;
                 }
                 // background
-                let text_padding = this.theme().text_padding as i32;
+                let text_padding = ui.theme().text_padding as i32;
 
                 let rect = layout_rect(RectLayoutDescriptor {
-                    padding: Some(this.theme.padding),
+                    padding: Some(ui.theme.padding),
                     width: w + 2 * text_padding,
                     height: h + 2 * text_padding,
-                    dir: this.ui_state.layout_dir,
-                    bounds: this.ui_state.bounds,
+                    dir: ui.ui_state.layout_dir,
+                    bounds: ui.ui_state.bounds,
                 });
                 let offset = layout_rect(RectLayoutDescriptor {
                     padding: Some(Padding::splat(text_padding)),
@@ -1490,7 +1487,7 @@ impl<'a> Ui<'a> {
                     bounds: rect,
                 });
 
-                for r in &mut this.ui_state.text_rects[text_rect_idx..] {
+                for r in &mut ui.ui_state.text_rects[text_rect_idx..] {
                     r.x += offset.min_x;
                     r.y += offset.min_y;
                 }
@@ -1505,16 +1502,16 @@ impl<'a> Ui<'a> {
                         width,
                         height,
                     } => {
-                        let width = width.as_abolute(this.ui_state.bounds.width());
-                        let height = height.as_abolute(this.ui_state.bounds.height());
+                        let width = width.as_abolute(ui.ui_state.bounds.width());
+                        let height = height.as_abolute(ui.ui_state.bounds.height());
 
                         let padding = 6;
                         let rect = layout_rect(RectLayoutDescriptor {
-                            padding: Some(this.theme.padding),
+                            padding: Some(ui.theme.padding),
                             width: width + 2 * padding,
                             height: height + 2 * padding,
-                            dir: this.ui_state.layout_dir,
-                            bounds: this.ui_state.bounds,
+                            dir: ui.ui_state.layout_dir,
+                            bounds: ui.ui_state.bounds,
                         });
                         let inner = layout_rect(RectLayoutDescriptor {
                             padding: Some(Padding::splat(padding)),
@@ -1524,31 +1521,31 @@ impl<'a> Ui<'a> {
                             bounds: rect,
                         });
 
-                        let last_layer = this.push_layer();
+                        let last_layer = ui.push_layer();
 
-                        this.image_rect(
+                        ui.image_rect(
                             inner.min_x,
                             inner.min_y,
                             inner.width(),
                             inner.height(),
                             image,
-                            this.ui_state.layer,
+                            ui.ui_state.layer,
                         );
 
-                        this.ui_state.layer = last_layer;
+                        ui.ui_state.layer = last_layer;
 
                         rect
                     }
                 }
             };
-            this.color_rect_from_rect_with_outline(
+            ui.color_rect_from_rect_with_outline(
                 rect,
                 Color::TRANSPARENT_BLACK,
                 layer,
                 Color::BLACK,
                 1,
             );
-            this.theme_rect(
+            ui.theme_rect(
                 rect.min_x,
                 rect.min_y,
                 rect.width(),
@@ -1556,7 +1553,7 @@ impl<'a> Ui<'a> {
                 layer,
                 bg_color,
             );
-            this.submit_rect(id, rect, this.theme.padding);
+            ui.submit_rect(id, rect, ui.theme.padding);
 
             ButtonResponse {
                 id,
