@@ -433,6 +433,8 @@ impl Default for Theme {
             window_title_height: 32,
             font: Default::default(),
             window_padding: 4,
+            button_width: WrapperSize::Content,
+            button_height: WrapperSize::Content,
         }
     }
 }
@@ -527,6 +529,8 @@ theme!(
     window_title_height: u8, with_window_title_height,
     font: Handle<OwnedTypeFace>, with_font,
     window_padding: u8, with_window_padding,
+    button_width: WrapperSize, with_button_width,
+    button_height: WrapperSize, with_button_height,
 );
 
 #[derive(Debug, Clone, Copy)]
@@ -1387,7 +1391,17 @@ impl<'a> Ui<'a> {
     }
 
     pub fn button<'b>(&'b mut self, desc: impl Into<ButtonDescriptor<'b>>) -> ButtonResponse {
-        fn _button(ui: &mut Ui, label: ButtonDescriptor) -> ButtonResponse {
+        fn _button(
+            ui: &mut Ui,
+            ButtonDescriptor {
+                payload,
+                width,
+                height,
+            }: ButtonDescriptor,
+        ) -> ButtonResponse {
+            let width = width.unwrap_or(ui.theme.button_width);
+            let height = height.unwrap_or(ui.theme.button_height);
+
             let WidgetInfo {
                 id,
                 is_hovered,
@@ -1423,10 +1437,10 @@ impl<'a> Ui<'a> {
                 }
             }
 
-            let rect = if let Some(label) = label.as_str() {
+            let rect = if let Some(label) = payload.as_str() {
                 // shape the text
-                let mut w = 0;
-                let mut h = 0;
+                let mut text_width = 0;
+                let mut text_height = 0;
                 let mut text_y = 0;
                 let text_color = ui.theme.button_text_color.unwrap_or(ui.theme.primary_color);
 
@@ -1438,7 +1452,7 @@ impl<'a> Ui<'a> {
                     let pic = &e.texture;
                     let line_width = pic.width() as i32;
                     let line_height = pic.height() as i32;
-                    h += line_height + 1;
+                    text_height += line_height + 1;
 
                     let mut delta = 0;
                     if !is_active {
@@ -1457,7 +1471,7 @@ impl<'a> Ui<'a> {
                         // so it appears to have lowered
                         delta = 1
                     }
-                    w = w.max(line_width + delta);
+                    text_width = text_width.max(line_width + delta);
                     ui.text_rect(
                         delta,
                         text_y + delta,
@@ -1472,18 +1486,27 @@ impl<'a> Ui<'a> {
                 // background
                 let text_padding = ui.theme().text_padding as i32;
 
+                let width = match width {
+                    WrapperSize::Content => text_width + 2 * text_padding,
+                    WrapperSize::Size(ui_coord) => ui_coord.as_abolute(ui.ui_state.bounds.width()),
+                };
+                let height = match height {
+                    WrapperSize::Content => text_height + 2 * text_padding,
+                    WrapperSize::Size(ui_coord) => ui_coord.as_abolute(ui.ui_state.bounds.height()),
+                };
+
                 let rect = layout_rect(RectLayoutDescriptor {
                     padding: Some(ui.theme.padding),
-                    width: w + 2 * text_padding,
-                    height: h + 2 * text_padding,
+                    width,
+                    height,
                     dir: ui.ui_state.layout_dir,
                     bounds: ui.ui_state.bounds,
                 });
                 let offset = layout_rect(RectLayoutDescriptor {
-                    padding: Some(Padding::splat(text_padding)),
-                    width: w,
-                    height: h,
-                    dir: LayoutDirection::TopDown(HorizontalAlignment::Center),
+                    padding: None,
+                    width: text_width,
+                    height: text_height,
+                    dir: LayoutDirection::Center,
                     bounds: rect,
                 });
 
@@ -1493,17 +1516,19 @@ impl<'a> Ui<'a> {
                 }
                 rect
             } else {
-                match label.payload {
+                match payload {
                     ButtonDescriptorPayload::Label(_) | ButtonDescriptorPayload::OwnedLabel(_) => {
                         unreachable!()
                     }
-                    ButtonDescriptorPayload::Image {
-                        image,
-                        width,
-                        height,
-                    } => {
-                        let width = width.as_abolute(ui.ui_state.bounds.width());
-                        let height = height.as_abolute(ui.ui_state.bounds.height());
+                    ButtonDescriptorPayload::Image(image) => {
+                        let width = width
+                            .as_size()
+                            .map(|s| s.as_abolute(ui.ui_state.bounds.width()))
+                            .unwrap_or(100);
+                        let height = height
+                            .as_size()
+                            .map(|s| s.as_abolute(ui.ui_state.bounds.height()))
+                            .unwrap_or(100);
 
                         let padding = 6;
                         let rect = layout_rect(RectLayoutDescriptor {
@@ -3049,8 +3074,8 @@ fn align_horizontal(alignment: HorizontalAlignment, mut rect: UiRect, bounds: Ui
 fn align_vertical(alignment: VerticalAlignment, mut rect: UiRect, bounds: UiRect) -> UiRect {
     let delta = match alignment {
         VerticalAlignment::Top => bounds.min_y - rect.min_y,
-        VerticalAlignment::Center => bounds.max_y - rect.max_y,
-        VerticalAlignment::Bottom => bounds.center_y() - rect.center_y(),
+        VerticalAlignment::Bottom => bounds.max_y - rect.max_y,
+        VerticalAlignment::Center => bounds.center_y() - rect.center_y(),
     };
     rect.offset_y(delta);
     rect
@@ -4135,10 +4160,18 @@ pub struct SelectResponse {
     pub selected: Option<usize>,
 }
 
+#[derive(Default, Debug, Clone, Copy)]
 pub enum WrapperSize {
     /// Size to content
+    #[default]
     Content,
     Size(UiCoord),
+}
+
+impl From<UiCoord> for WrapperSize {
+    fn from(value: UiCoord) -> Self {
+        Self::Size(value)
+    }
 }
 
 impl WrapperSize {
@@ -4161,37 +4194,42 @@ impl WrapperSize {
 
 pub struct ButtonDescriptor<'a> {
     pub payload: ButtonDescriptorPayload<'a>,
-    pub width: WrapperSize,
-    pub height: WrapperSize,
+    pub width: Option<WrapperSize>,
+    pub height: Option<WrapperSize>,
 }
 
 pub enum ButtonDescriptorPayload<'a> {
     Label(&'a str),
     OwnedLabel(String),
-    Image {
-        image: Handle<DynamicImage>,
-        width: UiCoord,
-        height: UiCoord,
-    },
+    Image(Handle<DynamicImage>),
 }
 
 impl<'a> ButtonDescriptor<'a> {
     pub fn as_str(&'a self) -> Option<&'a str> {
-        match &self.payload {
+        self.payload.as_str()
+    }
+
+    pub fn with_width(mut self, size: impl Into<WrapperSize>) -> Self {
+        self.width = Some(size.into());
+        self
+    }
+
+    pub fn with_height(mut self, size: impl Into<WrapperSize>) -> Self {
+        self.height = Some(size.into());
+        self
+    }
+}
+impl<'a> ButtonDescriptorPayload<'a> {
+    pub fn as_str(&'a self) -> Option<&'a str> {
+        match self {
             ButtonDescriptorPayload::Label(s) => Some(s),
             ButtonDescriptorPayload::OwnedLabel(s) => Some(s.as_str()),
-            ButtonDescriptorPayload::Image { .. } => None,
+            ButtonDescriptorPayload::Image(..) => None,
         }
     }
 
-    pub fn with_width(mut self, size: WrapperSize) -> Self {
-        self.width = size;
-        self
-    }
-
-    pub fn with_height(mut self, size: WrapperSize) -> Self {
-        self.height = size;
-        self
+    pub fn as_desc(self) -> ButtonDescriptor<'a> {
+        From::from(self)
     }
 }
 
@@ -4199,8 +4237,8 @@ impl<'a> From<String> for ButtonDescriptor<'a> {
     fn from(value: String) -> Self {
         Self {
             payload: ButtonDescriptorPayload::OwnedLabel(value),
-            width: WrapperSize::Content,
-            height: WrapperSize::Content,
+            width: None,
+            height: None,
         }
     }
 }
@@ -4208,8 +4246,8 @@ impl<'a> From<ButtonDescriptorPayload<'a>> for ButtonDescriptor<'a> {
     fn from(payload: ButtonDescriptorPayload<'a>) -> Self {
         Self {
             payload,
-            width: WrapperSize::Content,
-            height: WrapperSize::Content,
+            width: None,
+            height: None,
         }
     }
 }
@@ -4223,8 +4261,8 @@ impl<'a> From<&'a str> for ButtonDescriptor<'a> {
     fn from(value: &'a str) -> Self {
         Self {
             payload: ButtonDescriptorPayload::Label(value),
-            width: WrapperSize::Content,
-            height: WrapperSize::Content,
+            width: None,
+            height: None,
         }
     }
 }

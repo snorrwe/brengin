@@ -1,7 +1,7 @@
 use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
 use brengin::ui::{
-    ButtonDescriptorPayload, HorizontalAlignment, OutlineDescriptor, ScrollDescriptor, UiCoord,
-    UiRoot, VerticalAlignment,
+    ButtonDescriptor, ButtonDescriptorPayload, HorizontalAlignment, OutlineDescriptor,
+    ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment, WrapperSize,
 };
 use brengin::{App, DefaultPlugins};
 use brengin::{CloseRequest, prelude::*, transform};
@@ -63,11 +63,14 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                                                 ui.margin(
                                                     brengin::ui::Padding::from_vertical(10),
                                                     |ui| {
-                                                        ui.button(ButtonDescriptorPayload::Image {
-                                                            image: ui_state.boid.clone(),
-                                                            width: UiCoord::Percent(50),
-                                                            height: UiCoord::Absolute(56),
-                                                        });
+                                                        ui.button(
+                                                            ButtonDescriptorPayload::Image(
+                                                                ui_state.boid.clone(),
+                                                            )
+                                                            .as_desc()
+                                                            .with_width(UiCoord::Percent(50))
+                                                            .with_height(UiCoord::Absolute(56)),
+                                                        );
                                                     },
                                                 );
                                             },
@@ -94,11 +97,12 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                             let c = col * 2;
                             cols.span(c..=c + 1, |ui| {
                                 ui.margin(brengin::ui::Padding::from_vertical(10), |ui| {
-                                    ui.button(ButtonDescriptorPayload::Image {
-                                        image: ui_state.boid.clone(),
-                                        width: UiCoord::Percent(50),
-                                        height: UiCoord::Absolute(56),
-                                    });
+                                    ui.button(
+                                        ButtonDescriptorPayload::Image(ui_state.boid.clone())
+                                            .as_desc()
+                                            .with_width(UiCoord::Percent(50))
+                                            .with_height(UiCoord::Absolute(56)),
+                                    );
                                 });
                             });
                         }
@@ -145,24 +149,37 @@ fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>, cr: Res<CloseRequest>) {
         |ui| {
             ui.vertical(HorizontalAlignment::Center, |ui| {
                 ui.label("Choose example");
-                if ui.button("Drag and drop").inner.pressed {
-                    *state = MenuState::DragNDrop;
-                }
-                if ui.button("Buttons").inner.pressed {
-                    *state = MenuState::Buttons;
-                }
-                if ui.button("ImageGrid").inner.pressed {
-                    *state = MenuState::ImageGrid;
-                }
-                if ui.button("Layout").inner.pressed {
-                    *state = MenuState::Layout;
-                }
-                if ui.button("Windows").inner.pressed {
-                    *state = MenuState::Windows;
-                }
-                if ui.button("Exit").inner.pressed {
-                    cr.request_close();
-                }
+                ui.with_theme_override(
+                    brengin::ui::ThemeOverride::default()
+                        .with_button_width(WrapperSize::Size(UiCoord::Percent(80))),
+                    |ui| {
+                        if ui
+                            .button(
+                                ButtonDescriptor::from("Drag and drop")
+                                    .with_height(UiCoord::Absolute(50)),
+                            )
+                            .inner
+                            .pressed
+                        {
+                            *state = MenuState::DragNDrop;
+                        }
+                        if ui.button("Buttons").inner.pressed {
+                            *state = MenuState::Buttons;
+                        }
+                        if ui.button("ImageGrid").inner.pressed {
+                            *state = MenuState::ImageGrid;
+                        }
+                        if ui.button("Layout").inner.pressed {
+                            *state = MenuState::Layout;
+                        }
+                        if ui.button("Windows").inner.pressed {
+                            *state = MenuState::Windows;
+                        }
+                        if ui.button("Exit").inner.pressed {
+                            cr.request_close();
+                        }
+                    },
+                );
             });
         },
     );
