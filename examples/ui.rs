@@ -1,7 +1,7 @@
 use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
 use brengin::ui::{
-    ButtonDescriptor, HorizontalAlignment, OutlineDescriptor, ScrollDescriptor, UiCoord, UiRoot,
-    VerticalAlignment,
+    ButtonDescriptorPayload, HorizontalAlignment, OutlineDescriptor, ScrollDescriptor, UiCoord,
+    UiRoot, VerticalAlignment,
 };
 use brengin::{App, DefaultPlugins};
 use brengin::{CloseRequest, prelude::*, transform};
@@ -63,7 +63,7 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                                                 ui.margin(
                                                     brengin::ui::Padding::from_vertical(10),
                                                     |ui| {
-                                                        ui.button(ButtonDescriptor::Image {
+                                                        ui.button(ButtonDescriptorPayload::Image {
                                                             image: ui_state.boid.clone(),
                                                             width: UiCoord::Percent(50),
                                                             height: UiCoord::Absolute(56),
@@ -94,7 +94,7 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
                             let c = col * 2;
                             cols.span(c..=c + 1, |ui| {
                                 ui.margin(brengin::ui::Padding::from_vertical(10), |ui| {
-                                    ui.button(ButtonDescriptor::Image {
+                                    ui.button(ButtonDescriptorPayload::Image {
                                         image: ui_state.boid.clone(),
                                         width: UiCoord::Percent(50),
                                         height: UiCoord::Absolute(56),

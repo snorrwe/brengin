@@ -1496,9 +1496,11 @@ impl<'a> Ui<'a> {
                 }
                 rect
             } else {
-                match label {
-                    ButtonDescriptor::Label(_) | ButtonDescriptor::OwnedLabel(_) => unreachable!(),
-                    ButtonDescriptor::Image {
+                match label.payload {
+                    ButtonDescriptorPayload::Label(_) | ButtonDescriptorPayload::OwnedLabel(_) => {
+                        unreachable!()
+                    }
+                    ButtonDescriptorPayload::Image {
                         image,
                         width,
                         height,
@@ -4136,7 +4138,19 @@ pub struct SelectResponse {
     pub selected: Option<usize>,
 }
 
-pub enum ButtonDescriptor<'a> {
+pub enum WrapperSize {
+    /// Size to content
+    Content,
+    Size(UiCoord),
+}
+
+pub struct ButtonDescriptor<'a> {
+    pub payload: ButtonDescriptorPayload<'a>,
+    pub width: WrapperSize,
+    pub height: WrapperSize,
+}
+
+pub enum ButtonDescriptorPayload<'a> {
     Label(&'a str),
     OwnedLabel(String),
     Image {
@@ -4148,27 +4162,55 @@ pub enum ButtonDescriptor<'a> {
 
 impl<'a> ButtonDescriptor<'a> {
     pub fn as_str(&'a self) -> Option<&'a str> {
-        match self {
-            ButtonDescriptor::Label(s) => Some(s),
-            ButtonDescriptor::OwnedLabel(s) => Some(s.as_str()),
-            ButtonDescriptor::Image { .. } => None,
+        match &self.payload {
+            ButtonDescriptorPayload::Label(s) => Some(s),
+            ButtonDescriptorPayload::OwnedLabel(s) => Some(s.as_str()),
+            ButtonDescriptorPayload::Image { .. } => None,
         }
+    }
+
+    pub fn with_width(mut self, size: WrapperSize) -> Self {
+        self.width = size;
+        self
+    }
+
+    pub fn with_height(mut self, size: WrapperSize) -> Self {
+        self.height = size;
+        self
     }
 }
 
 impl<'a> From<String> for ButtonDescriptor<'a> {
     fn from(value: String) -> Self {
-        Self::OwnedLabel(value)
+        Self {
+            payload: ButtonDescriptorPayload::OwnedLabel(value),
+            width: WrapperSize::Content,
+            height: WrapperSize::Content,
+        }
     }
 }
+impl<'a> From<ButtonDescriptorPayload<'a>> for ButtonDescriptor<'a> {
+    fn from(payload: ButtonDescriptorPayload<'a>) -> Self {
+        Self {
+            payload,
+            width: WrapperSize::Content,
+            height: WrapperSize::Content,
+        }
+    }
+}
+
 impl<'a> From<&'a String> for ButtonDescriptor<'a> {
     fn from(value: &'a String) -> Self {
-        Self::from(value.as_str())
+        ButtonDescriptor::from(value.as_str())
     }
 }
 impl<'a> From<&'a str> for ButtonDescriptor<'a> {
     fn from(value: &'a str) -> Self {
-        Self::Label(value)
+        Self {
+            payload: ButtonDescriptorPayload::Label(value),
+            width: WrapperSize::Content,
+            height: WrapperSize::Content,
+        }
     }
 }
 
