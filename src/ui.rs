@@ -1614,6 +1614,24 @@ impl<'a> Ui<'a> {
         unsafe { res.as_inner_mut() }
     }
 
+    pub fn get_memory_ptr_or_default<T: Default + 'static>(&mut self, id: UiId) -> NonNull<T> {
+        self.get_memory_ptr_or_insert(id, Default::default)
+    }
+
+    pub fn get_memory_ptr_or_insert<T: 'static>(
+        &mut self,
+        id: UiId,
+        f: impl FnOnce() -> T,
+    ) -> NonNull<T> {
+        let key = self.memory_key::<T>(id);
+        let res = self
+            .memory
+            .0
+            .entry(key)
+            .or_insert_with(|| ErasedMemoryEntry::new(f()));
+        unsafe { res.as_inner_ptr() }
+    }
+
     pub fn get_memory<T: 'static>(&self, id: UiId) -> Option<&T> {
         let key = self.memory_key::<T>(id);
         self.memory.0.get(&key).map(|res| unsafe { res.as_inner() })
@@ -1625,6 +1643,14 @@ impl<'a> Ui<'a> {
             .0
             .get_mut(&key)
             .map(|res| unsafe { res.as_inner_mut() })
+    }
+
+    pub fn get_memory_ptr<T: 'static>(&mut self, id: UiId) -> Option<NonNull<T>> {
+        let key = self.memory_key::<T>(id);
+        self.memory
+            .0
+            .get_mut(&key)
+            .map(|res| unsafe { res.as_inner_ptr() })
     }
 
     pub fn insert_memory<T: 'static>(&mut self, id: UiId, item: T) {
@@ -1779,11 +1805,15 @@ impl<'a> Ui<'a> {
             .height
             .unwrap_or(UiCoord::Percent(100))
             .as_abolute(self.ui_state.bounds.height());
-        let mut state = *self.get_memory_or_default::<ScrollState>(id);
+
+        let state = unsafe {
+            let mut state = self.get_memory_ptr_or_default::<ScrollState>(id);
+            state.as_mut()
+        };
 
         let line_height = self.theme.font_size + self.theme.text_padding;
 
-        self.update_scroll_state(desc, id, is_hovered, &mut state, line_height);
+        self.update_scroll_state(desc, id, is_hovered, state, line_height);
 
         // reset the tick to 0 if the content does not need scrolling (w/h == 0)
         let offset_x = state.tx * state.scroll_width as f32;
@@ -1794,8 +1824,6 @@ impl<'a> Ui<'a> {
         if offset_y == 0.0 {
             state.ty = 0.0;
         }
-
-        self.insert_memory(id, state);
 
         let old_bounds = self.ui_state.bounds;
 
@@ -1868,7 +1896,10 @@ impl<'a> Ui<'a> {
 
         let p_horizontal = self.theme.padding.horizonal(bounds.width());
         let p_vertical = self.theme.padding.vertical(bounds.height());
-        let state = self.get_memory_mut::<ScrollState>(id).unwrap();
+        let state = unsafe {
+            let mut state = self.get_memory_ptr::<ScrollState>(id).unwrap();
+            state.as_mut()
+        };
 
         // compute the area of the scroll. Area = content bounds - viewport, so only the overlap is
         // counted
@@ -1876,7 +1907,6 @@ impl<'a> Ui<'a> {
             (children_bounds.width() - width + p_horizontal + scroll_bar_size).max(0);
         state.scroll_height =
             (children_bounds.height() - height + p_vertical + scroll_bar_size).max(0);
-        let mut state = *state;
 
         if desc.width.is_some() {
             let mut scissor_bounds = scissor_bounds;
@@ -1884,12 +1914,11 @@ impl<'a> Ui<'a> {
                 // prevent overlap
                 scissor_bounds.max_x -= scroll_bar_size;
             }
-            self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_size, layer, &mut state);
+            self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_size, layer, state);
         }
         if desc.height.is_some() {
-            self.vertical_scroll_bar(&scissor_bounds, scroll_bar_size, layer, &mut state);
+            self.vertical_scroll_bar(&scissor_bounds, scroll_bar_size, layer, state);
         }
-        self.insert_memory(id, state);
         self.ui_state.bounds = old_bounds;
         self.submit_rect(id, area_bounds, self.theme.padding);
     }
@@ -1974,10 +2003,10 @@ impl<'a> Ui<'a> {
         } = self.begin_widget();
         let old_bounds = self.padd_bounds();
 
-        let mut state = self
-            .remove_memory::<DragState>(id)
-            .map(|x| *x)
-            .unwrap_or_default();
+        let state = unsafe {
+            let mut state = self.get_memory_ptr_or_default::<DragState>(id);
+            state.as_mut()
+        };
         let mut is_being_dragged = false;
         if is_active {
             // mark as dragged even if it was just released,
@@ -2052,8 +2081,6 @@ impl<'a> Ui<'a> {
         self.ui_state.scissor_idx = last_scissor;
 
         self.submit_rect(id, content_bounds, self.theme.padding);
-
-        self.insert_memory(id, state);
 
         DragResponse {
             is_being_dragged,
@@ -2178,12 +2205,10 @@ impl<'a> Ui<'a> {
         let last_layer = self.push_layer();
         let layer = self.ui_state.layer;
 
-        let mut state = self
-            .get_memory_or_insert::<TextInputState>(id, || TextInputState {
-                cursor: desc.content.len(),
-                ..Default::default()
-            })
-            .clone();
+        let state = unsafe {
+            let mut state = self.get_memory_ptr_or_default::<TextInputState>(id);
+            state.as_mut()
+        };
 
         let mut changed = false;
 
@@ -2419,7 +2444,6 @@ impl<'a> Ui<'a> {
         rect.max_y += p_bot;
         self.submit_rect(id, rect, self.theme.padding);
         self.ui_state.layer = last_layer;
-        self.insert_memory(id, state);
         Response {
             hovered: is_hovered,
             active: self.is_active(id),
@@ -2517,10 +2541,10 @@ impl<'a> Ui<'a> {
 
         let WidgetInfo { id, .. } = self.begin_widget();
 
-        let mut state = self
-            .remove_memory::<ContextMenuState>(parent_id)
-            .map(|x| *x)
-            .unwrap_or_default();
+        let state = unsafe {
+            let mut state = self.get_memory_ptr_or_default::<ContextMenuState>(id);
+            state.as_mut()
+        };
 
         state.open = self.has_context_menu(parent_id);
         if state.open {
@@ -2575,7 +2599,7 @@ impl<'a> Ui<'a> {
 
             ///////////////////////
             self.children_content(|ui| {
-                context_menu(ui, &mut state);
+                context_menu(ui, state);
             });
             ///////////////////////
             self.ui_state.bounds = original_bounds;
@@ -2651,7 +2675,6 @@ impl<'a> Ui<'a> {
                 .push(parent_id, self.ui_state.layer)
                 .add_flag(InteractionFlag::ContextMenu);
         }
-        self.insert_memory(parent_id, state);
         let resp = ContextMenuResponse {
             open,
             inner: resp,
@@ -2674,10 +2697,10 @@ impl<'a> Ui<'a> {
 
         let WidgetInfo { id, .. } = self.begin_widget();
 
-        let mut state = self
-            .remove_memory::<ContextMenuState>(parent_id)
-            .map(|x| *x)
-            .unwrap_or_default();
+        let state = unsafe {
+            let mut state = self.get_memory_ptr_or_default::<ContextMenuState>(id);
+            state.as_mut()
+        };
 
         if resp.pressed() {
             self.set_context_menu(resp.id);
@@ -2787,7 +2810,6 @@ impl<'a> Ui<'a> {
                 .push(parent_id, self.ui_state.layer)
                 .add_flag(InteractionFlag::ContextMenu);
         }
-        self.insert_memory(parent_id, state);
         let resp = SelectResponse {
             inner: resp.map_unit(),
             selected,
@@ -2985,7 +3007,10 @@ impl<'a> Ui<'a> {
 
         self.submit_rect(id, bounds, self.theme.padding);
 
-        let mut state = mem::take(self.get_memory_or_default::<TooltipState>(id));
+        let state = unsafe {
+            let mut state = self.get_memory_ptr_or_default::<TooltipState>(id);
+            state.as_mut()
+        };
 
         if self.contains_mouse(id) {
             state.hovered_seconds += self.delta_time.0.as_secs_f32();
@@ -3008,8 +3033,6 @@ impl<'a> Ui<'a> {
             state.hovered_seconds = 0.0;
             state.anchor.take();
         }
-
-        self.insert_memory(id, state);
     }
 }
 
@@ -3924,6 +3947,15 @@ impl ErasedMemoryEntry {
     /// Must be called with the same type as `new`
     pub unsafe fn as_inner_mut<T>(&mut self) -> &mut T {
         unsafe { &mut *self.inner.cast() }
+    }
+
+    /// # SAFETY
+    /// Must be called with the same type as `new`
+    pub unsafe fn as_inner_ptr<T>(&mut self) -> NonNull<T> {
+        unsafe {
+            let ptr: *mut T = self.inner.cast();
+            NonNull::new_unchecked(ptr)
+        }
     }
 
     pub unsafe fn into_inner<T>(mut self) -> Box<T> {
