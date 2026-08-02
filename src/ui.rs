@@ -2896,14 +2896,8 @@ impl<'a> Ui<'a> {
 
         self.ui_state.bounds = original_bounds;
 
-        let mut bounds = self.history_bounding_rect(history_start);
-        let [left, right, top, bottom] =
-            m.as_abs(original_bounds.width(), original_bounds.height());
-        bounds.min_x -= left;
-        bounds.max_x += right;
-        bounds.min_y -= top;
-        bounds.max_y += bottom;
-        self.submit_rect(id, bounds, None);
+        let bounds = self.history_bounding_rect(history_start);
+        self.submit_rect(id, bounds, m);
     }
 
     /// Add background to the widget. If background is None, then the Theme background is used
