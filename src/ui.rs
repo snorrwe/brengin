@@ -2922,7 +2922,8 @@ impl<'a> Ui<'a> {
         self.submit_rect(id, bounds, self.theme.padding);
     }
 
-    fn children_content(&mut self, contents: impl FnOnce(&mut Self)) {
+    /// Children container
+    pub fn children_content(&mut self, contents: impl FnOnce(&mut Self)) {
         let layer = self.push_layer();
         self.push_child();
         contents(self);
