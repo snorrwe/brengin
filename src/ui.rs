@@ -2685,13 +2685,11 @@ impl<'a> Ui<'a> {
         resp
     }
 
-    pub fn select<'b, T: Eq + AsRef<str> + 'b>(
-        &mut self,
-        label: &str,
-        current: T,
-        options: &'b [T],
-    ) -> SelectResponse {
-        let resp = self.button(format!("{label}: {}", current.as_ref()));
+    pub fn select<'b, T>(&mut self, current: &'b T, options: &'b [T]) -> SelectResponse
+    where
+        &'b T: Eq + AsRef<str>,
+    {
+        let resp = self.button(format!("{}", current.as_ref()));
 
         let parent_id = resp.id;
 
