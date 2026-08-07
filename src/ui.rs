@@ -2685,6 +2685,62 @@ impl<'a> Ui<'a> {
         resp
     }
 
+    /// return the next state, might be the same as the input
+    pub fn toggle(&mut self, mut option: bool) -> Response<bool> {
+        const SIZE: i32 = 20;
+
+        let toggle_rect = layout_rect(RectLayoutDescriptor {
+            width: SIZE * 2,
+            height: SIZE,
+            padding: Some(self.theme.padding),
+            dir: self.ui_state.layout_dir,
+            bounds: self.ui_state.bounds,
+        });
+
+        let WidgetInfo {
+            id,
+            is_hovered,
+            is_active,
+        } = self.begin_widget();
+        let layer = self.push_layer();
+
+        if is_hovered && self.mouse.just_released.contains(&MouseButton::Left) {
+            self.set_active(id);
+        }
+        if is_active {
+            option = !option;
+        }
+        self.color_rect_from_rect_with_outline(
+            toggle_rect,
+            self.theme.secondary_color,
+            self.ui_state.layer,
+            Color::BLACK,
+            1,
+        );
+
+        let pip_size = toggle_rect.width() / 2;
+        let mut button_rect = toggle_rect;
+        button_rect.max_x -= pip_size;
+        button_rect.offset_x(if option { pip_size } else { 0 });
+
+        self.color_rect_from_rect(
+            button_rect,
+            self.theme.primary_color,
+            self.ui_state.layer + 1,
+        );
+
+        self.ui_state.layer = layer;
+
+        self.submit_rect(id, toggle_rect, None);
+        Response {
+            id,
+            hovered: is_hovered,
+            active: is_active,
+            rect: toggle_rect,
+            inner: option,
+        }
+    }
+
     pub fn select<'b, T>(&mut self, current: &'b T, options: &'b [T]) -> SelectResponse
     where
         &'b T: Eq + AsRef<str>,

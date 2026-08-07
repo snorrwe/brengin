@@ -318,7 +318,8 @@ Mauris ut pharetra orci.
 Maecenas ac convallis ligula, id interdum turpis.
 "#;
 
-fn layout_ui(mut ctx: UiRoot) {
+struct LayoutToggle(bool);
+fn layout_ui(mut ctx: UiRoot, mut layout_toggle: ResMut<LayoutToggle>) {
     ctx.panel(
         brengin::ui::PanelDescriptor {
             width: 300.into(),
@@ -384,6 +385,8 @@ fn layout_ui(mut ctx: UiRoot) {
                     ui.label("bottom center");
                     ui.button("bottom center");
                 }
+                let resp = ui.toggle(layout_toggle.0);
+                layout_toggle.0 = resp.inner;
             });
         },
     );
@@ -562,6 +565,7 @@ async fn game(args: Args) {
     app.insert_resource(Label(Default::default()));
     app.insert_resource(args.state);
     app.insert_resource(UiState::default());
+    app.insert_resource(LayoutToggle(false));
     app.insert_resource(Dnd {
         lists: vec![
             vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
