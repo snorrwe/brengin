@@ -86,7 +86,7 @@ impl Plugin for UiPlugin {
             .add_system(update_ids)
             .add_system(shaping_gc_system)
             .add_system(update_ui_inputs.after(update_ids))
-            .add_system(gc_wants_focus_state_system);
+            .add_system(gc_memory);
         });
     }
 }
@@ -4359,11 +4359,9 @@ struct WantsFocusState {
     consumed: bool,
 }
 
-fn gc_wants_focus_state_system(mut memory: ResMut<UiMemory>, state: Res<UiState>) {
+fn gc_memory(mut memory: ResMut<UiMemory>, state: Res<UiState>) {
     let ids: HashSet<_> = state.widget_ids.iter().copied().collect();
-    memory
-        .0
-        .retain(|(id, t), _| t != &TypeId::of::<WantsFocusState>() || ids.contains(id));
+    memory.0.retain(|(id, _), _| ids.contains(id));
 }
 
 #[derive(Debug, Default)]
