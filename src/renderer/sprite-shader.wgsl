@@ -152,11 +152,14 @@ fn vs_main(
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var color = textureSample(texture, texture_sampler, in.uv);
-    if color.a < 0.2 {
+    if color.a < 0.01 {
         discard;
     }
 
     let mask = textureSample(mask, mask_sampler, in.uv);
     let mask_alpha = mask.r;
-    return vec4(mix(color.rgb, in.color, mask_alpha), color.a);
+    let rgb = mix(color.rgb, in.color, mask_alpha);
+    // premultiply in linear space, the pipeline blends with
+    // PREMULTIPLIED_ALPHA_BLENDING
+    return vec4(rgb * color.a, color.a);
 }

@@ -347,7 +347,9 @@ impl SpritePipeline {
                         compilation_options: Default::default(),
                         targets: &[Some(wgpu::ColorTargetState {
                             format: renderer.config.format,
-                            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                            // the fragment shader outputs premultiplied alpha, which avoids
+                            // dark fringes around sprite edges when the texture is filtered
+                            blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
                             write_mask: wgpu::ColorWrites::ALL,
                         })],
                     }),
@@ -373,7 +375,9 @@ impl SpritePipeline {
                     multisample: wgpu::MultisampleState {
                         count: 1,
                         mask: !0,
-                        alpha_to_coverage_enabled: true,
+                        // alpha-to-coverage only has a single sample to work with here, which
+                        // quantizes (and on most drivers dithers) partial alpha
+                        alpha_to_coverage_enabled: false,
                     },
                     multiview_mask: None,
                     cache: None,
