@@ -1530,7 +1530,7 @@ impl<'a> Ui<'a> {
                             .map(|s| s.as_abolute(ui.ui_state.bounds.height()))
                             .unwrap_or(100);
 
-                        let padding = 6;
+                        let padding = 1;
                         let rect = layout_rect(RectLayoutDescriptor {
                             padding: Some(ui.theme.padding),
                             width: width + 2 * padding,
