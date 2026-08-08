@@ -3013,7 +3013,7 @@ impl<'a> Ui<'a> {
         bounds.min_y = desc.y;
 
         let old_bounds = mem::replace(&mut self.ui_state.bounds, bounds);
-        let old_scissor = self.push_scissor(self.ui_state.scissors[0]);
+        let old_scissor = std::mem::replace(&mut self.ui_state.scissor_idx, 0);
         let old_layer = mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER);
         let history_start = self.ui_state.rect_history.len();
         let ids = self.ui_state.widget_ids.len();
