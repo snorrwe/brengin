@@ -2539,7 +2539,7 @@ impl<'a> Ui<'a> {
         let parent_id = resp.id;
         let contains_mouse = self.contains_mouse(parent_id);
 
-        let WidgetInfo { id, .. } = self.begin_widget();
+        let id = resp.id;
 
         let state = unsafe {
             let mut state = self.get_memory_ptr_or_default::<ContextMenuState>(id);
