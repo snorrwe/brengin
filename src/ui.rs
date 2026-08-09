@@ -2303,6 +2303,9 @@ impl<'a> Ui<'a> {
                         changed = true;
                         state.cursor += 1;
                     }
+                    KeyCode::Enter => {
+                        // if not multiline, then enter is a noop
+                    }
                     // for single-line inputs use tab as a means to jump to the next input
                     KeyCode::Tab if desc.multiline => {
                         self.ui_inputs.keys.insert(*k);
