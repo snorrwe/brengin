@@ -2200,7 +2200,7 @@ impl<'a> Ui<'a> {
         let WidgetInfo {
             id,
             is_hovered,
-            is_active,
+            mut is_active,
         } = self.begin_widget();
         let last_layer = self.push_layer();
         let layer = self.ui_state.layer;
@@ -2305,6 +2305,7 @@ impl<'a> Ui<'a> {
                     }
                     KeyCode::Enter => {
                         // if not multiline, then enter is a noop
+                        is_active = false;
                     }
                     // for single-line inputs use tab as a means to jump to the next input
                     KeyCode::Tab if desc.multiline => {
