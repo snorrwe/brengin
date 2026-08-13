@@ -1418,12 +1418,12 @@ impl<'a> Ui<'a> {
                     .as_ref()
                     .unwrap_or(&ui.theme.button_default)
                     .clone();
-                ui.set_active(id);
                 if ui.mouse_up() {
                     if is_hovered {
                         pressed = true;
                     }
-                    ui.set_not_active(id);
+                } else {
+                    ui.set_active(id);
                 }
             } else if ui.is_top_hovered(id) {
                 bg_color = ui
@@ -2704,15 +2704,25 @@ impl<'a> Ui<'a> {
         let WidgetInfo {
             id,
             is_hovered,
-            is_active,
+            mut is_active,
         } = self.begin_widget();
         let layer = self.push_layer();
 
-        if is_hovered && self.mouse.just_released.contains(&MouseButton::Left) {
-            self.set_active(id);
-        }
         if is_active {
-            option = !option;
+            is_active = false;
+            if self.mouse_up() {
+                if is_hovered {
+                    option = !option;
+                    // only mark this widget active in the response if the value has changed
+                    is_active = true;
+                }
+            } else {
+                self.set_active(id);
+            }
+        } else if self.is_top_hovered(id) {
+            if !self.is_anything_dragged() && self.mouse_down() {
+                self.set_active(id);
+            }
         }
         self.color_rect_from_rect_with_outline(
             toggle_rect,
