@@ -17,7 +17,7 @@ use std::{
     any::TypeId,
     collections::{HashMap, HashSet},
     hash::Hash,
-    i32, mem,
+    mem,
     ops::{Deref, DerefMut, RangeBounds},
     ptr::NonNull,
     time::Duration,
