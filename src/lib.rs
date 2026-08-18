@@ -10,6 +10,7 @@ pub mod transform;
 #[cfg(feature = "audio")]
 pub mod audio;
 pub mod color;
+pub mod diagnostics;
 pub mod ui;
 
 use anyhow::Context;

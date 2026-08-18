@@ -371,7 +371,7 @@ dependencies = [
 [[package]]
 name = "cecs"
 version = "0.1.11"
-source = "git+https://github.com/snorrwe/cecs#78fe7f73d4238cf852649717777f5b132db7787e"
+source = "git+https://github.com/snorrwe/cecs#61b0ca0ba3ba1f23c8692acd913bc2a6ef23e37e"
 dependencies = [
  "cache-padded",
  "cfg-if",
