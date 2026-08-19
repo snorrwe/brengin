@@ -39,11 +39,27 @@ pub struct AtlasRect {
     min_y: i32,
     max_x: i32,
     max_y: i32,
+    image_width: i32,
+    image_height: i32,
     node_id: guillotiere::AllocId,
     asset_handle: Handle<TextureAtlas>,
 }
 
 impl AtlasRect {
+    /// return the uv coordinates of this rect within the original texture
+    /// min_x, min_y, max_x, max_y
+    pub fn uv(&self) -> [f32; 4] {
+        let width = self.image_width as f64;
+        let height = self.image_height as f64;
+
+        let min_x = self.min_x as f64 / width;
+        let min_y = self.min_y as f64 / height;
+        let max_x = self.max_x as f64 / width;
+        let max_y = self.max_y as f64 / height;
+
+        [min_x as f32, min_y as f32, max_x as f32, max_y as f32]
+    }
+
     pub fn width(&self) -> i32 {
         self.max_x - self.min_x
     }
@@ -88,6 +104,10 @@ struct Atlases {
 
 impl TextureAtlasRegistry<'_> {
     pub fn allocate(&mut self, width: i32, height: i32) -> Option<AtlasRect> {
+        if width <= 0 || height <= 0 {
+            return None;
+        }
+
         for (id, atlas) in self.atlases.iter_mut() {
             if let Some(alloc) = atlas.allocate(width, height)
                 && let Some(asset_handle) = self.ids.atlas_ids[&id].upgrade()
@@ -97,6 +117,8 @@ impl TextureAtlasRegistry<'_> {
                     min_y: alloc.rectangle.min.y,
                     max_x: alloc.rectangle.max.x,
                     max_y: alloc.rectangle.max.y,
+                    image_width: atlas.texture.size.0 as i32,
+                    image_height: atlas.texture.size.1 as i32,
                     node_id: alloc.id,
                     asset_handle,
                 });
@@ -126,10 +148,15 @@ impl TextureAtlasRegistry<'_> {
         };
         let alloc = atlas.allocate(width, height)?;
 
+        let image_width = atlas.texture.size.0 as i32;
+        let image_height = atlas.texture.size.1 as i32;
+
         let handle = self.atlases.insert(atlas);
         self.ids.atlas_ids.insert(handle.id(), handle.downgrade());
 
         Some(AtlasRect {
+            image_width,
+            image_height,
             min_x: alloc.rectangle.min.x,
             min_y: alloc.rectangle.min.y,
             max_x: alloc.rectangle.max.x,
@@ -139,14 +166,15 @@ impl TextureAtlasRegistry<'_> {
         })
     }
 
-    pub fn upload(&mut self, rect: AtlasRect, image: &DynamicImage) {
+    pub fn upload_rgba(&mut self, rect: &AtlasRect, rgba: &[u8], width: u32, height: u32) {
+        let width = width.min(rect.width() as u32);
+        let height = height.min(rect.height() as u32);
+        if width == 0 || height == 0 {
+            return;
+        }
+
         let texture_atlas = self.atlases.get(&rect.asset_handle);
         let texture = &texture_atlas.texture.texture;
-
-        let rgba = image.to_rgba8();
-
-        let width = image.width().min(rect.width() as u32);
-        let height = image.height().min(rect.height() as u32);
 
         self.renderer.queue().write_texture(
             wgpu::TexelCopyTextureInfo {
@@ -175,8 +203,9 @@ impl TextureAtlasRegistry<'_> {
 
     // TODO: RAII / GC unused rects
     pub fn deallocate(&mut self, rect: AtlasRect) {
-        let atlas = self.atlases.get_mut(&rect.asset_handle);
-        atlas.deallocate(rect.node_id);
+        if let Some(atlas) = self.atlases.get_by_id_mut(rect.asset_handle.id()) {
+            atlas.deallocate(rect.node_id);
+        }
     }
 }
 
@@ -186,5 +215,32 @@ impl Plugin for TextureAtlasPlugin {
     fn build(self, app: &mut App) {
         app.add_plugin(AssetsPlugin::<TextureAtlas>::default());
         app.insert_resource(Atlases::default());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_atlas_rect_uv() {
+        let mut allocator =
+            guillotiere::AtlasAllocator::new(guillotiere::euclid::Size2D::new(1024, 1024));
+        let alloc = allocator
+            .allocate(guillotiere::euclid::Size2D::new(512, 256))
+            .unwrap();
+        let rect = AtlasRect {
+            min_x: alloc.rectangle.min.x,
+            min_y: alloc.rectangle.min.y,
+            max_x: alloc.rectangle.max.x,
+            max_y: alloc.rectangle.max.y,
+            image_width: 1024,
+            image_height: 1024,
+            node_id: alloc.id,
+            asset_handle: Handle::default(),
+        };
+
+        let uv = rect.uv();
+        assert_eq!(uv, [0.0, 0.0, 0.5, 0.25]);
     }
 }
