@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::mem::size_of;
 
 use crate::assets::{AssetId, Assets, Handle, WeakHandle};
-use crate::renderer::texture::Texture;
+use crate::renderer::texture::texture_bind_group_layout;
+use crate::renderer::texture_atlas::{AtlasRect, TextureAtlasPlugin, TextureAtlasRegistry};
 use crate::renderer::{
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, texture,
 };
@@ -32,13 +33,14 @@ pub struct DrawTextRect {
 /// XY is the center, WH are half-extents
 #[derive(Debug, Default, Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C)]
-pub struct DrawRectInstance {
+struct DrawRectInstance {
     pub x: f32,
     pub y: f32,
     pub w: f32,
     pub h: f32,
     pub color: u32,
     pub layer: f32,
+    pub uv: [f32; 4],
 }
 
 impl DrawRectInstance {
@@ -53,14 +55,20 @@ impl DrawRectInstance {
                     format: wgpu::VertexFormat::Float32x4,
                 },
                 wgpu::VertexAttribute {
-                    offset: size_of::<[u32; 4]>() as wgpu::BufferAddress,
+                    offset: size_of::<[f32; 4]>() as wgpu::BufferAddress,
                     shader_location: 1,
                     format: wgpu::VertexFormat::Uint32,
                 },
                 wgpu::VertexAttribute {
-                    offset: (size_of::<[u32; 4]>() + size_of::<u32>()) as wgpu::BufferAddress,
+                    offset: (size_of::<[f32; 4]>() + size_of::<u32>()) as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float32,
+                },
+                wgpu::VertexAttribute {
+                    offset: (size_of::<[f32; 4]>() + size_of::<u32>() + size_of::<f32>())
+                        as wgpu::BufferAddress,
+                    shader_location: 3,
+                    format: wgpu::VertexFormat::Float32x4,
                 },
             ],
         }
@@ -68,20 +76,18 @@ impl DrawRectInstance {
 }
 
 struct TextPipeline {
-    color_rect_pipeline: wgpu::RenderPipeline,
-    textures: HashMap<AssetId, UiTextureRenderingData>,
+    text_rect_pipeline: wgpu::RenderPipeline,
+    /// shaping_id -> AtlasRect
+    shaping_rects: HashMap<AssetId, AtlasRect>,
+    /// atlas_id -> bind group
+    atlases: HashMap<AssetId, wgpu::BindGroup>,
     instances: HashMap<UiScissor, Vec<UiTextureRenderingInstances>>,
 }
 
 pub struct UiTextureRenderingInstances {
-    pub id: AssetId,
+    pub atlas_id: AssetId,
     pub count: usize,
     pub instance_gpu: wgpu::Buffer,
-}
-
-pub struct UiTextureRenderingData {
-    pub texture_bind_group: wgpu::BindGroup,
-    pub texture: Texture,
 }
 
 #[derive(Default)]
@@ -90,12 +96,15 @@ struct UiTextureReferences(pub HashMap<AssetId, WeakHandle<super::ShapingResult>
 fn gc_text_textures(
     mut texturerefs: ResMut<UiTextureReferences>,
     mut pipeline: ResMut<TextPipeline>,
+    mut textures: TextureAtlasRegistry,
 ) {
     texturerefs.0.retain(|id, handle| {
         if handle.upgrade().is_none() {
             #[cfg(feature = "tracing")]
             tracing::debug!(id, "Collecting expired text texture");
-            pipeline.textures.remove(id);
+            if let Some(rect) = pipeline.shaping_rects.remove(id) {
+                textures.deallocate(rect);
+            }
             return false;
         }
         true
@@ -103,11 +112,11 @@ fn gc_text_textures(
 }
 
 fn extract_shaping_results(
-    renderer: Res<GraphicsState>,
     mut pipeline: ResMut<TextPipeline>,
     mut refs: ResMut<UiTextureReferences>,
     cache: Res<super::TextTextureCache>,
     shaping_results: Res<Assets<super::ShapingResult>>,
+    mut textures: TextureAtlasRegistry,
 ) {
     for handle in cache.0.values() {
         let res = shaping_results.get(handle);
@@ -115,23 +124,32 @@ fn extract_shaping_results(
         if refs.0.contains_key(&id) {
             continue;
         }
-        let texture = Texture::from_rgba8(
-            renderer.device(),
-            renderer.queue(),
-            res.texture.pixmap.data(),
-            (res.texture.width(), res.texture.height()),
-            None,
-        )
-        .expect("Failed to create text texture");
-        let texture_bind_group = texture_to_bindings(renderer.device(), &texture);
 
-        refs.0.insert(id, handle.downgrade());
-        let rendering_data = UiTextureRenderingData {
-            texture_bind_group,
-            texture,
+        let Some(rect) = textures.allocate(res.texture.width() as i32, res.texture.height() as i32)
+        else {
+            #[cfg(feature = "tracing")]
+            tracing::error!(
+                id = handle.id(),
+                "Failed to allocate texture for shaping result"
+            );
+            continue;
         };
 
-        pipeline.textures.insert(id, rendering_data);
+        textures.upload_rgba(
+            &rect,
+            res.texture.pixmap.data(),
+            res.texture.width(),
+            res.texture.height(),
+        );
+
+        let atlas_id = rect.atlas_handle().id();
+        pipeline.atlases.entry(atlas_id).or_insert_with(|| {
+            let (_, texture_bind_group) = textures.get_bind_group(&rect);
+            texture_bind_group
+        });
+
+        refs.0.insert(id, handle.downgrade());
+        pipeline.shaping_rects.insert(id, rect);
     }
 }
 
@@ -144,7 +162,7 @@ impl TextPipeline {
         let texture_bind_group_layout =
             texture_bind_group_layout(renderer.device(), "ui-text-layout");
 
-        let color_rect_pipeline =
+        let text_rect_pipeline =
             renderer
                 .device()
                 .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -198,8 +216,9 @@ impl TextPipeline {
                 });
 
         TextPipeline {
-            color_rect_pipeline,
-            textures: Default::default(),
+            text_rect_pipeline,
+            shaping_rects: Default::default(),
+            atlases: Default::default(),
             instances: Default::default(),
         }
     }
@@ -214,9 +233,7 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
         input: &'r mut RenderCommandInput<'a, 'r>,
         (size, pipeline): &'r Self::Parameters,
     ) {
-        input
-            .render_pass
-            .set_pipeline(&pipeline.color_rect_pipeline);
+        input.render_pass.set_pipeline(&pipeline.text_rect_pipeline);
 
         for (scissor, requests) in pipeline.instances.iter() {
             let x = scissor.0.min_x.max(0) as u32;
@@ -232,7 +249,10 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
 
             input.render_pass.set_scissor_rect(x, y, w, h);
             for requests in requests.iter() {
-                let Some(texture) = pipeline.textures.get(&requests.id) else {
+                if requests.count == 0 {
+                    continue;
+                }
+                let Some(atlas_bind_group) = pipeline.atlases.get(&requests.atlas_id) else {
                     continue;
                 };
                 input
@@ -240,7 +260,7 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
                     .set_vertex_buffer(0, requests.instance_gpu.slice(..));
                 input
                     .render_pass
-                    .set_bind_group(0, &texture.texture_bind_group, &[]);
+                    .set_bind_group(0, atlas_bind_group, &[]);
                 input.render_pass.draw(0..6, 0..requests.count as u32);
             }
         }
@@ -272,6 +292,10 @@ fn update_instances(
     let mut instances = HashMap::<(AssetId, UiScissor), Vec<DrawRectInstance>>::default();
     let mut update_gpu_instances = |rects: &TextRectRequests, scissor| {
         for rect in rects.0.iter() {
+            let Some(atlas_rect) = pipeline.shaping_rects.get(&rect.shaping.id()) else {
+                continue;
+            };
+
             let ww = rect.w as f32 * 0.5;
             let hh = rect.h as f32 * 0.5;
             // flip y
@@ -282,14 +306,16 @@ fn update_instances(
             let instance = DrawRectInstance {
                 x: (rect.x as f32 + ww) / w,
                 y: (y - hh) / h,
-                // w: ww / w,
                 w: rect.w as f32 / w,
                 h: rect.h as f32 / h,
                 layer,
                 color: rect.color,
+                uv: atlas_rect.uv(),
             };
+
+            let texture_atlas_id = atlas_rect.atlas_handle().id();
             instances
-                .entry((rect.shaping.id(), scissor))
+                .entry((texture_atlas_id, scissor))
                 .or_default()
                 .push(instance);
         }
@@ -324,17 +350,20 @@ fn update_instances(
 
     // FIXME: retain buffers or do a smarter gc
     pipeline.instances.clear();
-    for ((id, scissor), cpu) in instances.iter() {
+    for ((atlas_id, scissor), cpu) in instances.iter() {
         let rendering_data = pipeline.instances.entry(*scissor).or_default();
 
-        let rendering_data = match rendering_data.iter_mut().find(|r| &r.id == id) {
+        let rendering_data = match rendering_data.iter_mut().find(|r| &r.atlas_id == atlas_id) {
             Some(x) => x,
             None => {
                 let r = UiTextureRenderingInstances {
-                    id: *id,
+                    atlas_id: *atlas_id,
                     count: 0,
                     instance_gpu: renderer.device().create_buffer(&wgpu::BufferDescriptor {
-                        label: Some(&format!("Text Instance Buffer - {:?} {}", scissor, id)),
+                        label: Some(&format!(
+                            "Text Instance Buffer - {:?} {}",
+                            scissor, atlas_id
+                        )),
                         mapped_at_creation: false,
                         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                         size: 0,
@@ -351,7 +380,10 @@ fn update_instances(
             // resize the buffer
             rendering_data.instance_gpu =
                 renderer.device().create_buffer(&wgpu::BufferDescriptor {
-                    label: Some(&format!("UI Text Instance Buffer - {:?} {}", scissor, id)),
+                    label: Some(&format!(
+                        "UI Text Instance Buffer - {:?} {}",
+                        scissor, atlas_id
+                    )),
                     size,
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
@@ -369,6 +401,7 @@ pub struct UiTextRectPlugin;
 impl Plugin for UiTextRectPlugin {
     fn build(self, app: &mut crate::App) {
         app.insert_resource(TextRectRequests::default());
+        app.require_plugin(TextureAtlasPlugin);
 
         app.add_plugin(RenderCommandPlugin::<RectRenderCommand>::new(
             RenderPass::Ui,
@@ -379,53 +412,8 @@ impl Plugin for UiTextRectPlugin {
             s.add_system(gc_text_textures);
         });
         app.with_stage(crate::Stage::PostUpdate, |s| {
-            s.add_system(update_instances)
-                .add_system(extract_shaping_results);
+            s.add_system(extract_shaping_results)
+                .add_system(update_instances.after(extract_shaping_results));
         });
     }
-}
-
-fn texture_to_bindings(device: &wgpu::Device, texture: &texture::Texture) -> wgpu::BindGroup {
-    let texture_bind_group_layout = texture_bind_group_layout(device, "texture_bind_group_layout");
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &texture_bind_group_layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&texture.view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::Sampler(&texture.sampler),
-            },
-        ],
-        label: Some("text_texture_bind_group"),
-    });
-    bind_group
-}
-
-fn texture_bind_group_layout(device: &wgpu::Device, label: &str) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    multisampled: false,
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                // This should match the filterable field of the
-                // corresponding Texture entry above.
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                count: None,
-            },
-        ],
-        label: Some(label),
-    })
 }

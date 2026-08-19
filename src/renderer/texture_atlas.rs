@@ -5,9 +5,13 @@
 use std::{any::TypeId, collections::BTreeMap};
 
 use image::DynamicImage;
+use wgpu::{BindGroup, BindGroupLayout};
 
 use super::texture::Texture;
-use crate::{prelude::*, renderer::GraphicsState};
+use crate::{
+    prelude::*,
+    renderer::{GraphicsState, texture::texture_to_bindings},
+};
 
 pub struct TextureAtlas {
     texture: Texture,
@@ -220,11 +224,21 @@ impl TextureAtlasRegistry<'_> {
         );
     }
 
+    pub fn upload_image(&mut self, rect: &AtlasRect, image: &DynamicImage) {
+        let rgba = image.to_rgba8();
+        self.upload_rgba(rect, &rgba, image.width(), image.height());
+    }
+
     // TODO: RAII / GC unused rects
     pub fn deallocate(&mut self, rect: AtlasRect) {
         if let Some(atlas) = self.atlases.get_by_id_mut(rect.asset_handle.id()) {
             atlas.deallocate(rect.node_id);
         }
+    }
+
+    pub fn get_bind_group(&self, rect: &AtlasRect) -> (BindGroupLayout, BindGroup) {
+        let atlas = self.atlases.get(rect.atlas_handle());
+        texture_to_bindings(self.renderer.device(), &atlas.texture)
     }
 }
 

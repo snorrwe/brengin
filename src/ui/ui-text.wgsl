@@ -6,6 +6,7 @@ struct Instance {
     @location(0) xywh: vec4<f32>,
     @location(1) color: u32,
     @location(2) layer: f32,
+    @location(3) uv: vec4<f32>,
 }
 
 struct VertexOutput {
@@ -50,16 +51,16 @@ fn vs_main(
     }
 
     let uv = vec2<f32>(u, v);
-    out.uv = uv;
     // text textures are rendered upside down
-    out.uv.y = 1 - uv.y;
+    let flipped_uv = vec2<f32>(uv.x, 1.0 - uv.y);
+    out.uv = mix(instance.uv.xy, instance.uv.zw, flipped_uv);
 
-    var vertex = uv * vec2(2, -2) + vec2(-1, 1);
+    var vertex = uv * vec2(2.0, -2.0) + vec2(-1.0, 1.0);
     vertex *= xywh.zw;
 
     // pos is in 0..1
     // remap to -1..1
-    let pos = xywh.xy * 2 - 1;
+    let pos = xywh.xy * 2.0 - 1.0;
 
     out.clip_position = vec4<f32>(pos + vertex, instance.layer, 1.0);
     return out;
@@ -72,5 +73,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if alpha < 0.001 {
         discard;
     }
-    return vec4<f32>(color.rgb * alpha, alpha);
+    return vec4<f32>(color.rgb, alpha);
 }
