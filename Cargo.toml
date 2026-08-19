@@ -32,6 +32,7 @@ rustybuzz = "0.20.1"
 tiny-skia = "0.12.0"
 crossbeam = { version = "0.8.4", features = ["crossbeam-channel", "nightly"] }
 thiserror = "2.0.17"
+guillotiere = "0.7.0"
 
 [dev-dependencies]
 clap = "4.5.54"

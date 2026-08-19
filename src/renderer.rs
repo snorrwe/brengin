@@ -1,6 +1,7 @@
 pub mod background_renderer;
 pub mod sprite_renderer;
 pub mod texture;
+pub mod texture_atlas;
 
 use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
 
