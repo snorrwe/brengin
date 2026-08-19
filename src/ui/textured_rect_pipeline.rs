@@ -85,13 +85,13 @@ fn gc_text_textures(
     mut pipeline: ResMut<UiTexturePipeline>,
 ) {
     texturerefs.0.retain(|id, handle| {
-        if handle.upgrade().is_none() {
-            #[cfg(feature = "tracing")]
-            tracing::debug!(id, "Collecting expired text texture");
-            pipeline.textures.remove(id);
-            return false;
+        if handle.upgrade().is_some() {
+            return true;
         }
-        true
+        #[cfg(feature = "tracing")]
+        tracing::debug!(id, "Collecting expired text texture");
+        pipeline.textures.remove(id);
+        false
     });
 }
 
