@@ -4,9 +4,7 @@ use super::div_half_ceil;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UiRect {
-    /// center x
     pub min_x: i32,
-    /// center y
     pub min_y: i32,
     pub max_x: i32,
     pub max_y: i32,
