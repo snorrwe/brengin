@@ -142,7 +142,7 @@ impl UiTexturePipeline {
     fn new(renderer: &GraphicsState) -> Self {
         let shader = renderer
             .device()
-            .create_shader_module(include_wgsl!("textured-rect-shader.wgsl"));
+            .create_shader_module(include_wgsl!("./ui-texture.wgsl"));
 
         let texture_bind_group_layout =
             texture_bind_group_layout(renderer.device(), "ui-text-layout");
