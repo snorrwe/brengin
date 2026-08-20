@@ -10,7 +10,7 @@ use std::{
     collections::HashMap,
     marker::PhantomData,
     ptr::NonNull,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
 };
 
 use crate::{Plugin, assets::asset_id::ASSET_ID_SENTINEL};
@@ -175,22 +175,50 @@ impl<T> Handle<T> {
 
 pub struct Assets<T> {
     assets: HashMap<AssetId<T>, AssetEntry<T>>,
-    next_id: u64,
+    next_id: AtomicU64,
 }
 
 impl<T> Default for Assets<T> {
     fn default() -> Self {
         Self {
             assets: Default::default(),
-            next_id: 0,
+            next_id: AtomicU64::new(0),
         }
     }
 }
 
 impl<T> Assets<T> {
+    /// return the old value, if any and the handle to this value
+    /// if a value has been set previously, existing handles to it are _not invalidated_
+    pub fn set(&mut self, id: AssetId<T>, value: T) -> (Handle<T>, Option<T>) {
+        let old = self.assets.remove(&id);
+
+        // if value is a new item, or the existing handles have been invalidated,
+        // then allocate a new handle.
+        // otherwise reuse the existing
+        let handle = old
+            .as_ref()
+            .and_then(|e| e.handle.upgrade())
+            .unwrap_or(Handle::new(id));
+
+        self.assets.insert(
+            id,
+            AssetEntry {
+                val: value,
+                handle: handle.downgrade(),
+            },
+        );
+
+        (handle, old.map(|e| e.val))
+    }
+
+    /// thread-safe way of allocating a new asset id
+    pub fn allocate_id(&self) -> AssetId<T> {
+        AssetId::<T>::new(self.next_id.fetch_add(1, Ordering::Relaxed))
+    }
+
     pub fn insert(&mut self, val: T) -> Handle<T> {
-        let id = AssetId::<T>::new(self.next_id);
-        self.next_id += 1;
+        let id = self.allocate_id();
         let handle = Handle::new(id);
         let _old = self.assets.insert(
             id,
