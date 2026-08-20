@@ -173,16 +173,16 @@ impl<T> Handle<T> {
     }
 }
 
+static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+
 pub struct Assets<T> {
     assets: HashMap<AssetId<T>, AssetEntry<T>>,
-    next_id: AtomicU64,
 }
 
 impl<T> Default for Assets<T> {
     fn default() -> Self {
         Self {
             assets: Default::default(),
-            next_id: AtomicU64::new(0),
         }
     }
 }
@@ -202,13 +202,13 @@ impl<T> Assets<T> {
     }
 
     /// thread-safe way of allocating a new asset handle with an unoccupied entry
-    pub fn allocate(&self) -> Handle<T> {
-        let id = AssetId::<T>::new(self.next_id.fetch_add(1, Ordering::Relaxed));
+    pub fn allocate() -> Handle<T> {
+        let id = AssetId::<T>::new(NEXT_ID.fetch_add(1, Ordering::Relaxed));
         Handle::new(id)
     }
 
     pub fn insert(&mut self, val: T) -> Handle<T> {
-        let handle = self.allocate();
+        let handle = Self::allocate();
         let id = handle.id();
         let _old = self.assets.insert(
             id,
