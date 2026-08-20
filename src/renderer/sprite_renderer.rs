@@ -154,7 +154,7 @@ struct SpritePipelineInstances(BTreeMap<InstanceKey, Vec<SpriteInstanceRaw>>);
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct InstanceKey {
-    pub sprite_sheet: AssetId,
+    pub sprite_sheet: AssetId<SpriteSheet>,
     pub mesh: MeshKey,
 }
 
@@ -197,7 +197,7 @@ fn update_sprite_pipelines(
             instances.instance_gpu.destroy();
             instances.instance_gpu = renderer.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(&format!(
-                    "Sprite Instance Buffer - {} {:?}",
+                    "Sprite Instance Buffer - {:?} {:?}",
                     id.sprite_sheet, id.mesh
                 )),
                 size: size * 3 / 2,
@@ -213,7 +213,7 @@ fn update_sprite_pipelines(
 }
 
 #[derive(Default)]
-struct RenderSpritesheetHandles(pub HashMap<AssetId, WeakHandle<SpriteSheet>>);
+struct RenderSpritesheetHandles(pub HashMap<AssetId<SpriteSheet>, WeakHandle<SpriteSheet>>);
 
 // per spritesheet
 pub struct SpriteRenderingData {
@@ -231,7 +231,7 @@ struct SpriteInstances {
 
 pub struct SpritePipeline {
     instances: HashMap<InstanceKey, SpriteInstances>,
-    sheets: HashMap<AssetId, SpriteRenderingData>,
+    sheets: HashMap<AssetId<SpriteSheet>, SpriteRenderingData>,
     // TODO: unload unused meshes
     meshes: BTreeMap<MeshKey, SpriteMeshGpu>,
     // shared
@@ -241,11 +241,16 @@ pub struct SpritePipeline {
 }
 
 impl SpritePipeline {
-    pub fn unload_sheet(&mut self, id: AssetId) {
+    pub fn unload_sheet(&mut self, id: AssetId<SpriteSheet>) {
         self.sheets.remove(&id);
     }
 
-    pub fn add_sheet(&mut self, id: AssetId, sheet: &SpriteSheet, renderer: &GraphicsState) {
+    pub fn add_sheet(
+        &mut self,
+        id: AssetId<SpriteSheet>,
+        sheet: &SpriteSheet,
+        renderer: &GraphicsState,
+    ) {
         let mask = sheet.mask.as_ref().map(|m| {
             Texture::from_image(renderer.device(), renderer.queue(), m, None)
                 .expect("Failed to create mask texture")
@@ -264,7 +269,7 @@ impl SpritePipeline {
             renderer
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("SpriteSheet Instance Buffer {}", id)),
+                    label: Some(&format!("SpriteSheet Instance Buffer {id:?}")),
                     usage: wgpu::BufferUsages::UNIFORM,
                     contents: bytemuck::cast_slice(&[sheet_gpu]),
                 });
@@ -277,7 +282,7 @@ impl SpritePipeline {
                     binding: 0,
                     resource: spritesheet_buffer.as_entire_binding(),
                 }],
-                label: Some(&format!("spritesheet_bind_group {}", id)),
+                label: Some(&format!("spritesheet_bind_group {id:?}")),
             });
 
         self.sheets.insert(
@@ -597,7 +602,7 @@ enum MeshHandle {
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum MeshKey {
-    Mesh(AssetId),
+    Mesh(AssetId<SpriteMesh>),
     #[default]
     DefaultSquare,
 }
@@ -685,7 +690,7 @@ fn add_missing_instances(
                 count: 0,
                 instance_gpu: renderer.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some(&format!(
-                        "Sprite Instance Buffer - {} {:?}",
+                        "Sprite Instance Buffer - {:?} {:?}",
                         k.sprite_sheet, k.mesh
                     )),
                     size: 0,

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::mem::size_of;
 
 use crate::assets::{AssetId, Assets, Handle, WeakHandle};
-use crate::renderer::texture_atlas::{AtlasRect, TextureAtlasRegistry};
+use crate::renderer::texture_atlas::{AtlasRect, TextureAtlas, TextureAtlasRegistry};
 use crate::renderer::{
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, texture,
 };
@@ -71,21 +71,21 @@ impl DrawRectInstance {
 struct UiTexturePipeline {
     pipeline: wgpu::RenderPipeline,
     /// image_id -> AtlasRect
-    image_rects: HashMap<AssetId, AtlasRect>,
+    image_rects: HashMap<AssetId<DynamicImage>, AtlasRect>,
     /// atlas_id -> bind group
     /// TODO: invalidate if atlas is released
-    atlases: HashMap<AssetId, wgpu::BindGroup>,
+    atlases: HashMap<AssetId<TextureAtlas>, wgpu::BindGroup>,
     instances: HashMap<UiScissor, Vec<UiTextureRenderingInstances>>,
 }
 
 pub struct UiTextureRenderingInstances {
-    pub atlas_id: AssetId,
+    pub atlas_id: AssetId<TextureAtlas>,
     pub count: usize,
     pub instance_gpu: wgpu::Buffer,
 }
 
 #[derive(Default)]
-struct UiTextureReferences(pub HashMap<AssetId, WeakHandle<DynamicImage>>);
+struct UiTextureReferences(pub HashMap<AssetId<DynamicImage>, WeakHandle<DynamicImage>>);
 
 fn gc_text_textures(
     mut texturerefs: ResMut<UiTextureReferences>,
@@ -95,7 +95,7 @@ fn gc_text_textures(
     texturerefs.0.retain(|id, handle| {
         if handle.upgrade().is_none() {
             #[cfg(feature = "tracing")]
-            tracing::debug!(id, "Collecting expired text texture");
+            tracing::debug!(?id, "Collecting expired text texture");
             if let Some(rect) = pipeline.image_rects.remove(id) {
                 textures.deallocate(rect);
             }
@@ -123,7 +123,7 @@ fn extract_textures(
 
             let Some(rect) = textures.allocate(res.width() as i32, res.height() as i32) else {
                 #[cfg(feature = "tracing")]
-                tracing::error!(id = handle.id(), "Failed to allocate texture for image");
+                tracing::error!(id = ?handle.id(), "Failed to allocate texture for image");
                 continue;
             };
             textures.upload_rgba(&rect, &res.to_rgba8(), res.width(), res.height());
@@ -271,7 +271,7 @@ fn update_instances(
     fn update_draw_instances(
         w: f32,
         h: f32,
-        instances: &mut HashMap<(u64, UiScissor), Vec<DrawRectInstance>>,
+        instances: &mut HashMap<(AssetId<TextureAtlas>, UiScissor), Vec<DrawRectInstance>>,
         rects: &TextureRectRequests,
         scissor: &UiScissor,
         pipeline: &UiTexturePipeline,
@@ -305,7 +305,8 @@ fn update_instances(
     // TODO: retain buffer
     let w = renderer.size().x as f32;
     let h = renderer.size().y as f32;
-    let mut instances = HashMap::<(AssetId, UiScissor), Vec<DrawRectInstance>>::default();
+    let mut instances =
+        HashMap::<(AssetId<TextureAtlas>, UiScissor), Vec<DrawRectInstance>>::default();
 
     let mut textured_rects = std::mem::take(&mut ui.texture_rects);
     textured_rects.sort_unstable_by_key(|r| r.scissor);
@@ -327,7 +328,7 @@ fn update_instances(
     }
     for g in textured_rects[rects_consumed..].chunk_by_mut(|a, b| a.scissor == b.scissor) {
         let scissor = UiScissor(ui.scissors[g[0].scissor as usize]);
-        let mut requests = TextureRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect());
+        let requests = TextureRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect());
         update_draw_instances(w, h, &mut instances, &requests, &scissor, &pipeline);
         cmd.spawn().insert_bundle((scissor, requests));
     }
@@ -346,7 +347,7 @@ fn update_instances(
                     count: 0,
                     instance_gpu: renderer.device().create_buffer(&wgpu::BufferDescriptor {
                         label: Some(&format!(
-                            "Texture Instance Buffer - {:?} {}",
+                            "Texture Instance Buffer - {:?} {:?}",
                             scissor, atlas_id
                         )),
                         mapped_at_creation: false,
@@ -366,7 +367,7 @@ fn update_instances(
             rendering_data.instance_gpu =
                 renderer.device().create_buffer(&wgpu::BufferDescriptor {
                     label: Some(&format!(
-                        "UI Texture Instance Buffer - {:?} {}",
+                        "UI Texture Instance Buffer - {:?} {:?}",
                         scissor, atlas_id
                     )),
                     size,

@@ -1,6 +1,10 @@
 #[cfg(feature = "assets-stats")]
 pub mod asset_stats;
 
+pub mod asset_id;
+
+pub use asset_id::AssetId;
+
 use cecs::{Component, prelude::*};
 use std::{
     collections::HashMap,
@@ -9,10 +13,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::Plugin;
-
-pub type AssetId = u64;
-pub const ASSET_ID_SENTINEL: u64 = AssetId::MAX;
+use crate::{Plugin, assets::asset_id::ASSET_ID_SENTINEL};
 
 struct RefCount {
     data_references: AtomicUsize,
@@ -21,18 +22,18 @@ struct RefCount {
 
 #[derive(Debug)]
 pub struct Handle<T> {
-    id: AssetId,
+    id: AssetId<T>,
     weak: WeakHandle<T>,
 }
 
 impl<T> Default for Handle<T> {
     fn default() -> Self {
-        Self::new(ASSET_ID_SENTINEL)
+        Self::new(AssetId::new(ASSET_ID_SENTINEL))
     }
 }
 
 pub struct WeakHandle<T> {
-    id: AssetId,
+    id: AssetId<T>,
     references: NonNull<RefCount>,
     _m: PhantomData<T>,
 }
@@ -81,12 +82,12 @@ impl<T> WeakHandle<T> {
         }
     }
 
-    pub fn id(&self) -> AssetId {
+    pub fn id(&self) -> AssetId<T> {
         self.id
     }
 
     pub fn is_valid(&self) -> bool {
-        self.id != ASSET_ID_SENTINEL
+        self.id.id() != ASSET_ID_SENTINEL
     }
 }
 
@@ -142,7 +143,7 @@ impl<T> Clone for WeakHandle<T> {
 }
 
 impl<T> Handle<T> {
-    fn new(id: AssetId) -> Self {
+    fn new(id: AssetId<T>) -> Self {
         Self {
             id,
             weak: unsafe {
@@ -158,7 +159,7 @@ impl<T> Handle<T> {
         }
     }
 
-    pub fn id(&self) -> AssetId {
+    pub fn id(&self) -> AssetId<T> {
         self.id
     }
 
@@ -168,13 +169,13 @@ impl<T> Handle<T> {
     }
 
     pub fn is_valid(&self) -> bool {
-        self.id != ASSET_ID_SENTINEL
+        self.id.id() != ASSET_ID_SENTINEL
     }
 }
 
 pub struct Assets<T> {
-    assets: HashMap<AssetId, AssetEntry<T>>,
-    next_id: AssetId,
+    assets: HashMap<AssetId<T>, AssetEntry<T>>,
+    next_id: u64,
 }
 
 impl<T> Default for Assets<T> {
@@ -188,7 +189,7 @@ impl<T> Default for Assets<T> {
 
 impl<T> Assets<T> {
     pub fn insert(&mut self, val: T) -> Handle<T> {
-        let id = self.next_id;
+        let id = AssetId::<T>::new(self.next_id);
         self.next_id += 1;
         let handle = Handle::new(id);
         let _old = self.assets.insert(
@@ -208,25 +209,25 @@ impl<T> Assets<T> {
         handle
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (AssetId, &T)> {
+    pub fn iter(&self) -> impl Iterator<Item = (AssetId<T>, &T)> {
         self.assets.iter().map(|(id, entry)| (*id, &entry.val))
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (AssetId, &mut T)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (AssetId<T>, &mut T)> {
         self.assets
             .iter_mut()
             .map(|(id, entry)| (*id, &mut entry.val))
     }
 
-    pub fn contains(&self, id: AssetId) -> bool {
+    pub fn contains(&self, id: AssetId<T>) -> bool {
         self.assets.contains_key(&id)
     }
 
-    pub fn get_by_id(&self, id: AssetId) -> Option<&T> {
+    pub fn get_by_id(&self, id: AssetId<T>) -> Option<&T> {
         self.assets.get(&id).map(|val| &val.val)
     }
 
-    pub fn get_by_id_mut(&mut self, id: AssetId) -> Option<&mut T> {
+    pub fn get_by_id_mut(&mut self, id: AssetId<T>) -> Option<&mut T> {
         self.assets.get_mut(&id).map(|val| &mut val.val)
     }
 
@@ -256,7 +257,7 @@ fn gc_assets<T: 'static>(mut assets: ResMut<Assets<T>>) {
         #[cfg(feature = "tracing")]
         if !retain {
             tracing::debug!(
-                id = _id,
+                id = ?_id,
                 ty = std::any::type_name::<T>(),
                 "Garbage collecting"
             );

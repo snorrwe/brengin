@@ -122,7 +122,7 @@ unsafe impl<'a> WorldQuery<'a> for TextureAtlasRegistry<'a> {
 #[derive(Default)]
 struct Atlases {
     /// id -> Handle mapping
-    pub atlas_ids: BTreeMap<u64, WeakHandle<TextureAtlas>>,
+    pub atlas_ids: BTreeMap<AssetId<TextureAtlas>, WeakHandle<TextureAtlas>>,
 }
 
 impl TextureAtlasRegistry<'_> {

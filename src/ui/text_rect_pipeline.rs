@@ -3,7 +3,9 @@ use std::mem::size_of;
 
 use crate::assets::{AssetId, Assets, Handle, WeakHandle};
 use crate::renderer::texture::texture_bind_group_layout;
-use crate::renderer::texture_atlas::{AtlasRect, TextureAtlasPlugin, TextureAtlasRegistry};
+use crate::renderer::texture_atlas::{
+    AtlasRect, TextureAtlas, TextureAtlasPlugin, TextureAtlasRegistry,
+};
 use crate::renderer::{
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, texture,
 };
@@ -78,20 +80,20 @@ impl DrawRectInstance {
 struct TextPipeline {
     text_rect_pipeline: wgpu::RenderPipeline,
     /// shaping_id -> AtlasRect
-    shaping_rects: HashMap<AssetId, AtlasRect>,
+    shaping_rects: HashMap<AssetId<ShapingResult>, AtlasRect>,
     /// atlas_id -> bind group
-    atlases: HashMap<AssetId, wgpu::BindGroup>,
+    atlases: HashMap<AssetId<TextureAtlas>, wgpu::BindGroup>,
     instances: HashMap<UiScissor, Vec<UiTextureRenderingInstances>>,
 }
 
 pub struct UiTextureRenderingInstances {
-    pub atlas_id: AssetId,
+    pub atlas_id: AssetId<TextureAtlas>,
     pub count: usize,
     pub instance_gpu: wgpu::Buffer,
 }
 
 #[derive(Default)]
-struct UiTextureReferences(pub HashMap<AssetId, WeakHandle<super::ShapingResult>>);
+struct UiTextureReferences(pub HashMap<AssetId<ShapingResult>, WeakHandle<super::ShapingResult>>);
 
 fn gc_text_textures(
     mut texturerefs: ResMut<UiTextureReferences>,
@@ -101,7 +103,7 @@ fn gc_text_textures(
     texturerefs.0.retain(|id, handle| {
         if handle.upgrade().is_none() {
             #[cfg(feature = "tracing")]
-            tracing::debug!(id, "Collecting expired text texture");
+            tracing::debug!(?id, "Collecting expired text texture");
             if let Some(rect) = pipeline.shaping_rects.remove(id) {
                 textures.deallocate(rect);
             }
@@ -129,7 +131,7 @@ fn extract_shaping_results(
         else {
             #[cfg(feature = "tracing")]
             tracing::error!(
-                id = handle.id(),
+                id = ?handle.id(),
                 "Failed to allocate texture for shaping result"
             );
             continue;
@@ -287,7 +289,8 @@ fn update_instances(
     // TODO: retain buffer
     let w = renderer.size().x as f32;
     let h = renderer.size().y as f32;
-    let mut instances = HashMap::<(AssetId, UiScissor), Vec<DrawRectInstance>>::default();
+    let mut instances =
+        HashMap::<(AssetId<TextureAtlas>, UiScissor), Vec<DrawRectInstance>>::default();
     let mut update_gpu_instances = |rects: &TextRectRequests, scissor| {
         for rect in rects.0.iter() {
             let Some(atlas_rect) = pipeline.shaping_rects.get(&rect.shaping.id()) else {
@@ -359,7 +362,7 @@ fn update_instances(
                     count: 0,
                     instance_gpu: renderer.device().create_buffer(&wgpu::BufferDescriptor {
                         label: Some(&format!(
-                            "Text Instance Buffer - {:?} {}",
+                            "Text Instance Buffer - {:?} {:?}",
                             scissor, atlas_id
                         )),
                         mapped_at_creation: false,
@@ -379,7 +382,7 @@ fn update_instances(
             rendering_data.instance_gpu =
                 renderer.device().create_buffer(&wgpu::BufferDescriptor {
                     label: Some(&format!(
-                        "UI Text Instance Buffer - {:?} {}",
+                        "UI Text Instance Buffer - {:?} {:?}",
                         scissor, atlas_id
                     )),
                     size,

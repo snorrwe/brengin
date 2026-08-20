@@ -100,7 +100,7 @@ impl<'a> RenderCommand<'a> for BackgroundPipeline {
 }
 
 pub struct BackgroundTextureRenderingData {
-    pub id: AssetId,
+    pub id: AssetId<DynamicImage>,
     pub texture_bind_group: wgpu::BindGroup,
     pub texture: texture::Texture,
 }
