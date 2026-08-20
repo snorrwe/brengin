@@ -9,7 +9,8 @@ struct Vertex {
 
 struct Instance {
     @location(0) xywh: vec4<f32>,
-    @location(1) layer: f32,
+    @location(1) uv: vec4<f32>,
+    @location(2) layer: f32,
 }
 
 struct VertexOutput {
@@ -34,6 +35,7 @@ fn vs_main(
     }
 
     out.uv = vec2<f32>(u, v);
+    out.uv = mix(instance.uv.xy, instance.uv.zw, out.uv);
 
     var vertex = vec2<f32>(u, v) * vec2(2, -2) + vec2(-1, 1);
     vertex *= xywh.zw;

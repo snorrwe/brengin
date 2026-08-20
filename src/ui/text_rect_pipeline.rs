@@ -258,9 +258,7 @@ impl<'a> RenderCommand<'a> for RectRenderCommand {
                 input
                     .render_pass
                     .set_vertex_buffer(0, requests.instance_gpu.slice(..));
-                input
-                    .render_pass
-                    .set_bind_group(0, atlas_bind_group, &[]);
+                input.render_pass.set_bind_group(0, atlas_bind_group, &[]);
                 input.render_pass.draw(0..6, 0..requests.count as u32);
             }
         }
