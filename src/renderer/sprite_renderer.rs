@@ -83,7 +83,9 @@ fn update_cull(
     assets: Res<Assets<SpriteSheet>>,
 ) {
     q.par_for_each_mut(|(GlobalTransform(tr), cull, sheet)| {
-        let sheet = assets.get(sheet);
+        let Some(sheet) = assets.get(sheet) else {
+            return;
+        };
         cull.0 = (sheet.box_size.x * tr.scale.x).max(sheet.box_size.y * tr.scale.y);
     });
 }

@@ -115,7 +115,9 @@ fn extract_textures(
 ) {
     for r in requests.iter() {
         for handle in r.0.iter().map(|r| &r.image) {
-            let res = images.get(handle);
+            let Some(res) = images.get(handle) else {
+                continue;
+            };
             let id = handle.id();
             if refs.0.contains_key(&id) {
                 continue;

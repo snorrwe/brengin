@@ -188,38 +188,28 @@ impl<T> Default for Assets<T> {
 }
 
 impl<T> Assets<T> {
-    /// return the old value, if any and the handle to this value
-    /// if a value has been set previously, existing handles to it are _not invalidated_
-    pub fn set(&mut self, id: AssetId<T>, value: T) -> (Handle<T>, Option<T>) {
-        let old = self.assets.remove(&id);
-
-        // if value is a new item, or the existing handles have been invalidated,
-        // then allocate a new handle.
-        // otherwise reuse the existing
-        let handle = old
-            .as_ref()
-            .and_then(|e| e.handle.upgrade())
-            .unwrap_or(Handle::new(id));
-
-        self.assets.insert(
-            id,
-            AssetEntry {
-                val: value,
-                handle: handle.downgrade(),
-            },
-        );
-
-        (handle, old.map(|e| e.val))
+    /// return the old value, if any
+    pub fn set(&mut self, handle: &Handle<T>, value: T) -> Option<T> {
+        self.assets
+            .insert(
+                handle.id(),
+                AssetEntry {
+                    val: value,
+                    handle: handle.downgrade(),
+                },
+            )
+            .map(|e| e.val)
     }
 
-    /// thread-safe way of allocating a new asset id
-    pub fn allocate_id(&self) -> AssetId<T> {
-        AssetId::<T>::new(self.next_id.fetch_add(1, Ordering::Relaxed))
+    /// thread-safe way of allocating a new asset handle with an unoccupied entry
+    pub fn allocate(&self) -> Handle<T> {
+        let id = AssetId::<T>::new(self.next_id.fetch_add(1, Ordering::Relaxed));
+        Handle::new(id)
     }
 
     pub fn insert(&mut self, val: T) -> Handle<T> {
-        let id = self.allocate_id();
-        let handle = Handle::new(id);
+        let handle = self.allocate();
+        let id = handle.id();
         let _old = self.assets.insert(
             id,
             AssetEntry {
@@ -259,18 +249,12 @@ impl<T> Assets<T> {
         self.assets.get_mut(&id).map(|val| &mut val.val)
     }
 
-    pub fn get(&self, handle: &Handle<T>) -> &T {
-        self.assets
-            .get(&handle.id)
-            .map(|val| &val.val)
-            .expect("Handle was invalid")
+    pub fn get(&self, handle: &Handle<T>) -> Option<&T> {
+        self.get_by_id(handle.id())
     }
 
-    pub fn get_mut(&mut self, handle: &Handle<T>) -> &mut T {
-        self.assets
-            .get_mut(&handle.id)
-            .map(|val| &mut val.val)
-            .expect("Handle was invalid")
+    pub fn get_mut(&mut self, handle: &Handle<T>) -> Option<&mut T> {
+        self.get_by_id_mut(handle.id())
     }
 }
 

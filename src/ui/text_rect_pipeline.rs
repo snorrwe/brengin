@@ -121,7 +121,9 @@ fn extract_shaping_results(
     mut textures: TextureAtlasRegistry,
 ) {
     for handle in cache.0.values() {
-        let res = shaping_results.get(handle);
+        let Some(res) = shaping_results.get(handle) else {
+            continue;
+        };
         let id = handle.id();
         if refs.0.contains_key(&id) {
             continue;

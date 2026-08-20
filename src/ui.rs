@@ -1115,8 +1115,10 @@ impl<'a> Ui<'a> {
     }
 
     pub fn get_current_font(&self) -> &OwnedTypeFace {
-        if self.fonts.contains(self.theme.font.id()) {
-            self.fonts.get(&self.theme.font)
+        if self.fonts.contains(self.theme.font.id())
+            && let Some(f) = self.fonts.get(&self.theme.font)
+        {
+            f
         } else {
             &self.ui_state.fallback_font
         }
@@ -1138,8 +1140,10 @@ impl<'a> Ui<'a> {
             .or_insert_with(|| {
                 let mut buffer = rustybuzz::UnicodeBuffer::new();
                 buffer.push_str(&line);
-                let font = if self.fonts.contains(self.theme.font.id()) {
-                    self.fonts.get(&self.theme.font)
+                let font = if self.fonts.contains(self.theme.font.id())
+                    && let Some(f) = self.fonts.get(&self.theme.font)
+                {
+                    f
                 } else {
                     &self.ui_state.fallback_font
                 };
@@ -1156,7 +1160,7 @@ impl<'a> Ui<'a> {
                 self.shaping_results.insert(shaping)
             });
 
-        let shape = self.shaping_results.get_mut(handle);
+        let shape = self.shaping_results.get_mut(handle).unwrap();
         shape.last_access = self.tick.0;
         (handle.clone(), shape)
     }

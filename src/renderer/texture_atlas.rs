@@ -196,7 +196,7 @@ impl TextureAtlasRegistry<'_> {
             return;
         }
 
-        let texture_atlas = self.atlases.get(&rect.asset_handle);
+        let texture_atlas = self.atlases.get(&rect.asset_handle).unwrap();
         let texture = &texture_atlas.texture.texture;
 
         self.renderer.queue().write_texture(
@@ -237,7 +237,7 @@ impl TextureAtlasRegistry<'_> {
     }
 
     pub fn get_bind_group(&self, rect: &AtlasRect) -> (BindGroupLayout, BindGroup) {
-        let atlas = self.atlases.get(rect.atlas_handle());
+        let atlas = self.atlases.get(rect.atlas_handle()).unwrap();
         texture_to_bindings(self.renderer.device(), &atlas.texture)
     }
 }

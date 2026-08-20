@@ -107,7 +107,7 @@ pub struct BackgroundTextureRenderingData {
 
 pub struct BackgroundImage(pub Handle<DynamicImage>);
 
-fn extract_background(
+fn extract_background_system(
     mut pipeline: ResMut<BackgroundPipeline>,
     renderer: Res<GraphicsState>,
     img: Option<Res<BackgroundImage>>,
@@ -118,7 +118,9 @@ fn extract_background(
         return;
     };
     let id = img.0.id();
-    let img = images.get(&img.0);
+    let Some(img) = images.get(&img.0) else {
+        return;
+    };
 
     if let Some(t) = pipeline.texture.as_ref().map(|t| t.id) {
         if t == id {
@@ -146,7 +148,7 @@ impl Plugin for BackgroundPlugin {
         ));
         app.require_plugin(AssetsPlugin::<DynamicImage>::default());
         app.with_stage(crate::Stage::Update, |s| {
-            s.add_system(extract_background);
+            s.add_system(extract_background_system);
         });
         app.add_startup_system(setup_pipeline);
     }
