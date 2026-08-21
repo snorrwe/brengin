@@ -2,17 +2,37 @@ use std::{
     any::TypeId, collections::HashMap, mem::MaybeUninit, path::PathBuf, pin::Pin, sync::Arc,
 };
 
+use cecs::systems::SystemStageBuilder;
+
 use crate::prelude::*;
 
 pub struct AssetRegistryPlugin;
 
-pub const ASSET_LOADING_PRE_STAGE: &'static str = "asset-loading-dispatch";
+pub const ASSET_LOADING_STAGE: &'static str = "asset-loading-dispatch";
+
+/// Gets or inserts the asset loading stage into `s`. The asset loading stage runs when there are
+/// pending load requests
+pub fn with_asset_loading_stage(app: &mut App, s: Stage, f: impl FnOnce(&mut SystemStageBuilder)) {
+    let stage = app.stages.entry(s).or_default();
+
+    if let Some(s) = stage
+        .nested
+        .iter_mut()
+        .find(|s| s.name == ASSET_LOADING_STAGE)
+    {
+        f(s);
+    } else {
+        stage
+            .add_nested_stage(SystemStage::new(ASSET_LOADING_STAGE).with_should_run(check_loading));
+        f(stage.nested.last_mut().unwrap())
+    }
+}
 
 impl Plugin for AssetRegistryPlugin {
     fn build(self, app: &mut App) {
         app.with_stage(Stage::PreUpdate, |s| {
             s.add_nested_stage(
-                SystemStage::new(ASSET_LOADING_PRE_STAGE).with_should_run(check_loading),
+                SystemStage::new(ASSET_LOADING_STAGE).with_should_run(check_loading),
             );
         });
 
@@ -69,16 +89,43 @@ impl AsRef<async_lock::Semaphore> for AssetLoadingSemaphore {
 }
 
 pub struct AssetRegistry<'a> {
+    state: ResMut<'a, AssetsLoadStatus>,
     loaders: Res<'a, AssetLoaders>,
     js: Res<'a, JobPool>,
     semaphore: Res<'a, AssetLoadingSemaphore>,
 }
 
+unsafe impl<'a> WorldQuery<'a> for AssetRegistry<'a> {
+    fn resources_mut(set: &mut std::collections::HashSet<TypeId>) {
+        set.insert(TypeId::of::<AssetsLoadStatus>());
+    }
+
+    fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
+        set.insert(TypeId::of::<AssetLoaders>());
+        set.insert(TypeId::of::<JobPool>());
+        set.insert(TypeId::of::<AssetLoadingSemaphore>());
+    }
+
+    fn new(db: &'a World, _system_idx: usize) -> Self {
+        Self {
+            loaders: Res::new(db),
+            state: ResMut::new(db),
+            js: Res::new(db),
+            semaphore: Res::new(db),
+        }
+    }
+}
+
 impl<'a> AssetRegistry<'a> {
-    pub fn load<T: 'static + Send>(&self, path: impl Into<PathBuf>) -> Handle<T> {
+    pub fn load<T: 'static + Send>(&mut self, path: impl Into<PathBuf>) -> Handle<T> {
         let handle = Assets::<T>::allocate();
         let future = self.loaders.load(path.into());
         let semaphore = self.semaphore.0.acquire();
+
+        self.state
+            .0
+            .insert(handle.id().id(), AssetLoadState::default());
+
         self.js.enqueue_future({
             let handle = handle.clone();
             async move {
