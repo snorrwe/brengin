@@ -1,4 +1,6 @@
-use std::{any::TypeId, collections::HashMap, mem::MaybeUninit, path::PathBuf, pin::Pin};
+use std::{
+    any::TypeId, collections::HashMap, mem::MaybeUninit, path::PathBuf, pin::Pin, sync::Arc,
+};
 
 use crate::prelude::*;
 
@@ -15,6 +17,9 @@ impl Plugin for AssetRegistryPlugin {
         });
 
         app.insert_resource(AssetsLoadStatus::default());
+        app.insert_resource(AssetLoaders::default());
+        // TODO: configure n
+        app.insert_resource(AssetLoadingSemaphore(async_lock::Semaphore::new(4)));
 
         todo!()
     }
@@ -55,7 +60,41 @@ pub enum AssetLoadError {
     LoaderNotFound,
 }
 
-pub struct AssetRegistry {}
+pub struct AssetLoadingSemaphore(async_lock::Semaphore);
+
+impl AsRef<async_lock::Semaphore> for AssetLoadingSemaphore {
+    fn as_ref(&self) -> &async_lock::Semaphore {
+        &self.0
+    }
+}
+
+pub struct AssetRegistry<'a> {
+    loaders: Res<'a, AssetLoaders>,
+    js: Res<'a, JobPool>,
+    semaphore: Res<'a, AssetLoadingSemaphore>,
+}
+
+impl<'a> AssetRegistry<'a> {
+    pub fn load<T: 'static + Send>(&self, path: impl Into<PathBuf>) -> Handle<T> {
+        let handle = Assets::<T>::allocate();
+        let future = self.loaders.load(path.into());
+        let semaphore = self.semaphore.0.acquire();
+        self.js.enqueue_future({
+            let handle = handle.clone();
+            async move {
+                let _permit = semaphore.await;
+
+                let handle = handle;
+                let asset = future.await?;
+                // TODO: insert asset into Assets<T>
+                // TODO: update AssetsLoadStatus
+                Ok::<_, AssetLoadError>(asset)
+            }
+        });
+
+        handle
+    }
+}
 
 pub trait AssetLoader<T> {
     fn load(
@@ -65,20 +104,25 @@ pub trait AssetLoader<T> {
 }
 
 #[derive(Default)]
-pub struct AssetLoaders(HashMap<TypeId, ErasedLoader>);
+pub struct AssetLoaders(HashMap<TypeId, Arc<ErasedLoader>>);
 
 impl AssetLoaders {
     pub fn add_loader<T: 'static, L: AssetLoader<T> + Sync + 'static>(&mut self, loader: L) {
-        self.0.insert(TypeId::of::<T>(), ErasedLoader::new(loader));
+        self.0
+            .insert(TypeId::of::<T>(), Arc::new(ErasedLoader::new(loader)));
     }
 
-    pub async fn load<T: 'static>(&self, path: impl Into<PathBuf>) -> Result<T, AssetLoadError> {
+    pub fn load<T: 'static>(
+        &self,
+        path: PathBuf,
+    ) -> impl Future<Output = Result<T, AssetLoadError>> {
         let loader = self
             .0
             .get(&TypeId::of::<T>())
-            .ok_or(AssetLoadError::LoaderNotFound)?;
+            .ok_or(AssetLoadError::LoaderNotFound)
+            .map(Arc::clone);
 
-        unsafe { loader.load(path).await }
+        async move { unsafe { loader?.load(path).await } }
     }
 }
 
@@ -100,6 +144,7 @@ impl Drop for ErasedLoader {
     }
 }
 
+unsafe impl Send for ErasedLoader {}
 unsafe impl Sync for ErasedLoader {}
 
 #[expect(dead_code)]
@@ -187,7 +232,7 @@ mod tests {
 
         loaders.add_loader(NopLoader);
 
-        let fut = loaders.load::<PathBuf>("test");
+        let fut = loaders.load::<PathBuf>("test".into());
 
         let result = pollster::block_on(fut).expect("Load failed");
 
@@ -198,7 +243,7 @@ mod tests {
     fn test_unregistered_loader() {
         let loaders = AssetLoaders::default();
 
-        let fut = loaders.load::<i64>("test");
+        let fut = loaders.load::<i64>("test".into());
 
         let result = pollster::block_on(fut).expect_err("Load should fail");
         assert!(matches!(result, AssetLoadError::LoaderNotFound));
