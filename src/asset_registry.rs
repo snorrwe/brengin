@@ -185,7 +185,6 @@ type ReceiverChannel<T> = Arc<Oneshot<(Handle<T>, Result<T, AssetLoadError>)>>;
 impl<'a> AssetRegistry<'a> {
     pub fn load<T: 'static + Send>(&mut self, path: impl AsRef<std::path::Path>) -> Handle<T> {
         let handle = Assets::<T>::allocate();
-        // TODO: gotta check if file exists and try multiple prefixes
         let futures = self
             .basepaths
             .0
