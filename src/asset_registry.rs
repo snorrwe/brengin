@@ -3,7 +3,9 @@ mod erased_loader;
 pub mod image_loader;
 pub mod sprite_sheet_loader;
 
-use std::{any::TypeId, collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    any::TypeId, collections::HashMap, path::PathBuf, sync::Arc, thread::available_parallelism,
+};
 
 use cecs::systems::SystemStageBuilder;
 
@@ -42,8 +44,13 @@ impl Plugin for AssetRegistryPlugin {
         app.get_or_insert_resource(AssetBasePaths::default);
         app.insert_resource(AssetsLoadStatus::default());
         app.insert_resource(AssetLoaders::default());
-        // TODO: configure n
-        app.insert_resource(AssetLoadingSemaphore(async_lock::Semaphore::new(4)));
+        app.get_or_insert_resource(|| {
+            let n = available_parallelism()
+                .map(|x| x.get() * 2 / 3)
+                .unwrap_or(1)
+                .max(1);
+            AssetLoadingSemaphore(async_lock::Semaphore::new(n))
+        });
         app.insert_resource(AssetsReceivers::default());
 
         // add bundled loaders
