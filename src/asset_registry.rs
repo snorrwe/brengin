@@ -187,7 +187,7 @@ impl<'a> AssetRegistry<'a> {
             .0
             .iter()
             .map(|p| p.join(path.as_ref()))
-            .map(|path| self.loaders.load::<T>(path.into()))
+            .map(|path| (path.clone(), self.loaders.load::<T>(path)))
             .collect::<Vec<_>>();
         let semaphore = self.semaphore.0.acquire();
 
@@ -204,12 +204,18 @@ impl<'a> AssetRegistry<'a> {
             async move {
                 let _permit = semaphore.await;
                 let handle = handle;
-                for future in futures {
-                    // TODO: insert result asset into Assets<T>
-                    // TODO: update AssetsLoadStatus
+                for (path, future) in futures {
                     let result = future.await;
+
                     #[cfg(feature = "tracing")]
-                    tracing::debug!(result=?result.as_ref().map(drop), "Load result");
+                    match result.as_ref() {
+                        Ok(_) | Err(AssetLoadError::FileNotFound(_)) => {
+                            tracing::debug!(result=?result.as_ref().map(drop), path=path.to_str(), "Load result");
+                        }
+                        Err(err) => {
+                            tracing::error!(?err, path=path.to_str(), "Load failed");
+                        }
+                    }
 
                     // return the first success, or not-notfound error
                     if result.is_ok() || !matches!(result, Err(AssetLoadError::FileNotFound(_))) {
