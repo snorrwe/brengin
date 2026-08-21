@@ -1,11 +1,16 @@
 pub mod asset_loader;
 mod erased_loader;
+pub mod image_loader;
 
 use std::{any::TypeId, collections::HashMap, path::PathBuf, sync::Arc};
 
 use cecs::systems::SystemStageBuilder;
 
-use crate::{asset_registry::erased_loader::ErasedLoader, oneshot::Oneshot, prelude::*};
+use crate::{
+    asset_registry::{erased_loader::ErasedLoader, image_loader::DynamicImageLoaderPlugin},
+    oneshot::Oneshot,
+    prelude::*,
+};
 
 pub struct AssetRegistryPlugin;
 
@@ -42,6 +47,9 @@ impl Plugin for AssetRegistryPlugin {
         // TODO: configure n
         app.insert_resource(AssetLoadingSemaphore(async_lock::Semaphore::new(4)));
         app.insert_resource(AssetsReceivers::default());
+
+        // add bundled loaders
+        app.add_plugin(DynamicImageLoaderPlugin);
     }
 }
 
@@ -78,6 +86,8 @@ pub enum AssetLoadError {
     FileNotFound(PathBuf),
     #[error("Asset loader not found")]
     LoaderNotFound,
+    #[error("File load failed: {0}")]
+    LoadFailed(String),
 }
 
 pub struct AssetLoadingSemaphore(async_lock::Semaphore);
@@ -156,6 +166,9 @@ impl<'a> AssetRegistry<'a> {
                 // TODO: insert result asset into Assets<T>
                 // TODO: update AssetsLoadStatus
                 let result = future.await;
+                #[cfg(feature = "tracing")]
+                tracing::debug!(result=?result.as_ref().map(drop), "Load result");
+
                 result_channel.send((handle, result));
             }
         });
