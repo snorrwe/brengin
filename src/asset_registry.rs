@@ -1,5 +1,6 @@
 use std::{
-    any::TypeId, collections::HashMap, mem::MaybeUninit, path::PathBuf, pin::Pin, sync::Arc,
+    any::TypeId, collections::HashMap, ffi::c_void, mem::MaybeUninit, path::PathBuf, pin::Pin,
+    sync::Arc,
 };
 
 use cecs::systems::SystemStageBuilder;
@@ -181,13 +182,13 @@ impl AssetLoaders {
 
 /// Type erased asset loader
 struct ErasedLoader {
-    inner: *mut u8, // type L
+    inner: *mut c_void, // type L
     finalize: fn(&mut ErasedLoader),
     /// Cumbersome workaround the fact that type L is not known when load is called
     load: fn(
         &ErasedLoader,
         path: PathBuf,
-        output: *mut u8, // must be type T
+        output: *mut c_void, // must be type T
     ) -> Pin<Box<dyn std::future::Future<Output = Result<(), AssetLoadError>> + Send>>,
 }
 
@@ -216,7 +217,7 @@ impl ErasedLoader {
                     resource.inner = std::ptr::null_mut();
                 }
             },
-            load: |resource, path, out: *mut u8| unsafe {
+            load: |resource, path, out: *mut c_void| unsafe {
                 assert!(!resource.inner.is_null());
                 let _inner: &L = &*resource.inner.cast::<L>();
                 struct Out<T>(*mut T);
