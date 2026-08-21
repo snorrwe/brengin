@@ -31,6 +31,9 @@ impl<T> Drop for OneShot<T> {
     }
 }
 
+unsafe impl<T> Send for OneShot<T> {}
+unsafe impl<T> Sync for OneShot<T> {}
+
 impl<T> OneShot<T> {
     pub fn send(&self, value: T) {
         if self
@@ -60,6 +63,11 @@ impl<T> OneShot<T> {
         self.status.store(NOT_READY, Ordering::Release);
 
         Some(value)
+    }
+
+    pub fn receive(&self) -> T {
+        self.try_receive()
+            .expect("receive called on an uninitialized channel")
     }
 
     pub fn is_ready(&self) -> bool {
