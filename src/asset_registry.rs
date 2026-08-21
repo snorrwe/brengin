@@ -1,3 +1,4 @@
+pub mod asset_loader;
 mod erased_loader;
 
 use std::{any::TypeId, collections::HashMap, path::PathBuf, sync::Arc};
@@ -41,8 +42,6 @@ impl Plugin for AssetRegistryPlugin {
         // TODO: configure n
         app.insert_resource(AssetLoadingSemaphore(async_lock::Semaphore::new(4)));
         app.insert_resource(AssetsReceivers::default());
-
-        todo!()
     }
 }
 
