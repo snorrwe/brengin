@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use brengin::asset_registry::AssetRegistry;
 use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
 use brengin::prelude::*;
 use brengin::renderer::sprite_renderer::{self, SpriteInstance, SpriteSheet};
@@ -34,7 +35,7 @@ fn camera_rotation_system(dt: Res<DeltaTime>, mut q: Query<&mut Transform, With<
     }
 }
 
-fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
+fn setup(mut cmd: Commands, mut reg: AssetRegistry) {
     //camera
     cmd.spawn()
         .insert(WindowCamera)
@@ -46,12 +47,7 @@ fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
         }))
         .insert_bundle(transform_bundle(Transform::default()));
 
-    let boom = load_sprite_sheet(
-        include_bytes!("static-assets/boom3.png"),
-        Vec2::splat(128.0),
-        8,
-        &mut assets,
-    );
+    let boom = reg.load("boom3.json");
 
     const CUBE_SIDE: f32 = 100.0;
     println!("Spawning {N} explosions");
@@ -70,18 +66,6 @@ fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
                 true,
             ));
     }
-}
-
-fn load_sprite_sheet(
-    bytes: &[u8],
-    box_size: Vec2,
-    num_cols: u32,
-    assets: &mut Assets<SpriteSheet>,
-) -> Handle<SpriteSheet> {
-    let image = image::load_from_memory(bytes).expect("Failed to load spritesheet");
-    let sprite_sheet = SpriteSheet::from_grid(Vec2::ZERO, box_size, num_cols, image);
-
-    assets.insert(sprite_sheet)
 }
 
 impl Plugin for GamePlugin {

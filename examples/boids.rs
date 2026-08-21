@@ -2,6 +2,7 @@
 
 use brengin::{
     App, DefaultPlugins, DeltaTime, Plugin, Stage,
+    asset_registry::AssetRegistry,
     assets::{self, Assets, Handle},
     camera::{PerspectiveCamera, WindowCamera},
     glam::{Quat, Vec2, Vec3},
@@ -87,11 +88,8 @@ fn update_boids_pos(mut q: Query<(&mut LastPos, &Pos)>) {
     });
 }
 
-fn setup_background(mut cmd: Commands, mut assets: ResMut<Assets<DynamicImage>>) {
-    let image = image::load_from_memory(include_bytes!("static-assets/boom3.png"))
-        .expect("Failed to load background");
-    let handle = assets.insert(image);
-
+fn setup_background(mut cmd: Commands, mut reg: AssetRegistry) {
+    let handle = reg.load("boom3.png");
     cmd.insert_resource(BackgroundImage(handle));
 }
 
