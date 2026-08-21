@@ -282,7 +282,6 @@ fn delete_hierarchy(
     }
 }
 
-#[cfg(feature = "parallel")]
 fn update_child_transforms(
     root: Query<(&Transform, &Children), WithOut<Parent>>,
     qchildren: Query<(&Transform, &mut GlobalTransform, Option<&Children>)>,
@@ -303,7 +302,6 @@ fn update_child_transforms(
     });
 }
 
-#[cfg(feature = "parallel")]
 unsafe fn update_children_transforms_recursive(
     qchildren: &Query<(&Transform, &mut GlobalTransform, Option<&Children>)>,
     parent_tr: &Transform,
@@ -332,40 +330,6 @@ unsafe fn update_children_transforms_recursive(
                         }
                     });
                 });
-            });
-        }
-    }
-}
-
-#[cfg(not(feature = "parallel"))]
-fn update_child_transforms(
-    root: Query<(&Transform, &Children), WithOut<Parent>>,
-    qchildren: Query<(&Transform, &mut GlobalTransform, Option<&Children>)>,
-) {
-    root.par_for_each(|(tr, children)| {
-        children.iter().for_each(|child_id| unsafe {
-            update_children_transforms_recursive(&qchildren, tr, *child_id);
-        });
-    });
-}
-
-#[cfg(not(feature = "parallel"))]
-unsafe fn update_children_transforms_recursive(
-    qchildren: &Query<(&Transform, &mut GlobalTransform, Option<&Children>)>,
-    parent_tr: &Transform,
-    child_id: EntityId,
-) {
-    unsafe {
-        let Some((transform, global_tr, children)) = qchildren.fetch_unsafe(child_id) else {
-            // child may have been despawned
-            return;
-        };
-        (*global_tr).0 = parent_tr * &*transform;
-        let global_tr = &*global_tr;
-        if let Some(children) = children {
-            let children = (&*children).0.as_slice();
-            children.iter().for_each(|child_id| {
-                update_children_transforms_recursive(qchildren, &global_tr.0, *child_id);
             });
         }
     }

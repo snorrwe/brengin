@@ -207,16 +207,16 @@ impl<'a> AssetRegistry<'a> {
             async move {
                 let _permit = semaphore.await;
                 let handle = handle;
-                for (path, future) in futures {
+                for (_path, future) in futures {
                     let result = future.await;
 
                     #[cfg(feature = "tracing")]
                     match result.as_ref() {
                         Ok(_) | Err(AssetLoadError::FileNotFound(_)) => {
-                            tracing::debug!(result=?result.as_ref().map(drop), path=path.to_str(), "Load result");
+                            tracing::debug!(result=?result.as_ref().map(drop), path=_path.to_str(), "Load result");
                         }
                         Err(err) => {
-                            tracing::error!(?err, path=path.to_str(), "Load failed");
+                            tracing::error!(?err, path=_path.to_str(), "Load failed");
                         }
                     }
 
