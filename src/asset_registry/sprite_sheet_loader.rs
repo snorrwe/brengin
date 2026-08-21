@@ -2,7 +2,6 @@ use glam::Vec2;
 
 use crate::{
     asset_registry::{AssetLoadError, AssetLoader},
-    prelude::*,
     renderer::sprite_renderer::SpriteSheet,
 };
 use std::{fs::OpenOptions, io::BufReader, path::PathBuf};
@@ -79,15 +78,5 @@ impl AssetLoader<SpriteSheet> for SpriteSheetLoader {
                 mask: mask_image,
             })
         }
-    }
-}
-
-pub struct SpriteSheetLoaderPlugin;
-
-impl Plugin for SpriteSheetLoaderPlugin {
-    fn build(self, app: &mut App) {
-        app.add_plugin(
-            super::asset_loader::AssetLoaderPlugin::<SpriteSheet, _>::new(SpriteSheetLoader),
-        );
     }
 }

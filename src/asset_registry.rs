@@ -7,14 +7,7 @@ use std::{any::TypeId, collections::HashMap, path::PathBuf, sync::Arc};
 
 use cecs::systems::SystemStageBuilder;
 
-use crate::{
-    asset_registry::{
-        erased_loader::ErasedLoader, image_loader::DynamicImageLoaderPlugin,
-        sprite_sheet_loader::SpriteSheetLoaderPlugin,
-    },
-    oneshot::Oneshot,
-    prelude::*,
-};
+use crate::{asset_registry::erased_loader::ErasedLoader, oneshot::Oneshot, prelude::*};
 
 pub struct AssetRegistryPlugin;
 
@@ -54,8 +47,12 @@ impl Plugin for AssetRegistryPlugin {
         app.insert_resource(AssetsReceivers::default());
 
         // add bundled loaders
-        app.add_plugin(DynamicImageLoaderPlugin);
-        app.add_plugin(SpriteSheetLoaderPlugin);
+        app.add_plugin(asset_loader::AssetLoaderPlugin::new(
+            sprite_sheet_loader::SpriteSheetLoader,
+        ));
+        app.add_plugin(asset_loader::AssetLoaderPlugin::new(
+            image_loader::DynamicImageLoader,
+        ));
     }
 }
 
