@@ -1,5 +1,6 @@
 #![feature(debug_closure_helpers)]
 
+pub mod asset_registry;
 pub mod assets;
 pub mod camera;
 pub mod prelude;
@@ -47,6 +48,8 @@ use renderer::{GraphicsState, RenderResult, RendererPlugin, WindowSize};
 use winit::event_loop::EventLoop;
 
 use cecs::{prelude::*, systems::SystemStageBuilder};
+
+use crate::asset_registry::AssetRegistryPlugin;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Time(pub instant::Instant);
@@ -766,6 +769,8 @@ impl Plugin for DefaultPlugins {
 
         #[cfg(feature = "audio")]
         app.add_plugin(audio::AudioPlugin);
+
+        app.add_plugin(AssetRegistryPlugin);
     }
 }
 
