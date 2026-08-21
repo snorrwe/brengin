@@ -42,6 +42,7 @@ impl Plugin for AssetRegistryPlugin {
             );
         });
 
+        app.get_or_insert_resource(AssetBasePaths::default);
         app.insert_resource(AssetsLoadStatus::default());
         app.insert_resource(AssetLoaders::default());
         // TODO: configure n
@@ -50,6 +51,33 @@ impl Plugin for AssetRegistryPlugin {
 
         // add bundled loaders
         app.add_plugin(DynamicImageLoaderPlugin);
+    }
+}
+
+/// Directories where AssetRegistry will attempt to load the requested assets
+/// You can override these by either inserting an AssetBasePaths resource before the
+/// AssetRegistryPlugin or you can override the resource, but it will only take effect for loads
+/// _after_ the modification.
+///
+/// It is recommended that you override before the plugin load
+pub struct AssetBasePaths(pub Vec<PathBuf>);
+
+impl Default for AssetBasePaths {
+    fn default() -> Self {
+        let mut default_paths = Vec::new();
+        if let Some(v) = std::env::var_os("CARGO_MANIFEST_DIR").map(|s| PathBuf::from(s)) {
+            default_paths.push(v.join("assets"));
+        }
+        if let Some(v) = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        {
+            default_paths.push(v.join("assets"));
+        }
+        if let Ok(v) = std::env::current_dir() {
+            default_paths.push(v.join("assets"));
+        }
+        Self(default_paths)
     }
 }
 
@@ -99,6 +127,7 @@ impl AsRef<async_lock::Semaphore> for AssetLoadingSemaphore {
 }
 
 pub struct AssetRegistry<'a> {
+    basepaths: Res<'a, AssetBasePaths>,
     state: ResMut<'a, AssetsLoadStatus>,
     recv: ResMut<'a, AssetsReceivers>,
     loaders: Res<'a, AssetLoaders>,
@@ -116,10 +145,12 @@ unsafe impl<'a> WorldQuery<'a> for AssetRegistry<'a> {
         set.insert(TypeId::of::<AssetLoaders>());
         set.insert(TypeId::of::<JobPool>());
         set.insert(TypeId::of::<AssetLoadingSemaphore>());
+        set.insert(TypeId::of::<AssetBasePaths>());
     }
 
     fn new(db: &'a World, _system_idx: usize) -> Self {
         Self {
+            basepaths: Res::new(db),
             loaders: Res::new(db),
             state: ResMut::new(db),
             recv: ResMut::new(db),
@@ -143,10 +174,16 @@ type ErasedReceiver = cecs::resources::ErasedResource;
 type ReceiverChannel<T> = Arc<Oneshot<(Handle<T>, Result<T, AssetLoadError>)>>;
 
 impl<'a> AssetRegistry<'a> {
-    pub fn load<T: 'static + Send>(&mut self, path: impl Into<PathBuf>) -> Handle<T> {
+    pub fn load<T: 'static + Send>(&mut self, path: impl AsRef<std::path::Path>) -> Handle<T> {
         let handle = Assets::<T>::allocate();
         // TODO: gotta check if file exists and try multiple prefixes
-        let future = self.loaders.load::<T>(path.into());
+        let futures = self
+            .basepaths
+            .0
+            .iter()
+            .map(|p| p.join(path.as_ref()))
+            .map(|path| self.loaders.load::<T>(path.into()))
+            .collect::<Vec<_>>();
         let semaphore = self.semaphore.0.acquire();
 
         self.state
@@ -161,15 +198,20 @@ impl<'a> AssetRegistry<'a> {
             let result_channel = Arc::clone(&result_channel);
             async move {
                 let _permit = semaphore.await;
-
                 let handle = handle;
-                // TODO: insert result asset into Assets<T>
-                // TODO: update AssetsLoadStatus
-                let result = future.await;
-                #[cfg(feature = "tracing")]
-                tracing::debug!(result=?result.as_ref().map(drop), "Load result");
+                for future in futures {
+                    // TODO: insert result asset into Assets<T>
+                    // TODO: update AssetsLoadStatus
+                    let result = future.await;
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!(result=?result.as_ref().map(drop), "Load result");
 
-                result_channel.send((handle, result));
+                    // return the first success, or not-notfound error
+                    if result.is_ok() || !matches!(result, Err(AssetLoadError::FileNotFound(_))) {
+                        result_channel.send((handle, result));
+                        return;
+                    }
+                }
             }
         });
 
