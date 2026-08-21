@@ -40,6 +40,7 @@ impl Plugin for AssetRegistryPlugin {
         app.insert_resource(AssetLoaders::default());
         // TODO: configure n
         app.insert_resource(AssetLoadingSemaphore(async_lock::Semaphore::new(4)));
+        app.insert_resource(AssetsReceivers::default());
 
         todo!()
     }
@@ -90,6 +91,7 @@ impl AsRef<async_lock::Semaphore> for AssetLoadingSemaphore {
 
 pub struct AssetRegistry<'a> {
     state: ResMut<'a, AssetsLoadStatus>,
+    recv: ResMut<'a, AssetsReceivers>,
     loaders: Res<'a, AssetLoaders>,
     js: Res<'a, JobPool>,
     semaphore: Res<'a, AssetLoadingSemaphore>,
@@ -98,6 +100,7 @@ pub struct AssetRegistry<'a> {
 unsafe impl<'a> WorldQuery<'a> for AssetRegistry<'a> {
     fn resources_mut(set: &mut std::collections::HashSet<TypeId>) {
         set.insert(TypeId::of::<AssetsLoadStatus>());
+        set.insert(TypeId::of::<AssetsReceivers>());
     }
 
     fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
@@ -110,11 +113,25 @@ unsafe impl<'a> WorldQuery<'a> for AssetRegistry<'a> {
         Self {
             loaders: Res::new(db),
             state: ResMut::new(db),
+            recv: ResMut::new(db),
             js: Res::new(db),
             semaphore: Res::new(db),
         }
     }
 }
+
+/// Collection of ReceiverChannel<T>s for each TypeId T
+///
+/// Loading plugins must consume these
+#[derive(Default)]
+pub struct AssetsReceivers(pub HashMap<TypeId, Vec<ErasedReceiver>>);
+unsafe impl Send for AssetsReceivers {}
+unsafe impl Sync for AssetsReceivers {}
+
+/// Type erased ReceiverChannel<T>
+type ErasedReceiver = cecs::resources::ErasedResource;
+
+type ReceiverChannel<T> = Arc<Oneshot<(Handle<T>, Result<T, AssetLoadError>)>>;
 
 impl<'a> AssetRegistry<'a> {
     pub fn load<T: 'static + Send>(&mut self, path: impl Into<PathBuf>) -> Handle<T> {
@@ -127,7 +144,8 @@ impl<'a> AssetRegistry<'a> {
             .0
             .insert(handle.id().id(), AssetLoadState::default());
 
-        let result_channel = Arc::new(Oneshot::<(Handle<T>, Result<T, AssetLoadError>)>::default());
+        let result_channel: ReceiverChannel<T> =
+            Arc::new(Oneshot::<(Handle<T>, Result<T, AssetLoadError>)>::default());
 
         self.js.enqueue_future({
             let handle = handle.clone();
@@ -143,7 +161,11 @@ impl<'a> AssetRegistry<'a> {
             }
         });
 
-        // TODO:consume the channel result
+        self.recv
+            .0
+            .entry(TypeId::of::<T>())
+            .or_default()
+            .push(ErasedReceiver::new(result_channel));
 
         handle
     }
