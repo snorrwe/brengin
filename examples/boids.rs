@@ -15,7 +15,6 @@ use brengin::{
     },
     transform::{self, Transform, transform_bundle},
 };
-use image::DynamicImage;
 
 struct Boid;
 
