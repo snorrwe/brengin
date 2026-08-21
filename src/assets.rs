@@ -5,7 +5,7 @@ pub mod asset_id;
 
 pub use asset_id::AssetId;
 
-use cecs::{Component, prelude::*};
+use cecs::{prelude::*, Component};
 use std::{
     collections::HashMap,
     marker::PhantomData,
@@ -13,7 +13,7 @@ use std::{
     sync::atomic::{AtomicU64, AtomicUsize, Ordering},
 };
 
-use crate::{Plugin, assets::asset_id::ASSET_ID_SENTINEL};
+use crate::{assets::asset_id::ASSET_ID_SENTINEL, Plugin};
 
 struct RefCount {
     data_references: AtomicUsize,
@@ -221,7 +221,6 @@ impl<T> Assets<T> {
         #[cfg(feature = "tracing")]
         tracing::debug!(
             id = ?handle.id(),
-            ty = std::any::type_name::<T>(),
             "Inserted new asset"
         );
         handle
@@ -270,7 +269,6 @@ fn gc_assets<T: 'static>(mut assets: ResMut<Assets<T>>) {
         if !retain {
             tracing::debug!(
                 id = ?_id,
-                ty = std::any::type_name::<T>(),
                 "Garbage collecting"
             );
         }
