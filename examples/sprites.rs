@@ -3,9 +3,9 @@ use std::time::Duration;
 use brengin::asset_registry::AssetRegistry;
 use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
 use brengin::prelude::*;
-use brengin::renderer::sprite_renderer::{self, SpriteInstance, SpriteSheet};
+use brengin::renderer::sprite_renderer::{self, SpriteInstance};
 use brengin::{App, DefaultPlugins, Plugin};
-use glam::{Quat, Vec2, Vec3};
+use glam::{Quat, Vec3};
 
 struct GamePlugin;
 

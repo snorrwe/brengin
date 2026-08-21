@@ -36,7 +36,7 @@ impl MandelbrotPipeline {
 
         let shader = renderer
             .device()
-            .create_shader_module(include_wgsl!("assets/mandelbrot.wgsl"));
+            .create_shader_module(include_wgsl!("static-assets/mandelbrot.wgsl"));
 
         let render_pipeline =
             renderer
