@@ -55,9 +55,9 @@ impl AssetLoader<SpriteSheet> for SpriteSheetLoader {
                 .decode()
                 .map_err(|err| AssetLoadError::LoadFailed(err.to_string()))?;
 
-            let mask_image = if let Some(img_path) = data.mask.as_ref() {
-                let mask = image::ImageReader::open(img_path)
-                    .map_err(|_| AssetLoadError::FileNotFound(img_path.clone()))?
+            let mask_image = if let Some(mask_path) = data.mask.as_ref() {
+                let mask = image::ImageReader::open(mask_path)
+                    .map_err(|_| AssetLoadError::FileNotFound(mask_path.clone()))?
                     .decode()
                     .map_err(|err| AssetLoadError::LoadFailed(err.to_string()))?;
                 Some(mask)
