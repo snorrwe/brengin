@@ -4,7 +4,7 @@ use std::{
 
 use cecs::systems::SystemStageBuilder;
 
-use crate::prelude::*;
+use crate::{oneshot::OneShot, prelude::*};
 
 pub struct AssetRegistryPlugin;
 
@@ -127,8 +127,11 @@ impl<'a> AssetRegistry<'a> {
             .0
             .insert(handle.id().id(), AssetLoadState::default());
 
+        let result_channel = Arc::new(OneShot::<(Handle<T>, Result<T, AssetLoadError>)>::default());
+
         self.js.enqueue_future({
             let handle = handle.clone();
+            let result_channel = Arc::clone(&result_channel);
             async move {
                 let _permit = semaphore.await;
 
@@ -136,8 +139,11 @@ impl<'a> AssetRegistry<'a> {
                 // TODO: insert result asset into Assets<T>
                 // TODO: update AssetsLoadStatus
                 let result = future.await;
+                result_channel.send((handle, result));
             }
         });
+
+        // TODO:consume the channel result
 
         handle
     }
