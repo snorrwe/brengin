@@ -88,7 +88,7 @@ fn update_boids_pos(mut q: Query<(&mut LastPos, &Pos)>) {
 }
 
 fn setup_background(mut cmd: Commands, mut assets: ResMut<Assets<DynamicImage>>) {
-    let image = image::load_from_memory(include_bytes!("assets/boom3.png"))
+    let image = image::load_from_memory(include_bytes!("static-assets/boom3.png"))
         .expect("Failed to load background");
     let handle = assets.insert(image);
 
@@ -114,7 +114,7 @@ fn setup_boids(
         )));
 
     let boid = load_sprite_sheet(
-        include_bytes!("assets/boid.png"),
+        include_bytes!("static-assets/boid.png"),
         Vec2::splat(32.0),
         1,
         &mut assets,

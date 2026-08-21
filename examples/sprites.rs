@@ -47,7 +47,7 @@ fn setup(mut cmd: Commands, mut assets: ResMut<Assets<SpriteSheet>>) {
         .insert_bundle(transform_bundle(Transform::default()));
 
     let boom = load_sprite_sheet(
-        include_bytes!("assets/boom3.png"),
+        include_bytes!("static-assets/boom3.png"),
         Vec2::splat(128.0),
         8,
         &mut assets,

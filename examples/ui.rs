@@ -33,7 +33,7 @@ struct Args {
 }
 
 fn load_image(mut state: ResMut<UiState>, mut images: ResMut<Assets<DynamicImage>>) {
-    let data = include_bytes!("./assets/boid.png");
+    let data = include_bytes!("./static-assets/boid.png");
     let image = image::load_from_memory(data).expect("Failed to load image");
 
     state.boid = images.insert(image);
