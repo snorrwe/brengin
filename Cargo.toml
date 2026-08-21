@@ -34,6 +34,9 @@ crossbeam = { version = "0.8.4", features = ["crossbeam-channel", "nightly"] }
 thiserror = "2.0.17"
 guillotiere = "0.7.0"
 async-lock = "3.4.2"
+serde_json = "1.0.151"
+serde = "1.0.229"
+serde_derive = "1.0.229"
 
 [dev-dependencies]
 clap = "4.5.54"

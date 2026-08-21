@@ -1,13 +1,17 @@
 pub mod asset_loader;
 mod erased_loader;
 pub mod image_loader;
+pub mod sprite_sheet_loader;
 
 use std::{any::TypeId, collections::HashMap, path::PathBuf, sync::Arc};
 
 use cecs::systems::SystemStageBuilder;
 
 use crate::{
-    asset_registry::{erased_loader::ErasedLoader, image_loader::DynamicImageLoaderPlugin},
+    asset_registry::{
+        erased_loader::ErasedLoader, image_loader::DynamicImageLoaderPlugin,
+        sprite_sheet_loader::SpriteSheetLoaderPlugin,
+    },
     oneshot::Oneshot,
     prelude::*,
 };
@@ -51,6 +55,7 @@ impl Plugin for AssetRegistryPlugin {
 
         // add bundled loaders
         app.add_plugin(DynamicImageLoaderPlugin);
+        app.add_plugin(SpriteSheetLoaderPlugin);
     }
 }
 
