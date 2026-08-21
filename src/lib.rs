@@ -3,6 +3,7 @@
 pub mod asset_registry;
 pub mod assets;
 pub mod camera;
+pub mod oneshot;
 pub mod prelude;
 pub mod quat_ext;
 pub mod renderer;
