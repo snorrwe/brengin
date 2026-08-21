@@ -4,7 +4,7 @@ use std::{
 
 use cecs::systems::SystemStageBuilder;
 
-use crate::{oneshot::OneShot, prelude::*};
+use crate::{oneshot::Oneshot, prelude::*};
 
 pub struct AssetRegistryPlugin;
 
@@ -127,7 +127,7 @@ impl<'a> AssetRegistry<'a> {
             .0
             .insert(handle.id().id(), AssetLoadState::default());
 
-        let result_channel = Arc::new(OneShot::<(Handle<T>, Result<T, AssetLoadError>)>::default());
+        let result_channel = Arc::new(Oneshot::<(Handle<T>, Result<T, AssetLoadError>)>::default());
 
         self.js.enqueue_future({
             let handle = handle.clone();
