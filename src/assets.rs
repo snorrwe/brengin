@@ -5,7 +5,7 @@ pub mod asset_id;
 
 pub use asset_id::AssetId;
 
-use cecs::{prelude::*, Component};
+use cecs::{Component, prelude::*};
 use std::{
     collections::HashMap,
     marker::PhantomData,
@@ -13,7 +13,7 @@ use std::{
     sync::atomic::{AtomicU64, AtomicUsize, Ordering},
 };
 
-use crate::{assets::asset_id::ASSET_ID_SENTINEL, Plugin};
+use crate::{Plugin, assets::asset_id::ASSET_ID_SENTINEL};
 
 struct RefCount {
     data_references: AtomicUsize,
@@ -22,7 +22,6 @@ struct RefCount {
 
 #[derive(Debug)]
 pub struct Handle<T> {
-    id: AssetId<T>,
     weak: WeakHandle<T>,
 }
 
@@ -75,10 +74,7 @@ impl<T> WeakHandle<T> {
                 n = e;
                 continue;
             }
-            return Some(Handle {
-                id: self.id,
-                weak: self.clone(),
-            });
+            return Some(Handle { weak: self.clone() });
         }
     }
 
@@ -125,7 +121,6 @@ impl<T> Clone for Handle<T> {
             .data_references
             .fetch_add(1, Ordering::Relaxed);
         Self {
-            id: self.id,
             weak: self.weak.clone(),
         }
     }
@@ -145,7 +140,6 @@ impl<T> Clone for WeakHandle<T> {
 impl<T> Handle<T> {
     fn new(id: AssetId<T>) -> Self {
         Self {
-            id,
             weak: unsafe {
                 WeakHandle {
                     id,
@@ -160,7 +154,7 @@ impl<T> Handle<T> {
     }
 
     pub fn id(&self) -> AssetId<T> {
-        self.id
+        self.weak.id
     }
 
     pub fn downgrade(&self) -> WeakHandle<T> {
@@ -169,7 +163,7 @@ impl<T> Handle<T> {
     }
 
     pub fn is_valid(&self) -> bool {
-        self.id.id() != ASSET_ID_SENTINEL
+        self.id().id() != ASSET_ID_SENTINEL
     }
 }
 
