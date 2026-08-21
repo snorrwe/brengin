@@ -1,3 +1,4 @@
+use brengin::asset_registry::AssetRegistry;
 use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
 use brengin::ui::{
     ButtonDescriptor, ButtonDescriptorPayload, HorizontalAlignment, OutlineDescriptor,
@@ -32,11 +33,8 @@ struct Args {
     state: MenuState,
 }
 
-fn load_image(mut state: ResMut<UiState>, mut images: ResMut<Assets<DynamicImage>>) {
-    let data = include_bytes!("./static-assets/boid.png");
-    let image = image::load_from_memory(data).expect("Failed to load image");
-
-    state.boid = images.insert(image);
+fn load_image(mut state: ResMut<UiState>, mut reg: AssetRegistry) {
+    state.boid = reg.load("boid.png");
 }
 
 fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
