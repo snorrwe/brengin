@@ -11,12 +11,12 @@ const READY: i8 = 1;
 const WRITING: i8 = 2;
 const READING: i8 = 3;
 
-pub struct OneShot<T> {
+pub struct Oneshot<T> {
     value: UnsafeCell<MaybeUninit<T>>,
     status: AtomicI8,
 }
 
-impl<T> Default for OneShot<T> {
+impl<T> Default for Oneshot<T> {
     fn default() -> Self {
         Self {
             value: UnsafeCell::new(MaybeUninit::uninit()),
@@ -25,16 +25,16 @@ impl<T> Default for OneShot<T> {
     }
 }
 
-impl<T> Drop for OneShot<T> {
+impl<T> Drop for Oneshot<T> {
     fn drop(&mut self) {
         let _ = self.try_receive();
     }
 }
 
-unsafe impl<T> Send for OneShot<T> {}
-unsafe impl<T> Sync for OneShot<T> {}
+unsafe impl<T> Send for Oneshot<T> {}
+unsafe impl<T> Sync for Oneshot<T> {}
 
-impl<T> OneShot<T> {
+impl<T> Oneshot<T> {
     pub fn send(&self, value: T) {
         if self
             .status
