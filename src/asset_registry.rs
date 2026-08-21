@@ -119,7 +119,8 @@ unsafe impl<'a> WorldQuery<'a> for AssetRegistry<'a> {
 impl<'a> AssetRegistry<'a> {
     pub fn load<T: 'static + Send>(&mut self, path: impl Into<PathBuf>) -> Handle<T> {
         let handle = Assets::<T>::allocate();
-        let future = self.loaders.load(path.into());
+        // TODO: gotta check if file exists and try multiple prefixes
+        let future = self.loaders.load::<T>(path.into());
         let semaphore = self.semaphore.0.acquire();
 
         self.state
@@ -132,10 +133,9 @@ impl<'a> AssetRegistry<'a> {
                 let _permit = semaphore.await;
 
                 let handle = handle;
-                let asset = future.await?;
-                // TODO: insert asset into Assets<T>
+                // TODO: insert result asset into Assets<T>
                 // TODO: update AssetsLoadStatus
-                Ok::<_, AssetLoadError>(asset)
+                let result = future.await;
             }
         });
 
