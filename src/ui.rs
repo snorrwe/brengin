@@ -329,6 +329,7 @@ pub struct UiState {
 
     /// Hash of the current tree root
     root_hash: u32,
+    root_children: u32,
 
     layout_dir: LayoutDirection,
 
@@ -457,6 +458,7 @@ impl UiState {
             last_bounding_boxes: Default::default(),
             rect_history: Default::default(),
             root_hash: 0,
+            root_children: 0,
             layout_dir: LayoutDirection::TopDown(HorizontalAlignment::Left),
             windows: Default::default(),
             fallback_font: text::parse_font(
@@ -1339,24 +1341,31 @@ impl<'a> Ui<'a> {
         let (parent, children) = self
             .ui_state
             .id_stack
-            .len()
-            .checked_sub(2)
-            .and_then(|i| {
-                let idx = *self.ui_state.id_stack.get(i)? as usize;
+            .iter()
+            .rev()
+            .skip(1)
+            .find(|i| **i != SENTINEL)
+            .map(|i| *i as usize)
+            .and_then(|parent| {
+                let parent_idx = *self.ui_state.id_stack.get(parent)? as usize;
 
-                let id = self.ui_state.widget_ids.get(idx).copied()?;
-                let ch = &mut self.ui_state.widget_properties[idx].children;
+                let parent_id = self.ui_state.widget_ids.get(parent_idx).copied()?;
+                let ch = &mut self.ui_state.widget_properties[parent_idx].children;
                 *ch += 1;
 
-                Some((id, *ch))
+                Some((parent_id, *ch))
             })
-            .unwrap_or((
-                UiId {
-                    uid: self.ui_state.root_hash,
-                    ..UiId::SENTINEL
-                },
-                0,
-            ));
+            .unwrap_or_else(|| {
+                let children = self.ui_state.root_children;
+                self.ui_state.root_children += 1;
+                (
+                    UiId {
+                        uid: self.ui_state.root_hash,
+                        ..UiId::SENTINEL
+                    },
+                    children as usize,
+                )
+            });
 
         let index = self.ui_state.widget_ids.len() as IdxType;
         let hash = fnv_1a(bytemuck::cast_slice(&[
@@ -3522,6 +3531,7 @@ fn begin_frame(
 
     ui.layout_dir = LayoutDirection::TopDown(HorizontalAlignment::Left);
     ui.root_hash = 0;
+    ui.root_children = 0;
     ui.id_stack.clear();
     ui.widget_ids.clear();
     ui.widget_properties.clear();
@@ -3671,6 +3681,7 @@ impl<'a> UiRoot<'a> {
         };
 
         self.0.ui_state.root_hash = fnv_1a(desc.name.as_bytes());
+        self.0.ui_state.root_children = 0;
         self.0.push_child();
         self.0.begin_widget();
 
@@ -3784,6 +3795,7 @@ impl<'a> UiRoot<'a> {
             width,
             height,
         ]));
+        self.0.ui_state.root_children = 0;
         let scissor = self.0.push_scissor(bounds);
 
         let old_layer = self.0.push_layer();
@@ -3856,6 +3868,7 @@ impl<'a> UiRoot<'a> {
     /// key should be a unique index for each empty call in an application
     pub fn empty(&mut self, contents: impl FnOnce(&mut Ui)) {
         self.0.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[0xdeadbeefu32; 4]));
+        self.0.ui_state.root_children = 0;
         let old_bounds = self.0.ui_state.bounds;
         let scissor = self.0.push_scissor(old_bounds);
         let old_layer = self.0.push_layer();
