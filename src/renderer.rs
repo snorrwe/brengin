@@ -6,6 +6,7 @@ pub mod texture_atlas;
 use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
 
 use cecs::{prelude::*, query::WorldQuery};
+use cfg_if::cfg_if;
 use glam::UVec2;
 use wgpu::{Backends, ExperimentalFeatures, InstanceFlags, StoreOp, SurfaceTarget};
 use winit::event_loop::OwnedDisplayHandle;
@@ -110,10 +111,13 @@ impl GraphicsState {
         window: impl Into<SurfaceTarget<'static>>,
         size: UVec2,
     ) -> Self {
-        #[cfg(not(debug_assertions))]
-        let flags = InstanceFlags::default();
-        #[cfg(debug_assertions)]
-        let flags = InstanceFlags::debugging();
+        cfg_if! {
+            if #[cfg(debug_assertions)] {
+                let flags = InstanceFlags::debugging();
+            } else {
+                let flags = InstanceFlags::default();
+            }
+        }
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             display: Some(Box::new(handle)),
@@ -187,6 +191,24 @@ impl GraphicsState {
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
+        cfg_if! {
+            if #[cfg(debug_assertions)] {
+                let clear_color = wgpu::Color {
+                    r: 0.4588,
+                    g: 0.031,
+                    b: 0.451,
+                    a: 1.0,
+                };
+            } else {
+                let clear_color = wgpu::Color {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 1.0,
+                };
+            }
+        }
+
         Self {
             depth_texture,
             size,
@@ -195,12 +217,7 @@ impl GraphicsState {
             config,
             surface,
             camera_bind_group_layout,
-            clear_color: wgpu::Color {
-                r: 0.4588,
-                g: 0.031,
-                b: 0.451,
-                a: 1.0,
-            },
+            clear_color,
         }
     }
 
