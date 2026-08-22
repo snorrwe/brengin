@@ -182,6 +182,37 @@ type ErasedReceiver = cecs::resources::ErasedResource;
 
 type ReceiverChannel<T> = Arc<Oneshot<(Handle<T>, Result<T, AssetLoadError>)>>;
 
+async fn try_load_asset<T, F>(
+    semaphore: async_lock::futures::Acquire<'_>,
+    handle: Handle<T>,
+    result_channel: ReceiverChannel<T>,
+    futures: Vec<(PathBuf, F)>,
+) where
+    F: Future<Output = Result<T, AssetLoadError>>,
+{
+    let _permit = semaphore.await;
+    let handle = handle;
+    for (_path, future) in futures {
+        let result = future.await;
+
+        #[cfg(feature = "tracing")]
+        match result.as_ref() {
+            Ok(_) | Err(AssetLoadError::FileNotFound(_)) => {
+                tracing::debug!(result=?result.as_ref().map(drop), path=_path.to_str(), "Load result");
+            }
+            Err(err) => {
+                tracing::error!(?err, path = _path.to_str(), "Load failed");
+            }
+        }
+
+        // return the first success, or not-notfound error
+        if result.is_ok() || !matches!(result, Err(AssetLoadError::FileNotFound(_))) {
+            result_channel.send((handle, result));
+            return;
+        }
+    }
+}
+
 impl<'a> AssetRegistry<'a> {
     pub fn load<T: 'static + Send>(&mut self, path: impl AsRef<std::path::Path>) -> Handle<T> {
         let handle = Assets::<T>::allocate();
@@ -192,8 +223,6 @@ impl<'a> AssetRegistry<'a> {
             .map(|p| p.join(path.as_ref()))
             .map(|path| (path.clone(), self.loaders.load::<T>(path)))
             .collect::<Vec<_>>();
-        let semaphore = self.semaphore.0.acquire();
-
         self.state
             .0
             .insert(handle.id().id(), AssetLoadState::default());
@@ -201,33 +230,12 @@ impl<'a> AssetRegistry<'a> {
         let result_channel: ReceiverChannel<T> =
             Arc::new(Oneshot::<(Handle<T>, Result<T, AssetLoadError>)>::default());
 
-        self.js.enqueue_future({
-            let handle = handle.clone();
-            let result_channel = Arc::clone(&result_channel);
-            async move {
-                let _permit = semaphore.await;
-                let handle = handle;
-                for (_path, future) in futures {
-                    let result = future.await;
-
-                    #[cfg(feature = "tracing")]
-                    match result.as_ref() {
-                        Ok(_) | Err(AssetLoadError::FileNotFound(_)) => {
-                            tracing::debug!(result=?result.as_ref().map(drop), path=_path.to_str(), "Load result");
-                        }
-                        Err(err) => {
-                            tracing::error!(?err, path=_path.to_str(), "Load failed");
-                        }
-                    }
-
-                    // return the first success, or not-notfound error
-                    if result.is_ok() || !matches!(result, Err(AssetLoadError::FileNotFound(_))) {
-                        result_channel.send((handle, result));
-                        return;
-                    }
-                }
-            }
-        });
+        self.js.enqueue_future(try_load_asset(
+            self.semaphore.0.acquire(),
+            handle.clone(),
+            Arc::clone(&result_channel),
+            futures,
+        ));
 
         self.recv
             .0
