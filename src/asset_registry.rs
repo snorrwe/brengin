@@ -214,13 +214,49 @@ async fn try_load_asset<T, F>(
 }
 
 impl<'a> AssetRegistry<'a> {
+    fn get_candidate_paths<'b>(
+        &'b self,
+        path: &'b std::path::Path,
+    ) -> impl Iterator<Item = PathBuf> + 'b {
+        self.basepaths.0.iter().map(move |p| p.join(path))
+    }
+
+    /// waits for the asset load to complete before proceeding
+    pub fn load_sync<T: 'static + Send>(&mut self, path: impl AsRef<std::path::Path>) -> Handle<T> {
+        // TODO: only the future handling is different, could probably dedupe more
+
+        let handle = Assets::<T>::allocate();
+        let futures = self
+            .get_candidate_paths(path.as_ref())
+            .map(|path| (path.clone(), self.loaders.load::<T>(path)))
+            .collect::<Vec<_>>();
+        self.state
+            .0
+            .insert(handle.id().id(), AssetLoadState::default());
+
+        let result_channel: ReceiverChannel<T> =
+            Arc::new(Oneshot::<(Handle<T>, Result<T, AssetLoadError>)>::default());
+
+        pollster::block_on(try_load_asset(
+            self.semaphore.0.acquire(),
+            handle.clone(),
+            Arc::clone(&result_channel),
+            futures,
+        ));
+
+        self.recv
+            .0
+            .entry(TypeId::of::<T>())
+            .or_default()
+            .push(ErasedReceiver::new(result_channel));
+
+        handle
+    }
+
     pub fn load<T: 'static + Send>(&mut self, path: impl AsRef<std::path::Path>) -> Handle<T> {
         let handle = Assets::<T>::allocate();
         let futures = self
-            .basepaths
-            .0
-            .iter()
-            .map(|p| p.join(path.as_ref()))
+            .get_candidate_paths(path.as_ref())
             .map(|path| (path.clone(), self.loaders.load::<T>(path)))
             .collect::<Vec<_>>();
         self.state
