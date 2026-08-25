@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 #![feature(debug_closure_helpers)]
 
 pub mod asset_registry;
