@@ -2372,7 +2372,7 @@ impl<'a> Ui<'a> {
                     }
                     if let KeyCode::KeyV = k {
                         // paste text
-                        if let Some(ctx) = self.clipboard.as_deref_mut()
+                        if let Some(ctx) = self.clipboard.as_deref()
                             && let Ok(text) = ctx.get_text()
                         {
                             self.ui_inputs.keys.insert(*k);
@@ -3601,7 +3601,7 @@ query_collection! {
         delta_time: Res<'a, DeltaTime>,
         tick: Res<'a, Tick>,
         ui_inputs: ResMut<'a, NextUiInputs>,
-        clipboard: Option<ResMut<'a, clipboard_rs::ClipboardContext>>,
+        pub clipboard: Option<Res<'a, clipboard_rs::ClipboardContext>>,
     }
 }
 
