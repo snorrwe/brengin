@@ -1,14 +1,20 @@
 use std::{path::Path, pin::Pin};
 
 use anyhow::Context;
-use rustybuzz::GlyphBuffer;
+use harfrust::GlyphBuffer;
+use skrifa::{
+    MetadataProvider,
+    instance::{LocationRef, Size},
+    outline::{DrawSettings, OutlinePen, pen::ControlBoundsPen},
+};
 
 use super::rect::UiRect;
 
 pub struct OwnedTypeFace {
     _data: Pin<Box<[u8]>>,
     face_index: u32,
-    face: rustybuzz::Face<'static>,
+    face: read_fonts::FontRef<'static>,
+    shaper_data: harfrust::ShaperData,
 }
 
 impl std::fmt::Debug for OwnedTypeFace {
@@ -19,16 +25,24 @@ impl std::fmt::Debug for OwnedTypeFace {
 }
 
 impl OwnedTypeFace {
-    pub fn face(&self) -> &rustybuzz::Face<'static> {
+    pub fn face<'a>(&'a self) -> &'a read_fonts::FontRef<'a> {
         &self.face
     }
 
-    pub fn face_mut(&mut self) -> &mut rustybuzz::Face<'static> {
+    pub fn face_mut<'a>(&'a mut self) -> &'a mut read_fonts::FontRef<'a>
+    where
+        'a: 'static,
+    {
         &mut self.face
     }
 
     pub fn face_index(&self) -> u32 {
         self.face_index
+    }
+
+    /// Build a shaper for this face
+    pub fn shaper<'a>(&'a self) -> harfrust::Shaper<'a> {
+        self.shaper_data.shaper(&self.face).build()
     }
 }
 
@@ -41,15 +55,17 @@ pub fn load_font(path: impl AsRef<Path>, face_index: u32) -> anyhow::Result<Owne
 
 pub fn parse_font(data: Box<[u8]>, face_index: u32) -> anyhow::Result<OwnedTypeFace> {
     let data = Pin::new(data);
-    let face = rustybuzz::Face::from_slice(&data[..], face_index)
-        .with_context(|| format!("Failed to parse font"))?;
+    let face = read_fonts::FontRef::new(&data).context("Failed to parse font")?;
 
-    let face: rustybuzz::Face<'static> = unsafe { std::mem::transmute(face) };
+    let face: read_fonts::FontRef<'static> = unsafe { std::mem::transmute(face) };
+
+    let shaper_data = harfrust::ShaperData::new(&face);
 
     Ok(OwnedTypeFace {
         _data: data,
         face_index,
         face,
+        shaper_data,
     })
 }
 
@@ -62,20 +78,31 @@ pub struct GlyphBufferBounds {
     pub glyph_bounds: Vec<(u32, UiRect)>,
 }
 
-pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBounds {
+pub fn get_bounds(face: &read_fonts::FontRef, glyphs: &GlyphBuffer) -> GlyphBufferBounds {
     let info = glyphs.glyph_infos();
     let glyph_positions = glyphs.glyph_positions();
 
-    let bounds = face.global_bounding_box();
+    let outlines = face.outline_glyphs();
+    let metrics = face.metrics(Size::unscaled(), LocationRef::default());
+    let bounds = metrics.bounds.unwrap_or_default();
 
     let mut maxx = 0;
-    let mut maxy = bounds.height() as i32;
+    let mut maxy = (bounds.y_max - bounds.y_min) as i32;
     let mut padding_x = 0;
-    let mut padding_y = -bounds.y_min as u32;
+    let mut padding_y = (-bounds.y_min).max(0.0) as u32;
     let mut glyph_bounds = Vec::with_capacity(glyph_positions.len());
     for (pos, info) in glyph_positions.into_iter().zip(info.into_iter()) {
-        let glyph_id = rustybuzz::ttf_parser::GlyphId(info.glyph_id as u16);
-        let bounds = face.glyph_bounding_box(glyph_id);
+        let glyph_id = harfrust::GlyphId::new(info.glyph_id);
+        let bounds = outlines.get(glyph_id).and_then(|outline| {
+            let mut pen = ControlBoundsPen::new();
+            outline
+                .draw(
+                    DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
+                    &mut pen,
+                )
+                .ok()?;
+            pen.bounding_box()
+        });
         if let Some(bounds) = bounds {
             glyph_bounds.push((
                 info.cluster,
@@ -86,10 +113,10 @@ pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBo
                     max_y: bounds.y_max as i32,
                 },
             ));
-            if bounds.x_min < 0 {
+            if bounds.x_min < 0.0 {
                 padding_x = padding_x.max(-bounds.x_min as u32);
             }
-            if bounds.y_min < 0 {
+            if bounds.y_min < 0.0 {
                 padding_y = padding_y.max(-bounds.y_min as u32);
             }
             if bounds.x_max as i32 > pos.x_advance {
@@ -99,7 +126,7 @@ pub fn get_bounds(face: &rustybuzz::Face, glyphs: &GlyphBuffer) -> GlyphBufferBo
                 maxy = maxy.max(bounds.y_max as i32);
             }
         }
-        maxx += pos.x_advance as i32;
+        maxx += pos.x_advance;
     }
 
     GlyphBufferBounds {
@@ -134,7 +161,7 @@ impl TextDrawResponse {
 }
 
 pub fn draw_glyph_buffer(
-    face: &rustybuzz::Face,
+    face: &read_fonts::FontRef,
     glyphs: &GlyphBuffer,
     height: u32,
 ) -> anyhow::Result<TextDrawResponse> {
@@ -159,10 +186,15 @@ pub fn draw_glyph_buffer(
     let glyph_positions = glyphs.glyph_positions();
     for (pos, info) in glyph_positions.into_iter().zip(info.into_iter()) {
         let glyph_id = info.glyph_id;
-        face.outline_glyph(
-            rustybuzz::ttf_parser::GlyphId(glyph_id as u16),
+        let Some(outline) = face.outline_glyphs().get(harfrust::GlyphId::new(glyph_id)) else {
+            continue;
+        };
+        outline.draw(
+            // draw in font units, TextOutlineBuilder applies the scaling
+            DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
             &mut builder,
-        );
+        )?;
+
         builder.xoffset += pos.x_advance as f32 * scaling_factor;
         builder.yoffset += pos.y_advance as f32 * scaling_factor;
         builder.draw(!0, &mut pixmap);
@@ -233,7 +265,7 @@ impl Default for TextOutlineBuilder {
     }
 }
 
-impl rustybuzz::ttf_parser::OutlineBuilder for TextOutlineBuilder {
+impl OutlinePen for TextOutlineBuilder {
     fn move_to(&mut self, x: f32, y: f32) {
         self.pb.move_to(self.xpos(x), self.ypos(y));
     }

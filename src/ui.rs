@@ -131,7 +131,7 @@ pub struct TextTextureCache(pub HashMap<ShapeKey, assets::Handle<ShapingResult>>
 
 #[derive(Debug)]
 pub struct ShapingResult {
-    pub glyphs: rustybuzz::GlyphBuffer,
+    pub glyphs: harfrust::GlyphBuffer,
     pub texture: TextDrawResponse,
     last_access: u64,
 }
@@ -1142,8 +1142,10 @@ impl<'a> Ui<'a> {
                 font: self.theme.font.downgrade(),
             })
             .or_insert_with(|| {
-                let mut buffer = rustybuzz::UnicodeBuffer::new();
+                let mut buffer = harfrust::UnicodeBuffer::new();
                 buffer.push_str(&line);
+                // harfrust does not infer direction/script/language on its own
+                buffer.guess_segment_properties();
                 let font = if self.fonts.contains(self.theme.font.id())
                     && let Some(f) = self.fonts.get(&self.theme.font)
                 {
@@ -1152,7 +1154,8 @@ impl<'a> Ui<'a> {
                     &self.ui_state.fallback_font
                 };
 
-                let glyphs = rustybuzz::shape(font.face(), &[], buffer);
+                let shaper = font.shaper();
+                let glyphs = shaper.shape(buffer, harfrust::ShapeOptions::new());
                 let pic = text::draw_glyph_buffer(font.face(), &glyphs, size).unwrap();
 
                 let shaping = ShapingResult {
