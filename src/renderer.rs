@@ -5,7 +5,7 @@ pub mod texture_atlas;
 
 use std::{collections::BTreeSet, marker::PhantomData, sync::Arc};
 
-use cecs::{prelude::*, query::WorldQuery};
+use cecs::prelude::*;
 use cfg_if::cfg_if;
 use glam::UVec2;
 use wgpu::{Backends, ExperimentalFeatures, InstanceFlags, StoreOp, SurfaceTarget};

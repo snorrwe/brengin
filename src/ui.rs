@@ -23,7 +23,7 @@ use std::{
     time::Duration,
 };
 
-use cecs::{prelude::*, query};
+use cecs::{prelude::*, query_collection};
 use glam::IVec2;
 use image::DynamicImage;
 use text_rect_pipeline::DrawTextRect;
@@ -3556,24 +3556,30 @@ fn begin_frame(
     next_inputs.0.clear();
 }
 
-pub struct Ui<'a> {
-    ids: Res<'a, UiIds>,
-    next_ids: ResMut<'a, NextUiIds>,
-    ui_state: ResMut<'a, UiState>,
-    texture_cache: ResMut<'a, TextTextureCache>,
-    shaping_results: ResMut<'a, assets::Assets<ShapingResult>>,
-    theme: ResMut<'a, Theme>,
-    mouse: Res<'a, MouseInputs>,
-    keyboard: Res<'a, KeyBoardInputs>,
-    memory: ResMut<'a, UiMemory>,
-    fonts: Res<'a, Assets<OwnedTypeFace>>,
-    delta_time: Res<'a, DeltaTime>,
-    tick: Res<'a, Tick>,
-    ui_inputs: ResMut<'a, NextUiInputs>,
+query_collection! {
+    pub struct Ui<'a> {
+        ids: Res<'a, UiIds>,
+        next_ids: ResMut<'a, NextUiIds>,
+        ui_state: ResMut<'a, UiState>,
+        texture_cache: ResMut<'a, TextTextureCache>,
+        shaping_results: ResMut<'a, assets::Assets<ShapingResult>>,
+        theme: ResMut<'a, Theme>,
+        mouse: Res<'a, MouseInputs>,
+        keyboard: Res<'a, KeyBoardInputs>,
+        memory: ResMut<'a, UiMemory>,
+        fonts: Res<'a, Assets<OwnedTypeFace>>,
+        delta_time: Res<'a, DeltaTime>,
+        tick: Res<'a, Tick>,
+        ui_inputs: ResMut<'a, NextUiInputs>,
+    }
 }
 
+query_collection! {
 /// Root of the UI used to instantiate UI containers
-pub struct UiRoot<'a>(Ui<'a>);
+pub struct UiRoot<'a> {
+    ui: Ui<'a>,
+}
+}
 
 #[derive(Debug)]
 struct WindowState {
@@ -3643,10 +3649,10 @@ impl<'a> UiRoot<'a> {
         desc: WindowDescriptor,
         contents: impl FnOnce(&mut Ui),
     ) -> WindowResponse {
-        let mut allocator = mem::take(&mut self.0.ui_state.window_allocator);
-        let old_bounds = self.0.ui_state.bounds;
+        let mut allocator = mem::take(&mut self.ui.ui_state.window_allocator);
+        let old_bounds = self.ui.ui_state.bounds;
         let state: &mut WindowState = self
-            .0
+            .ui
             .ui_state
             .windows
             .entry(desc.name.to_owned())
@@ -3663,33 +3669,33 @@ impl<'a> UiRoot<'a> {
                 }
             });
 
-        let padding = self.0.theme.window_padding as i32;
+        let padding = self.ui.theme.window_padding as i32;
         let size = state.size + 2 * IVec2::splat(padding);
         let width = size.x;
-        let height = size.y - self.0.theme.window_title_height as i32;
+        let height = size.y - self.ui.theme.window_title_height as i32;
         let bounds = UiRect {
             min_x: state.pos.x,
-            min_y: state.pos.y + self.0.theme.window_title_height as i32,
+            min_y: state.pos.y + self.ui.theme.window_title_height as i32,
             max_x: state.pos.x + width,
-            max_y: state.pos.y + self.0.theme.window_title_height as i32 + height,
+            max_y: state.pos.y + self.ui.theme.window_title_height as i32 + height,
         };
         let title_bounds = UiRect {
             min_x: state.pos.x,
             min_y: state.pos.y,
             max_x: state.pos.x + width + 2 * padding,
-            max_y: state.pos.y + self.0.theme.window_title_height as i32,
+            max_y: state.pos.y + self.ui.theme.window_title_height as i32,
         };
 
-        self.0.ui_state.root_hash = fnv_1a(desc.name.as_bytes());
-        self.0.ui_state.root_children = 0;
-        self.0.push_child();
-        self.0.begin_widget();
+        self.ui.ui_state.root_hash = fnv_1a(desc.name.as_bytes());
+        self.ui.ui_state.root_children = 0;
+        self.ui.push_child();
+        self.ui.begin_widget();
 
-        let scissor = self.0.ui_state.scissor_idx;
+        let scissor = self.ui.ui_state.scissor_idx;
 
         let mut close_requested = false;
 
-        self.0.children_content(|ui| {
+        self.ui.children_content(|ui| {
             ui.ui_state.layer = WINDOW_LAYER;
             // window background
             let window_bounds = UiRect {
@@ -3749,19 +3755,19 @@ impl<'a> UiRoot<'a> {
             ui.window_decorators(window_bounds, &desc);
         });
         ///////////////////////
-        self.0.ui_state.bounds = old_bounds;
+        self.ui.ui_state.bounds = old_bounds;
 
-        self.0.ui_state.window_allocator = allocator;
-        self.0.pop_child();
+        self.ui.ui_state.window_allocator = allocator;
+        self.ui.pop_child();
 
         WindowResponse { close_requested }
     }
 
     pub fn panel(&mut self, desc: PanelDescriptor, contents: impl FnOnce(&mut Ui)) {
-        let width = desc.width.as_abolute(self.0.ui_state.bounds.width());
-        let height = desc.height.as_abolute(self.0.ui_state.bounds.height());
+        let width = desc.width.as_abolute(self.ui.ui_state.bounds.width());
+        let height = desc.height.as_abolute(self.ui.ui_state.bounds.height());
 
-        let old_bounds = self.0.ui_state.bounds;
+        let old_bounds = self.ui.ui_state.bounds;
         let mut bounds = old_bounds;
         bounds.resize_w(width);
         bounds.resize_h(height);
@@ -3788,27 +3794,27 @@ impl<'a> UiRoot<'a> {
             }
             VerticalAlignment::Center => {}
         }
-        self.0.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[
+        self.ui.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[
             0,
             bounds.min_x,
             bounds.min_y,
             width,
             height,
         ]));
-        self.0.ui_state.root_children = 0;
-        let scissor = self.0.push_scissor(bounds);
+        self.ui.ui_state.root_children = 0;
+        let scissor = self.ui.push_scissor(bounds);
 
-        let old_layer = self.0.push_layer();
-        self.0.theme_rect(
+        let old_layer = self.ui.push_layer();
+        self.ui.theme_rect(
             bounds.min_x,
             bounds.min_y,
             width,
             height,
-            self.0.ui_state.layer,
-            self.0.theme.background.clone(),
+            self.ui.ui_state.layer,
+            self.ui.theme.background.clone(),
         );
 
-        let [left, right, top, bottom] = self.0.theme.padding.as_abs(width, height);
+        let [left, right, top, bottom] = self.ui.theme.padding.as_abs(width, height);
 
         let mut content_width = width;
         content_width -= left + right;
@@ -3821,64 +3827,64 @@ impl<'a> UiRoot<'a> {
             content_height = height;
         }
 
-        self.0.ui_state.bounds = layout_rect(RectLayoutDescriptor {
+        self.ui.ui_state.bounds = layout_rect(RectLayoutDescriptor {
             width: content_width,
             height: content_height,
-            padding: Some(self.0.theme.padding),
-            dir: desc.content_layout.unwrap_or(self.0.ui_state.layout_dir),
+            padding: Some(self.ui.theme.padding),
+            dir: desc.content_layout.unwrap_or(self.ui.ui_state.layout_dir),
             bounds,
         });
 
         ///////////////////////
-        self.0.children_content(contents);
+        self.ui.children_content(contents);
         ///////////////////////
-        self.0.ui_state.layer = old_layer;
-        self.0.ui_state.bounds = old_bounds;
-        self.0.ui_state.scissor_idx = scissor;
+        self.ui.ui_state.layer = old_layer;
+        self.ui.ui_state.bounds = old_bounds;
+        self.ui.ui_state.scissor_idx = scissor;
     }
 
     pub fn theme(&self) -> &Theme {
-        &self.0.theme
+        &self.ui.theme
     }
 
     pub fn theme_mut(&mut self) -> &mut ResMut<'a, Theme> {
-        &mut self.0.theme
+        &mut self.ui.theme
     }
 
     pub fn with_theme(&mut self, theme: Theme, contents: impl FnOnce(&mut Self)) {
-        let t = mem::replace(&mut *self.0.theme, theme);
+        let t = mem::replace(&mut *self.ui.theme, theme);
 
         ///////////////////////
         contents(self);
         ///////////////////////
 
-        *self.0.theme = t;
+        *self.ui.theme = t;
     }
 
     pub fn with_theme_override(&mut self, theme: ThemeOverride, contents: impl FnOnce(&mut Self)) {
-        let theme = theme.apply(&mut self.0.theme);
+        let theme = theme.apply(&mut self.ui.theme);
 
         ///////////////////////
         contents(self);
         ///////////////////////
 
-        theme.apply(&mut self.0.theme);
+        theme.apply(&mut self.ui.theme);
     }
 
     /// key should be a unique index for each empty call in an application
     pub fn empty(&mut self, contents: impl FnOnce(&mut Ui)) {
-        self.0.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[0xdeadbeefu32; 4]));
-        self.0.ui_state.root_children = 0;
-        let old_bounds = self.0.ui_state.bounds;
-        let scissor = self.0.push_scissor(old_bounds);
-        let old_layer = self.0.push_layer();
+        self.ui.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[0xdeadbeefu32; 4]));
+        self.ui.ui_state.root_children = 0;
+        let old_bounds = self.ui.ui_state.bounds;
+        let scissor = self.ui.push_scissor(old_bounds);
+        let old_layer = self.ui.push_layer();
 
         ///////////////////////
-        self.0.children_content(contents);
+        self.ui.children_content(contents);
         ///////////////////////
-        self.0.ui_state.layer = old_layer;
-        self.0.ui_state.bounds = old_bounds;
-        self.0.ui_state.scissor_idx = scissor;
+        self.ui.ui_state.layer = old_layer;
+        self.ui.ui_state.bounds = old_bounds;
+        self.ui.ui_state.scissor_idx = scissor;
     }
 }
 
@@ -3933,58 +3939,6 @@ fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'
     ui.color_rect_from_rect(title_bounds, ui.theme.window_title_color, WINDOW_LAYER);
 
     request_close
-}
-
-unsafe impl<'a> query::WorldQuery<'a> for UiRoot<'a> {
-    fn new(db: &'a World, _system_idx: usize) -> Self {
-        let ui = ResMut::new(db);
-        let texture_cache = ResMut::new(db);
-        let text_assets = ResMut::new(db);
-        let theme = ResMut::new(db);
-        let memory = ResMut::new(db);
-        let mouse = Res::new(db);
-        let keyboard = Res::new(db);
-        let fonts = Res::new(db);
-        let ids = Res::new(db);
-        let next_ids = ResMut::new(db);
-        let delta_time = Res::new(db);
-        let tick = Res::new(db);
-        let keys = ResMut::new(db);
-        Self(Ui {
-            ids,
-            next_ids,
-            ui_state: ui,
-            texture_cache,
-            shaping_results: text_assets,
-            theme,
-            mouse,
-            keyboard,
-            memory,
-            fonts,
-            delta_time,
-            tick,
-            ui_inputs: keys,
-        })
-    }
-
-    fn resources_mut(set: &mut std::collections::HashSet<TypeId>) {
-        set.insert(TypeId::of::<NextUiIds>());
-        set.insert(TypeId::of::<UiState>());
-        set.insert(TypeId::of::<TextTextureCache>());
-        set.insert(TypeId::of::<Assets<ShapingResult>>());
-        set.insert(TypeId::of::<Theme>());
-        set.insert(TypeId::of::<UiMemory>());
-        set.insert(TypeId::of::<NextUiInputs>());
-    }
-
-    fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
-        set.insert(TypeId::of::<Tick>());
-        set.insert(TypeId::of::<DeltaTime>());
-        set.insert(TypeId::of::<MouseInputs>());
-        set.insert(TypeId::of::<UiIds>());
-        set.insert(TypeId::of::<KeyBoardInputs>());
-        set.insert(TypeId::of::<Assets<OwnedTypeFace>>());
-    }
 }
 
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -4090,16 +4044,17 @@ fn bounding_rect(history: &[UiRect]) -> UiRect {
 }
 
 fn draw_bounding_boxes(mut ui: UiRoot) {
-    let mut boxes: Vec<_> =
-        ui.0.ui_state
-            .next_bounding_boxes
-            .0
-            .iter()
-            .map(|(k, v)| (*k, *v))
-            .collect();
+    let mut boxes: Vec<_> = ui
+        .ui
+        .ui_state
+        .next_bounding_boxes
+        .0
+        .iter()
+        .map(|(k, v)| (*k, *v))
+        .collect();
     boxes.sort_unstable_by_key(|(k, _)| *k);
 
-    let ui = &mut ui.0;
+    let ui = &mut ui.ui;
     let mut ancestry = Vec::new();
     'rects: for (id, rect) in boxes.into_iter() {
         {

@@ -2,8 +2,9 @@
 // gc freed rects
 // use the atlas in renderers
 
-use std::{any::TypeId, collections::BTreeMap};
+use std::collections::BTreeMap;
 
+use cecs::query_collection;
 use image::DynamicImage;
 use wgpu::{BindGroup, BindGroupLayout};
 
@@ -93,29 +94,12 @@ impl AtlasRect {
     }
 }
 
-/// Primary way to use texture atlases
-pub struct TextureAtlasRegistry<'a> {
-    atlases: ResMut<'a, Assets<TextureAtlas>>,
-    ids: ResMut<'a, Atlases>,
-    renderer: Res<'a, GraphicsState>,
-}
-
-unsafe impl<'a> WorldQuery<'a> for TextureAtlasRegistry<'a> {
-    fn new(db: &'a World, _system_idx: usize) -> Self {
-        Self {
-            atlases: ResMut::new(db),
-            ids: ResMut::new(db),
-            renderer: Res::new(db),
-        }
-    }
-
-    fn resources_mut(set: &mut std::collections::HashSet<std::any::TypeId>) {
-        set.insert(TypeId::of::<Atlases>());
-        set.insert(TypeId::of::<Assets<TextureAtlas>>());
-    }
-
-    fn resources_const(set: &mut std::collections::HashSet<std::any::TypeId>) {
-        set.insert(TypeId::of::<GraphicsState>());
+query_collection! {
+    /// Primary way to use texture atlases
+    pub struct TextureAtlasRegistry<'a> {
+        atlases: ResMut<'a, Assets<TextureAtlas>>,
+        ids: ResMut<'a, Atlases>,
+        renderer: Res<'a, GraphicsState>,
     }
 }
 

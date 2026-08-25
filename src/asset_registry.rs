@@ -135,37 +135,14 @@ impl AsRef<async_lock::Semaphore> for AssetLoadingSemaphore {
     }
 }
 
-pub struct AssetRegistry<'a> {
-    basepaths: Res<'a, AssetBasePaths>,
-    state: ResMut<'a, AssetsLoadStatus>,
-    recv: ResMut<'a, AssetsReceivers>,
-    loaders: Res<'a, AssetLoaders>,
-    js: Res<'a, JobPool>,
-    semaphore: Res<'a, AssetLoadingSemaphore>,
-}
-
-unsafe impl<'a> WorldQuery<'a> for AssetRegistry<'a> {
-    fn resources_mut(set: &mut std::collections::HashSet<TypeId>) {
-        set.insert(TypeId::of::<AssetsLoadStatus>());
-        set.insert(TypeId::of::<AssetsReceivers>());
-    }
-
-    fn resources_const(set: &mut std::collections::HashSet<TypeId>) {
-        set.insert(TypeId::of::<AssetLoaders>());
-        set.insert(TypeId::of::<JobPool>());
-        set.insert(TypeId::of::<AssetLoadingSemaphore>());
-        set.insert(TypeId::of::<AssetBasePaths>());
-    }
-
-    fn new(db: &'a World, _system_idx: usize) -> Self {
-        Self {
-            basepaths: Res::new(db),
-            loaders: Res::new(db),
-            state: ResMut::new(db),
-            recv: ResMut::new(db),
-            js: Res::new(db),
-            semaphore: Res::new(db),
-        }
+cecs::query_collection! {
+    pub struct AssetRegistry<'a> {
+        basepaths: Res<'a, AssetBasePaths>,
+        state: ResMut<'a, AssetsLoadStatus>,
+        recv: ResMut<'a, AssetsReceivers>,
+        loaders: Res<'a, AssetLoaders>,
+        js: Res<'a, JobPool>,
+        semaphore: Res<'a, AssetLoadingSemaphore>,
     }
 }
 
