@@ -1,8 +1,9 @@
 use brengin::asset_registry::AssetRegistry;
 use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
 use brengin::ui::{
-    ButtonDescriptor, ButtonDescriptorPayload, HorizontalAlignment, OutlineDescriptor,
-    ScrollDescriptor, Theme, UiCoord, UiRoot, VerticalAlignment, WrapperSize,
+    ButtonDescriptor, ButtonDescriptorPayload, ContainerSize, HorizontalAlignment,
+    OutlineDescriptor, Padding, ScrollDescriptor, Theme, UiCoord, UiRoot, VerticalAlignment,
+    WrapperSize,
 };
 use brengin::{App, DefaultPlugins};
 use brengin::{CloseRequest, prelude::*, transform};
@@ -42,8 +43,8 @@ fn image_grid(mut ctx: UiRoot, state: Res<MenuState>, ui_state: Res<UiState>) {
 
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoord::Percent(50),
-            height: UiCoord::Percent(50),
+            width: ContainerSize::Coord(UiCoord::Percent(50)),
+            height: ContainerSize::Coord(UiCoord::Percent(50)),
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
             ..Default::default()
@@ -118,18 +119,18 @@ fn back(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
     };
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoord::Absolute(80),
-            height: UiCoord::Absolute(40),
+            width: ContainerSize::Fit,
+            height: ContainerSize::Fit,
             horizonal: HorizontalAlignment::Right,
             vertical: VerticalAlignment::Top,
+            padding: Some(Padding::splat(15)),
+            content_layout: Some(brengin::ui::LayoutDirection::Center),
             ..Default::default()
         },
         |ui| {
-            ui.horizontal_rev(None, |ui| {
-                if ui.button("Back").inner.pressed {
-                    *state = MenuState::Main;
-                }
-            });
+            if ui.button("Back").inner.pressed {
+                *state = MenuState::Main;
+            }
         },
     );
 }
@@ -138,10 +139,11 @@ fn menu(mut ctx: UiRoot, mut state: ResMut<MenuState>, cr: Res<CloseRequest>) {
     let MenuState::Main = *state else { return };
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoord::Absolute(500),
-            height: UiCoord::Percent(50),
+            width: ContainerSize::Coord(UiCoord::Absolute(500)),
+            height: ContainerSize::Fit,
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
+            padding: Some(Padding::from_vertical(50)),
             ..Default::default()
         },
         |ui| {
@@ -320,8 +322,8 @@ struct LayoutToggle(bool);
 fn layout_ui(mut ctx: UiRoot, mut layout_toggle: ResMut<LayoutToggle>) {
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: 300.into(),
-            height: 300.into(),
+            width: ContainerSize::Fit,
+            height: ContainerSize::Fit,
             horizonal: HorizontalAlignment::Left,
             vertical: VerticalAlignment::Top,
             ..Default::default()
@@ -337,8 +339,8 @@ fn layout_ui(mut ctx: UiRoot, mut layout_toggle: ResMut<LayoutToggle>) {
     );
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: 300.into(),
-            height: 300.into(),
+            width: ContainerSize::Fit,
+            height: ContainerSize::Fit,
             horizonal: HorizontalAlignment::Left,
             vertical: VerticalAlignment::Bottom,
             ..Default::default()
@@ -354,8 +356,8 @@ fn layout_ui(mut ctx: UiRoot, mut layout_toggle: ResMut<LayoutToggle>) {
     );
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: 300.into(),
-            height: 300.into(),
+            width: ContainerSize::Fit,
+            height: ContainerSize::Fit,
             horizonal: HorizontalAlignment::Right,
             vertical: VerticalAlignment::Bottom,
             ..Default::default()
@@ -371,8 +373,8 @@ fn layout_ui(mut ctx: UiRoot, mut layout_toggle: ResMut<LayoutToggle>) {
     );
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: 300.into(),
-            height: 300.into(),
+            width: ContainerSize::Fit,
+            height: ContainerSize::Fit,
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
             ..Default::default()
@@ -393,8 +395,8 @@ fn layout_ui(mut ctx: UiRoot, mut layout_toggle: ResMut<LayoutToggle>) {
 fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormState>) {
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoord::Percent(100),
-            height: 300.into(),
+            width: ContainerSize::Coord(UiCoord::Percent(100)),
+            height: ContainerSize::Coord(300.into()),
             horizonal: HorizontalAlignment::Right,
             vertical: VerticalAlignment::Bottom,
             ..Default::default()
@@ -425,8 +427,8 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
     );
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoord::Percent(50),
-            height: 400.into(),
+            width: ContainerSize::Coord(UiCoord::Percent(50)),
+            height: ContainerSize::Coord(400.into()),
             horizonal: HorizontalAlignment::Center,
             vertical: VerticalAlignment::Center,
             ..Default::default()
@@ -475,8 +477,8 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
     );
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoord::Absolute(500),
-            height: 200.into(),
+            width: ContainerSize::Coord(UiCoord::Absolute(500)),
+            height: ContainerSize::Coord(200.into()),
             horizonal: HorizontalAlignment::Left,
             vertical: VerticalAlignment::Top,
             ..Default::default()
@@ -498,8 +500,8 @@ fn buttons_ui(mut ctx: UiRoot, mut label: ResMut<Label>, mut form: ResMut<FormSt
 
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoord::Absolute(400),
-            height: 200.into(),
+            width: ContainerSize::Coord(UiCoord::Absolute(400)),
+            height: ContainerSize::Coord(200.into()),
             horizonal: HorizontalAlignment::Left,
             vertical: VerticalAlignment::Center,
             ..Default::default()

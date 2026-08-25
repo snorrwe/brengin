@@ -106,12 +106,34 @@ impl Plugin for UiPlugin {
 }
 
 fn fnv_1a(value: &[u8]) -> u32 {
-    let mut hash: u32 = 0x811c9dc5;
-    for byte in value {
-        hash ^= *byte as u32;
-        hash = hash.wrapping_mul(0x1000193);
+    fnv_1a_hash(&value)
+}
+
+fn fnv_1a_hash(value: &impl Hash) -> u32 {
+    let mut hasher = Fnv1a::default();
+    value.hash(&mut hasher);
+    hasher.0
+}
+
+struct Fnv1a(u32);
+
+impl Default for Fnv1a {
+    fn default() -> Self {
+        Self(0x811c9dc5)
     }
-    hash
+}
+
+impl std::hash::Hasher for Fnv1a {
+    fn finish(&self) -> u64 {
+        self.0 as u64
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.0 ^= *byte as u32;
+            self.0 = self.0.wrapping_mul(0x1000193);
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -549,7 +571,7 @@ theme!(
     button_height: WrapperSize, with_button_height,
 );
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LayoutDirection {
     Center,
     TopDown(HorizontalAlignment),
@@ -558,7 +580,15 @@ pub enum LayoutDirection {
     RightLeft(VerticalAlignment),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum ContainerSize {
+    Coord(UiCoord),
+    /// Fit to content
+    #[default]
+    Fit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UiCoord {
     Absolute(i32),
     Percent(i8),
@@ -588,16 +618,17 @@ impl UiCoord {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PanelDescriptor {
-    pub width: UiCoord,
-    pub height: UiCoord,
+    pub width: ContainerSize,
+    pub height: ContainerSize,
     pub horizonal: HorizontalAlignment,
     pub vertical: VerticalAlignment,
     pub content_layout: Option<LayoutDirection>,
+    pub padding: Option<Padding>,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum HorizontalAlignment {
     #[default]
     Left,
@@ -605,7 +636,7 @@ pub enum HorizontalAlignment {
     Right,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum VerticalAlignment {
     #[default]
     Top,
@@ -3199,7 +3230,7 @@ pub struct TooltipState {
     pub anchor: Option<IVec2>,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Padding {
     pub left: Option<UiCoord>,
     pub right: Option<UiCoord>,
@@ -3764,83 +3795,122 @@ impl<'a> UiRoot<'a> {
     }
 
     pub fn panel(&mut self, desc: PanelDescriptor, contents: impl FnOnce(&mut Ui)) {
-        let width = desc.width.as_abolute(self.ui.ui_state.bounds.width());
-        let height = desc.height.as_abolute(self.ui.ui_state.bounds.height());
-
+        let max_w = self.ui.ui_state.bounds.width();
+        let max_h = self.ui.ui_state.bounds.height();
         let old_bounds = self.ui.ui_state.bounds;
-        let mut bounds = old_bounds;
-        bounds.resize_w(width);
-        bounds.resize_h(height);
+        self.ui.ui_state.root_hash = fnv_1a_hash(&desc);
+        self.ui.ui_state.root_children = 0;
+        let WidgetInfo { id, .. } = self.ui.begin_widget();
+        let mut state = self.ui.get_memory_or_default::<PanelState>(id).borrow_mut();
+        if let ContainerSize::Coord(w) = desc.width {
+            state.content_width = w.as_abolute(max_w);
+        }
+        if let ContainerSize::Coord(h) = desc.height {
+            state.content_height = h.as_abolute(max_h);
+        }
+
+        let padding = desc.padding.unwrap_or(self.ui.theme.padding);
+        let [left, right, top, bottom] = padding.as_abs(state.content_width, state.content_height);
+
+        // the outer rect covers the panel including its padding.
+        let mut outer_rect = old_bounds;
+        outer_rect.resize_w(state.content_width);
+        outer_rect.resize_h(state.content_height);
 
         match desc.horizonal {
             HorizontalAlignment::Left => {
-                let delta = -bounds.min_x;
-                bounds.offset_x(delta);
+                let delta = old_bounds.min_x - outer_rect.min_x;
+                outer_rect.offset_x(delta);
             }
             HorizontalAlignment::Right => {
-                let delta = old_bounds.max_x - bounds.max_x;
-                bounds.offset_x(delta);
+                let delta = old_bounds.max_x - outer_rect.max_x;
+                outer_rect.offset_x(delta);
             }
+            // resize_w keeps the rect centered
             HorizontalAlignment::Center => {}
         }
         match desc.vertical {
             VerticalAlignment::Top => {
-                let delta = -bounds.min_y;
-                bounds.offset_y(delta);
+                let delta = old_bounds.min_y - outer_rect.min_y;
+                outer_rect.offset_y(delta);
             }
             VerticalAlignment::Bottom => {
-                let delta = old_bounds.max_y - bounds.max_y;
-                bounds.offset_y(delta);
+                let delta = old_bounds.max_y - outer_rect.max_y;
+                outer_rect.offset_y(delta);
             }
+            // resize_h keeps the rect centered
             VerticalAlignment::Center => {}
         }
-        self.ui.ui_state.root_hash = fnv_1a(bytemuck::cast_slice(&[
-            0,
-            bounds.min_x,
-            bounds.min_y,
-            width,
-            height,
-        ]));
-        self.ui.ui_state.root_children = 0;
-        let scissor = self.ui.push_scissor(bounds);
 
-        let old_layer = self.ui.push_layer();
-        self.ui.theme_rect(
-            bounds.min_x,
-            bounds.min_y,
-            width,
-            height,
-            self.ui.ui_state.layer,
-            self.ui.theme.background.clone(),
-        );
-
-        let [left, right, top, bottom] = self.ui.theme.padding.as_abs(width, height);
-
-        let mut content_width = width;
-        content_width -= left + right;
-        if content_width <= 0 {
-            content_width = width;
-        }
-        let mut content_height = height;
-        content_height -= top + bottom;
-        if content_height <= 0 {
-            content_height = height;
-        }
-
-        self.ui.ui_state.bounds = layout_rect(RectLayoutDescriptor {
-            width: content_width,
-            height: content_height,
-            padding: Some(self.ui.theme.padding),
-            dir: desc.content_layout.unwrap_or(self.ui.ui_state.layout_dir),
-            bounds,
+        let layout_dir = desc.content_layout.unwrap_or(self.ui.ui_state.layout_dir);
+        let bounds = layout_rect(RectLayoutDescriptor {
+            width: outer_rect.width(),
+            height: outer_rect.height(),
+            padding: Some(padding),
+            dir: layout_dir,
+            bounds: outer_rect,
         });
+
+        let old_scissor = self.ui.push_scissor(bounds);
+        let old_layer = self.ui.push_layer();
+
+        // bounds is already padded, it is the content area
+        self.ui.ui_state.bounds = bounds;
+        let old_layout_dir = mem::replace(&mut self.ui.ui_state.layout_dir, layout_dir);
+
+        let history_start = self.ui.ui_state.rect_history.len();
 
         ///////////////////////
         self.ui.children_content(contents);
         ///////////////////////
+
+        self.ui.ui_state.layout_dir = old_layout_dir;
+
+        let rect = self.ui.history_bounding_rect(history_start);
+
+        // only Fit sizes follow the content, Coord sizes keep the size requested by the caller
+        let background = UiRect {
+            min_x: if desc.width == ContainerSize::Fit {
+                rect.min_x - left
+            } else {
+                outer_rect.min_x
+            },
+            min_y: if desc.height == ContainerSize::Fit {
+                rect.min_y - top
+            } else {
+                outer_rect.min_y
+            },
+            max_x: if desc.width == ContainerSize::Fit {
+                rect.max_x + right
+            } else {
+                outer_rect.max_x
+            },
+            max_y: if desc.height == ContainerSize::Fit {
+                rect.max_y + bottom
+            } else {
+                outer_rect.max_y
+            },
+        };
+
+        if desc.width == ContainerSize::Fit && background.width() > 0 {
+            state.content_width = background.width();
+        }
+        if desc.height == ContainerSize::Fit && background.height() > 0 {
+            state.content_height = background.height();
+        }
+
+        self.ui.ui_state.scissor_idx = old_scissor;
+        self.ui.theme_rect(
+            background.min_x,
+            background.min_y,
+            background.width(),
+            background.height(),
+            self.ui.ui_state.layer,
+            self.ui.theme.background.clone(),
+        );
+
         self.ui.ui_state.layer = old_layer;
         self.ui.ui_state.bounds = old_bounds;
-        self.ui.ui_state.scissor_idx = scissor;
     }
 
     pub fn theme(&self) -> &Theme {
@@ -4362,4 +4432,10 @@ fn padded_rect(padding: Padding, mut bounds: UiRect) -> UiRect {
     bounds.min_y = bounds.min_y.min(bounds.max_y);
 
     bounds
+}
+
+#[derive(Default)]
+struct PanelState {
+    pub content_width: i32,
+    pub content_height: i32,
 }
