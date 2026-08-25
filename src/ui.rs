@@ -2288,16 +2288,16 @@ impl<'a> Ui<'a> {
                         changed = true;
                         state.cursor += 1;
                     }
-                    KeyCode::Tab | KeyCode::Enter => {
-                        // if not multiline, then enter is a noop
-                        is_active = false;
-                    }
                     // for single-line inputs use tab as a means to jump to the next input
                     KeyCode::Tab if desc.multiline => {
                         self.ui_inputs.keys.insert(*k);
                         desc.content.insert_str(state.cursor, "\t");
                         changed = true;
                         state.cursor += 1;
+                    }
+                    KeyCode::Tab | KeyCode::Enter => {
+                        // if not multiline, then enter is a noop
+                        is_active = false;
                     }
                     // TODO: ctrl + a, selecting with shift
                     _ => 'handler: {
@@ -2307,12 +2307,11 @@ impl<'a> Ui<'a> {
                             self.ui_inputs.keys.insert(KeyCode::ControlRight);
                             if let KeyCode::KeyC = k {
                                 // TODO: copy
-                                break 'handler;
                             }
                             if let KeyCode::KeyV = k {
                                 // TODO: paste
-                                break 'handler;
                             }
+                            break 'handler;
                         }
 
                         if let Some(text) = self
