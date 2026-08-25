@@ -1,5 +1,6 @@
 pub mod asset_loader;
 mod erased_loader;
+pub mod font_loader;
 pub mod image_loader;
 pub mod sprite_sheet_loader;
 
@@ -59,6 +60,9 @@ impl Plugin for AssetRegistryPlugin {
         ));
         app.add_plugin(asset_loader::AssetLoaderPlugin::new(
             image_loader::DynamicImageLoader,
+        ));
+        app.add_plugin(asset_loader::AssetLoaderPlugin::new(
+            font_loader::FontLoader,
         ));
     }
 }

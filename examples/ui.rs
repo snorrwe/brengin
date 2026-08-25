@@ -2,7 +2,7 @@ use brengin::asset_registry::AssetRegistry;
 use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
 use brengin::ui::{
     ButtonDescriptor, ButtonDescriptorPayload, HorizontalAlignment, OutlineDescriptor,
-    ScrollDescriptor, UiCoord, UiRoot, VerticalAlignment, WrapperSize,
+    ScrollDescriptor, Theme, UiCoord, UiRoot, VerticalAlignment, WrapperSize,
 };
 use brengin::{App, DefaultPlugins};
 use brengin::{CloseRequest, prelude::*, transform};
@@ -118,7 +118,7 @@ fn back(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
     };
     ctx.panel(
         brengin::ui::PanelDescriptor {
-            width: UiCoord::Absolute(60),
+            width: UiCoord::Absolute(80),
             height: UiCoord::Absolute(40),
             horizonal: HorizontalAlignment::Right,
             vertical: VerticalAlignment::Top,
@@ -558,6 +558,12 @@ fn windows_ui(mut ui: UiRoot) {
     );
 }
 
+fn setup_theme(mut reg: AssetRegistry, mut theme: ResMut<Theme>) {
+    let font = reg.load("pixelated-elegance-font/PixelatedEleganceRegular-ovawB.ttf");
+    theme.font = font;
+    theme.font_size = 8;
+}
+
 async fn game(args: Args) {
     let mut app = App::default();
     app.insert_resource(Label(Default::default()));
@@ -576,6 +582,7 @@ async fn game(args: Args) {
     app.insert_resource(FormState::default());
     app.add_plugin(DefaultPlugins);
     app.add_startup_system(setup);
+    app.add_startup_system(setup_theme);
     app.add_startup_system(load_image);
     app.with_stage(brengin::Stage::Update, |s| {
         s.add_nested_stage(
