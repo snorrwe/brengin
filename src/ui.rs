@@ -15,7 +15,9 @@ mod tests;
 
 use std::{
     any::TypeId,
+    cell::RefCell,
     collections::{HashMap, HashSet},
+    ffi::c_void,
     hash::Hash,
     mem,
     ops::{Deref, DerefMut, RangeBounds},
@@ -1613,57 +1615,34 @@ impl<'a> Ui<'a> {
         &mut self.theme
     }
 
-    pub fn get_memory_or_default<T: Default + 'static>(&mut self, id: UiId) -> &mut T {
+    pub fn get_memory_or_default<'b, 'c, T: Default + 'static>(
+        &'c mut self,
+        id: UiId,
+    ) -> &'b RefCell<T> {
         self.get_memory_or_insert(id, Default::default)
     }
 
-    pub fn get_memory_or_insert<T: 'static>(&mut self, id: UiId, f: impl FnOnce() -> T) -> &mut T {
-        let key = self.memory_key::<T>(id);
-        let res = self
-            .memory
-            .0
-            .entry(key)
-            .or_insert_with(|| ErasedMemoryEntry::new(f()));
-        unsafe { res.as_inner_mut() }
-    }
-
-    pub fn get_memory_ptr_or_default<T: Default + 'static>(&mut self, id: UiId) -> NonNull<T> {
-        self.get_memory_ptr_or_insert(id, Default::default)
-    }
-
-    pub fn get_memory_ptr_or_insert<T: 'static>(
-        &mut self,
+    pub fn get_memory_or_insert<'c, 'b, T: 'static>(
+        &'b mut self,
         id: UiId,
         f: impl FnOnce() -> T,
-    ) -> NonNull<T> {
+    ) -> &'c RefCell<T> {
         let key = self.memory_key::<T>(id);
         let res = self
             .memory
             .0
             .entry(key)
             .or_insert_with(|| ErasedMemoryEntry::new(f()));
-        unsafe { res.as_inner_ptr() }
+        unsafe { res.as_inner_ptr::<T>().as_ref() }
     }
 
-    pub fn get_memory<T: 'static>(&self, id: UiId) -> Option<&T> {
-        let key = self.memory_key::<T>(id);
-        self.memory.0.get(&key).map(|res| unsafe { res.as_inner() })
-    }
-
-    pub fn get_memory_mut<T: 'static>(&mut self, id: UiId) -> Option<&mut T> {
+    pub fn get_memory<'c, 'b, T: 'static>(&'c self, id: UiId) -> Option<&'b RefCell<T>> {
         let key = self.memory_key::<T>(id);
         self.memory
             .0
-            .get_mut(&key)
-            .map(|res| unsafe { res.as_inner_mut() })
-    }
-
-    pub fn get_memory_ptr<T: 'static>(&mut self, id: UiId) -> Option<NonNull<T>> {
-        let key = self.memory_key::<T>(id);
-        self.memory
-            .0
-            .get_mut(&key)
-            .map(|res| unsafe { res.as_inner_ptr() })
+            .get(&key)
+            .map(|res| unsafe { res.as_inner_ptr::<T>() })
+            .map(|ptr| unsafe { ptr.as_ref() })
     }
 
     pub fn insert_memory<T: 'static>(&mut self, id: UiId, item: T) {
@@ -1671,12 +1650,12 @@ impl<'a> Ui<'a> {
         self.memory.0.insert(key, ErasedMemoryEntry::new(item));
     }
 
-    pub fn remove_memory<T: 'static>(&mut self, id: UiId) -> Option<Box<T>> {
+    pub fn remove_memory<T: 'static>(&mut self, id: UiId) -> Option<T> {
         let key = self.memory_key::<T>(id);
         self.memory
             .0
             .remove(&key)
-            .map(|res| unsafe { res.into_inner() })
+            .map(|res| unsafe { res.into_inner::<T>().into_inner() })
     }
 
     fn memory_key<T: 'static>(&self, id: UiId) -> (UiId, TypeId) {
@@ -1819,14 +1798,11 @@ impl<'a> Ui<'a> {
             .unwrap_or(UiCoord::Percent(100))
             .as_abolute(self.ui_state.bounds.height());
 
-        let state = unsafe {
-            let mut state = self.get_memory_ptr_or_default::<ScrollState>(id);
-            state.as_mut()
-        };
+        let mut state = self.get_memory_or_default::<ScrollState>(id).borrow_mut();
 
         let line_height = self.theme.font_size + self.theme.text_padding;
 
-        self.update_scroll_state(desc, id, is_hovered, state, line_height);
+        self.update_scroll_state(desc, id, is_hovered, &mut state, line_height);
 
         // reset the tick to 0 if the content does not need scrolling (w/h == 0)
         let offset_x = state.tx * state.scroll_width as f32;
@@ -1909,10 +1885,6 @@ impl<'a> Ui<'a> {
 
         let p_horizontal = self.theme.padding.horizonal(bounds.width());
         let p_vertical = self.theme.padding.vertical(bounds.height());
-        let state = unsafe {
-            let mut state = self.get_memory_ptr::<ScrollState>(id).unwrap();
-            state.as_mut()
-        };
 
         // compute the area of the scroll. Area = content bounds - viewport, so only the overlap is
         // counted
@@ -1927,10 +1899,10 @@ impl<'a> Ui<'a> {
                 // prevent overlap
                 scissor_bounds.max_x -= scroll_bar_size;
             }
-            self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_size, layer, state);
+            self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_size, layer, &mut state);
         }
         if desc.height.is_some() {
-            self.vertical_scroll_bar(&scissor_bounds, scroll_bar_size, layer, state);
+            self.vertical_scroll_bar(&scissor_bounds, scroll_bar_size, layer, &mut state);
         }
         self.ui_state.bounds = old_bounds;
         self.submit_rect(id, area_bounds, self.theme.padding);
@@ -2016,10 +1988,7 @@ impl<'a> Ui<'a> {
         } = self.begin_widget();
         let old_bounds = self.padd_bounds();
 
-        let state = unsafe {
-            let mut state = self.get_memory_ptr_or_default::<DragState>(id);
-            state.as_mut()
-        };
+        let mut state = self.get_memory_or_default::<DragState>(id).borrow_mut();
         let mut is_being_dragged = false;
         if is_active {
             // mark as dragged even if it was just released,
@@ -2184,8 +2153,9 @@ impl<'a> Ui<'a> {
         let WidgetInfo { id: this, .. } = self.begin_widget();
 
         if !self.is_anything_active() {
-            let state =
-                self.get_memory_or_insert::<WantsFocusState>(this, WantsFocusState::default);
+            let mut state = self
+                .get_memory_or_insert::<WantsFocusState>(this, WantsFocusState::default)
+                .borrow_mut();
             if !state.consumed {
                 state.consumed = true;
                 self.set_active(id);
@@ -2218,10 +2188,9 @@ impl<'a> Ui<'a> {
         let last_layer = self.push_layer();
         let layer = self.ui_state.layer;
 
-        let state = unsafe {
-            let mut state = self.get_memory_ptr_or_default::<TextInputState>(id);
-            state.as_mut()
-        };
+        let mut state = self
+            .get_memory_or_default::<TextInputState>(id)
+            .borrow_mut();
 
         let mut changed = false;
 
@@ -2558,10 +2527,9 @@ impl<'a> Ui<'a> {
 
         let id = resp.id;
 
-        let state = unsafe {
-            let mut state = self.get_memory_ptr_or_default::<ContextMenuState>(id);
-            state.as_mut()
-        };
+        let mut state = self
+            .get_memory_or_default::<ContextMenuState>(id)
+            .borrow_mut();
 
         state.open = self.has_context_menu(parent_id);
         if state.open {
@@ -2616,7 +2584,7 @@ impl<'a> Ui<'a> {
 
             ///////////////////////
             self.children_content(|ui| {
-                context_menu(ui, state);
+                context_menu(ui, &mut state);
             });
             ///////////////////////
             self.ui_state.bounds = original_bounds;
@@ -2778,10 +2746,9 @@ impl<'a> Ui<'a> {
 
         let WidgetInfo { id, .. } = self.begin_widget();
 
-        let state = unsafe {
-            let mut state = self.get_memory_ptr_or_default::<ContextMenuState>(id);
-            state.as_mut()
-        };
+        let mut state = self
+            .get_memory_or_default::<ContextMenuState>(id)
+            .borrow_mut();
 
         if resp.pressed() {
             self.set_context_menu(resp.id);
@@ -2930,7 +2897,9 @@ impl<'a> Ui<'a> {
             let cur_pos = self.mouse.cursor_position;
             IVec2::new(cur_pos.x as i32, cur_pos.y as i32)
         });
-        let state = self.get_memory_or_default::<ContextMenuState>(id);
+        let mut state = self
+            .get_memory_or_default::<ContextMenuState>(id)
+            .borrow_mut();
         state.open = true;
         state.offset = offset;
         self.next_ids
@@ -2939,7 +2908,8 @@ impl<'a> Ui<'a> {
     }
 
     pub fn close_context_menu(&mut self, id: UiId) {
-        if let Some(m) = self.get_memory_mut::<ContextMenuState>(id) {
+        if let Some(m) = self.get_memory::<ContextMenuState>(id) {
+            let mut m = m.borrow_mut();
             m.open = false;
             self.next_ids
                 .push(id, self.ui_state.layer)
@@ -3088,10 +3058,7 @@ impl<'a> Ui<'a> {
 
         self.submit_rect(id, bounds, self.theme.padding);
 
-        let state = unsafe {
-            let mut state = self.get_memory_ptr_or_default::<TooltipState>(id);
-            state.as_mut()
-        };
+        let mut state = self.get_memory_or_default::<TooltipState>(id).borrow_mut();
 
         if self.contains_mouse(id) {
             state.hovered_seconds += self.delta_time.0.as_secs_f32();
@@ -3284,8 +3251,8 @@ pub struct ContextMenuResponse<'a, 'b> {
 impl<'a, 'b> ContextMenuResponse<'a, 'b> {
     pub fn close(&mut self) {
         if self.open {
-            let mem: &mut ContextMenuState = self.ui.get_memory_or_default(self.id);
-            mem.open = false;
+            let mem = self.ui.get_memory_or_default::<ContextMenuState>(self.id);
+            mem.borrow_mut().open = false;
         }
     }
 }
@@ -3952,7 +3919,7 @@ unsafe impl Send for UiMemory {}
 unsafe impl Sync for UiMemory {}
 
 pub struct ErasedMemoryEntry {
-    inner: *mut u8,
+    inner: *mut c_void,
     finalize: fn(&mut ErasedMemoryEntry),
 }
 
@@ -3964,12 +3931,13 @@ impl Drop for ErasedMemoryEntry {
 
 impl ErasedMemoryEntry {
     pub fn new<T>(value: T) -> Self {
-        let inner = Box::leak(Box::new(value));
+        let inner: Box<RefCell<T>> = Box::new(RefCell::new(value));
         Self {
-            inner: (inner as *mut T).cast(),
+            inner: Box::into_raw(inner).cast(),
             finalize: |resource| unsafe {
                 if !resource.inner.is_null() {
-                    let _inner: Box<T> = Box::from_raw(resource.inner.cast::<T>());
+                    let _inner: Box<RefCell<T>> =
+                        Box::from_raw(resource.inner.cast::<RefCell<T>>());
                     resource.inner = std::ptr::null_mut();
                 }
             },
@@ -3978,30 +3946,22 @@ impl ErasedMemoryEntry {
 
     /// # SAFETY
     /// Must be called with the same type as `new`
-    pub unsafe fn as_inner<T>(&self) -> &T {
-        unsafe { &*self.inner.cast() }
+    pub unsafe fn as_inner<T>(&self) -> &RefCell<T> {
+        unsafe { self.inner.cast::<RefCell<T>>().as_ref().unwrap() }
     }
 
     /// # SAFETY
     /// Must be called with the same type as `new`
-    pub unsafe fn as_inner_mut<T>(&mut self) -> &mut T {
-        unsafe { &mut *self.inner.cast() }
+    pub unsafe fn as_inner_ptr<T>(&self) -> NonNull<RefCell<T>> {
+        let ptr = self.inner.cast();
+        NonNull::new(ptr).unwrap()
     }
 
-    /// # SAFETY
-    /// Must be called with the same type as `new`
-    pub unsafe fn as_inner_ptr<T>(&mut self) -> NonNull<T> {
+    pub unsafe fn into_inner<T>(mut self) -> Box<RefCell<T>> {
         unsafe {
-            let ptr: *mut T = self.inner.cast();
-            NonNull::new_unchecked(ptr)
-        }
-    }
-
-    pub unsafe fn into_inner<T>(mut self) -> Box<T> {
-        unsafe {
-            let inner = self.inner;
+            let inner: *mut RefCell<T> = self.inner.cast();
             self.inner = std::ptr::null_mut();
-            Box::from_raw(inner.cast())
+            Box::from_raw(inner)
         }
     }
 }
