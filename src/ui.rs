@@ -10,6 +10,9 @@ pub mod text;
 pub mod text_rect_pipeline;
 pub mod textured_rect_pipeline;
 
+pub use clipboard_rs;
+use clipboard_rs::Clipboard;
+
 #[cfg(test)]
 mod tests;
 
@@ -69,6 +72,15 @@ impl Plugin for UiPlugin {
         app.insert_resource(UiMemory::default());
         app.insert_resource(UiInputs::default());
         app.insert_resource(NextUiInputs::default());
+        match clipboard_rs::ClipboardContext::new() {
+            Ok(ctx) => {
+                app.insert_resource(ctx);
+            }
+            Err(_err) => {
+                #[cfg(feature = "tracing")]
+                tracing::error!(err=?_err, "Failed to initialize clipboard");
+            }
+        }
 
         if app.get_resource::<Theme>().is_none() {
             app.insert_resource(Theme::default());
@@ -2303,14 +2315,6 @@ impl<'a> Ui<'a> {
                     _ => 'handler: {
                         self.ui_inputs.keys.insert(*k);
                         if self.keyboard.modifiers.ctrl {
-                            self.ui_inputs.keys.insert(KeyCode::ControlLeft);
-                            self.ui_inputs.keys.insert(KeyCode::ControlRight);
-                            if let KeyCode::KeyC = k {
-                                // TODO: copy
-                            }
-                            if let KeyCode::KeyV = k {
-                                // TODO: paste
-                            }
                             break 'handler;
                         }
 
@@ -2325,6 +2329,32 @@ impl<'a> Ui<'a> {
                             changed = true;
                             state.cursor += text.len();
                         }
+                    }
+                }
+            }
+            if self.keyboard.modifiers.ctrl {
+                self.ui_inputs.keys.insert(KeyCode::ControlLeft);
+                self.ui_inputs.keys.insert(KeyCode::ControlRight);
+                for k in self.keyboard.just_released.iter() {
+                    if let KeyCode::KeyC = k {
+                        // TODO: copy
+                    }
+                    if let KeyCode::KeyV = k {
+                        // paste text
+                        if let Some(ctx) = self.clipboard.as_deref_mut()
+                            && let Ok(text) = ctx.get_text()
+                        {
+                            self.ui_inputs.keys.insert(*k);
+                            desc.content.insert_str(state.cursor, text.as_str());
+                            changed = true;
+                            state.cursor += text.len();
+                        }
+                    }
+                    if let KeyCode::KeyZ = k {
+                        // TODO: undo
+                    }
+                    if let KeyCode::KeyY = k {
+                        // TODO: redo
                     }
                 }
             }
@@ -3540,14 +3570,15 @@ query_collection! {
         delta_time: Res<'a, DeltaTime>,
         tick: Res<'a, Tick>,
         ui_inputs: ResMut<'a, NextUiInputs>,
+        clipboard: Option<ResMut<'a, clipboard_rs::ClipboardContext>>,
     }
 }
 
 query_collection! {
-/// Root of the UI used to instantiate UI containers
-pub struct UiRoot<'a> {
-    ui: Ui<'a>,
-}
+    /// Root of the UI used to instantiate UI containers
+    pub struct UiRoot<'a> {
+        ui: Ui<'a>,
+    }
 }
 
 #[derive(Debug)]

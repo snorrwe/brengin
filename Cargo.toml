@@ -41,6 +41,7 @@ cfg-if = "1.0.4"
 harfrust = "0.13.2"
 read-fonts = "0.43.3"
 skrifa = "0.46.2"
+clipboard-rs = "0.3.5"
 
 [dev-dependencies]
 clap = "4.6.6"
