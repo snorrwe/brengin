@@ -2288,7 +2288,7 @@ impl<'a> Ui<'a> {
                         changed = true;
                         state.cursor += 1;
                     }
-                    KeyCode::Enter => {
+                    KeyCode::Tab | KeyCode::Enter => {
                         // if not multiline, then enter is a noop
                         is_active = false;
                     }
