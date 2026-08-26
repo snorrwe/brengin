@@ -571,7 +571,7 @@ impl Plugin for SpriteRendererPlugin {
         app.with_stage(Stage::PostUpdate, |s| {
             s.add_system(add_missing_sheets)
                 .add_system(add_missing_meshes)
-                .add_system(add_missing_instances);
+                .add_system(add_missing_instance_buffers);
         });
 
         app.add_plugin(RenderCommandPlugin::<SpriteRenderCommand>::new(
@@ -663,7 +663,7 @@ fn add_missing_meshes(
     }
 }
 
-fn add_missing_instances(
+fn add_missing_instance_buffers(
     renderer: Res<GraphicsState>,
     mut pipeline: ResMut<SpritePipeline>,
     q: Query<(Option<&Handle<SpriteMesh>>, &Handle<SpriteSheet>), With<Visible>>,
