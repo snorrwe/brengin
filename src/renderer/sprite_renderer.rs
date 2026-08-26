@@ -22,7 +22,7 @@ use crate::{
     Plugin, Stage,
     assets::{AssetId, Assets, AssetsPlugin, Handle, WeakHandle},
     camera::ViewFrustum,
-    renderer::texture_atlas::{AtlasRect, TextureAtlasRegistry},
+    renderer::texture_atlas::{AtlasRect, TextureAtlas, TextureAtlasRegistry},
     transform::GlobalTransform,
 };
 
@@ -190,10 +190,50 @@ fn compute_sprite_instances(
 #[derive(Default)]
 struct SpritePipelineInstances(BTreeMap<InstanceKey, Vec<SpriteInstanceRaw>>);
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Groups by the texture atlases and the mesh
+/// holds sprite_sheet id for identification, but it is ignored in comparision and hash functions
+#[derive(Default, Debug, Clone, Copy)]
 struct InstanceKey {
     pub sprite_sheet: AssetId<SpriteSheet>,
+    pub texture: AssetId<TextureAtlas>,
+    pub mask: AssetId<TextureAtlas>,
     pub mesh: MeshKey,
+}
+
+impl Eq for InstanceKey {}
+
+impl Ord for InstanceKey {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
+impl std::hash::Hash for InstanceKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.texture.hash(state);
+        self.mask.hash(state);
+        self.mesh.hash(state);
+    }
+}
+
+impl PartialOrd for InstanceKey {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.texture.partial_cmp(&other.texture) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.mask.partial_cmp(&other.mask) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.mesh.partial_cmp(&other.mesh)
+    }
+}
+
+impl PartialEq for InstanceKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.texture == other.texture && self.mask == other.mask && self.mesh == other.mesh
+    }
 }
 
 fn clear_pipeline_instances(mut instances: ResMut<SpritePipelineInstances>) {
@@ -216,8 +256,19 @@ fn update_sprite_pipelines(
         let mesh = mesh
             .map(|h| MeshHandle::Mesh(h.downgrade()))
             .unwrap_or_default();
+
+        let Some(t) = pipeline.sheets.get(&sheet.id()) else {
+            continue;
+        };
+
         let k = InstanceKey {
             sprite_sheet: sheet.id(),
+            texture: t.rect.atlas_handle().id(),
+            mask: t
+                .mask_rect
+                .as_ref()
+                .map(|r| r.atlas_handle().id())
+                .unwrap_or_default(),
             mesh: mesh.into(),
         };
         instances.0.entry(k).or_default().push(*raw);
@@ -235,8 +286,8 @@ fn update_sprite_pipelines(
             instances.instance_gpu.destroy();
             instances.instance_gpu = renderer.device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(&format!(
-                    "Sprite Instance Buffer - {:?} {:?}",
-                    id.sprite_sheet, id.mesh
+                    "Sprite Instance Buffer - {:?} {:?} {:?}",
+                    id.texture, id.mask, id.mesh
                 )),
                 size: size * 3 / 2,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
@@ -675,14 +726,21 @@ fn add_missing_instance_buffers(
 ) {
     let instances = q
         .iter()
-        .map(|(mesh, sheet)| {
+        .filter_map(|(mesh, sheet)| {
             let mesh = mesh
                 .map(|h| MeshHandle::Mesh(h.downgrade()))
                 .unwrap_or_default();
-            InstanceKey {
+            let t = pipeline.sheets.get(&sheet.id())?;
+            Some(InstanceKey {
                 sprite_sheet: sheet.id(),
+                texture: t.rect.atlas_handle().id(),
+                mask: t
+                    .mask_rect
+                    .as_ref()
+                    .map(|r| r.atlas_handle().id())
+                    .unwrap_or_default(),
                 mesh: mesh.into(),
-            }
+            })
         })
         .fold(HashSet::new(), |mut a, b| {
             a.insert(b);
@@ -697,8 +755,8 @@ fn add_missing_instance_buffers(
                 count: 0,
                 instance_gpu: renderer.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some(&format!(
-                        "Sprite Instance Buffer - {:?} {:?}",
-                        k.sprite_sheet, k.mesh
+                        "Sprite Instance Buffer - {:?} {:?} {:?}",
+                        k.texture, k.mask, k.mesh
                     )),
                     size: 0,
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
