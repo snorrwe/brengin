@@ -36,6 +36,14 @@ impl TextureAtlas {
     fn deallocate(&mut self, rect: guillotiere::AllocId) {
         self.allocator.deallocate(rect);
     }
+
+    pub fn width(&self) -> u32 {
+        self.texture.size.0
+    }
+
+    pub fn height(&self) -> u32 {
+        self.texture.size.1
+    }
 }
 
 #[derive(Clone)]
@@ -97,9 +105,9 @@ impl AtlasRect {
 query_collection! {
     /// Primary way to use texture atlases
     pub struct TextureAtlasRegistry<'a> {
-        atlases: ResMut<'a, Assets<TextureAtlas>>,
-        ids: ResMut<'a, Atlases>,
-        renderer: Res<'a, GraphicsState>,
+        pub atlases: ResMut<'a, Assets<TextureAtlas>>,
+        pub ids: ResMut<'a, Atlases>,
+        pub renderer: Res<'a, GraphicsState>,
     }
 }
 

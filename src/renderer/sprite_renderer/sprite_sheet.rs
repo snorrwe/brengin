@@ -75,16 +75,6 @@ impl SpriteSheet {
         }
     }
 
-    pub fn extract(&self) -> SpriteSheetGpu {
-        SpriteSheetGpu {
-            padding: self.padding.to_array(),
-            box_size: self.box_size.to_array(),
-            num_cols: self.num_cols,
-            size: self.size.to_array(),
-            _pad: 0,
-        }
-    }
-
     /// return the min-max bounding box in image pixel coordinates
     pub fn get_instance_box(&self, instance: SpriteInstance) -> [Vec2; 2] {
         let row: u32 = instance.index / self.num_cols;
@@ -107,7 +97,7 @@ impl SpriteSheet {
         [min, max]
     }
 
-    /// return the min-max bounding box in UV coordinates
+    /// return the min-max bounding box in UV coordinates (-1..=1 range)
     pub fn get_instance_uv(&self, instance: SpriteInstance) -> [Vec2; 2] {
         let [min, max] = self.get_instance_box(instance);
         let div = Vec2::new(self.image.width() as f32, self.image.height() as f32);

@@ -15,12 +15,14 @@ mod tests;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use cecs::prelude::*;
+use glam::{FloatExt as _, Vec2};
 use wgpu::{include_wgsl, util::DeviceExt};
 
 use crate::{
     Plugin, Stage,
     assets::{AssetId, Assets, AssetsPlugin, Handle, WeakHandle},
     camera::ViewFrustum,
+    renderer::texture_atlas::{AtlasRect, TextureAtlasRegistry},
     transform::GlobalTransform,
 };
 
@@ -101,12 +103,12 @@ fn insert_missing_cull(
 
 pub fn add_missing_sheets(
     mut pipeline: ResMut<SpritePipeline>,
-    renderer: Res<GraphicsState>,
     sheets: Res<crate::assets::Assets<SpriteSheet>>,
+    mut reg: TextureAtlasRegistry,
 ) {
     for (id, sheet) in sheets.iter() {
         if !pipeline.sheets.contains_key(&id) {
-            pipeline.add_sheet(id, sheet, &renderer);
+            pipeline.add_sheet(id, sheet, &mut reg);
         }
     }
 }
@@ -115,6 +117,7 @@ fn unload_sheets(
     mut handles: ResMut<RenderSpritesheetHandles>,
     mut pipeline: ResMut<SpritePipeline>,
     mut instances: ResMut<SpritePipelineInstances>,
+    mut textures: TextureAtlasRegistry,
 ) {
     let unloaded = handles
         .0
@@ -123,10 +126,23 @@ fn unload_sheets(
         .map(|(id, _)| *id)
         .collect::<Vec<_>>();
     for id in unloaded {
-        pipeline.unload_sheet(id);
+        if let Some(data) = pipeline.unload_sheet(id) {
+            textures.deallocate(data.rect);
+            if let Some(mask_rect) = data.mask_rect {
+                textures.deallocate(mask_rect);
+            }
+        }
         instances.0.retain(|k, _| k.sprite_sheet != id);
         handles.0.remove(&id);
     }
+}
+
+fn spritesheet_uv_in_atlas(spritesheet_uv: &[Vec2; 2], atlas_uv: &[f32; 4]) -> [f32; 4] {
+    let uv_minx = atlas_uv[0].lerp(atlas_uv[2], spritesheet_uv[0].x);
+    let uv_maxx = atlas_uv[0].lerp(atlas_uv[2], spritesheet_uv[1].x);
+    let uv_miny = atlas_uv[1].lerp(atlas_uv[3], spritesheet_uv[0].y);
+    let uv_maxy = atlas_uv[1].lerp(atlas_uv[3], spritesheet_uv[1].y);
+    [uv_minx, uv_miny, uv_maxx, uv_maxy]
 }
 
 fn compute_sprite_instances(
@@ -140,16 +156,30 @@ fn compute_sprite_instances(
         With<Visible>,
     >,
     sheets: Res<crate::assets::Assets<SpriteSheet>>,
+    pipeline: Res<SpritePipeline>,
 ) {
     q.par_for_each_mut(|(tr, i, instance, sheet)| {
         let pos = tr.0.pos.to_array();
         let scale = tr.0.scale.truncate().to_array();
+        let Some(sprite_rendering_data) = pipeline.sheets.get(&sheet.id()) else {
+            return;
+        };
         let Some(sheet) = sheets.get(sheet) else {
             return;
         };
-        let uv = sheet.get_instance_uv(*i);
+        let spritesheet_uv = sheet.get_instance_uv(*i);
+
+        let atlas_uv = sprite_rendering_data.rect.uv();
+        let mask_uv = sprite_rendering_data.mask_rect.as_ref().map(|r| r.uv());
+
+        let uv = spritesheet_uv_in_atlas(&spritesheet_uv, &atlas_uv);
+        let mask_uv = mask_uv
+            .map(|atlas_uv| spritesheet_uv_in_atlas(&spritesheet_uv, &atlas_uv))
+            .unwrap_or_default();
+
         *instance = SpriteInstanceRaw {
-            uv: bytemuck::cast(uv),
+            mask_uv,
+            uv,
             pos,
             scale,
             color_flip: (i.color.0 & 0xFFFFFF00) | i.flip as u32,
@@ -225,11 +255,10 @@ struct RenderSpritesheetHandles(pub HashMap<AssetId<SpriteSheet>, WeakHandle<Spr
 
 // per spritesheet
 pub struct SpriteRenderingData {
-    pub spritesheet_gpu: wgpu::BindGroup,
     pub texture_bind_group: wgpu::BindGroup,
     pub mask_bind_group: Option<wgpu::BindGroup>,
-    pub texture: Texture,
-    pub mask: Option<Texture>,
+    pub rect: AtlasRect,
+    pub mask_rect: Option<AtlasRect>,
 }
 
 struct SpriteInstances {
@@ -244,84 +273,50 @@ pub struct SpritePipeline {
     meshes: BTreeMap<MeshKey, SpriteMeshGpu>,
     // shared
     render_pipeline: wgpu::RenderPipeline,
-    sprite_sheet_layout: wgpu::BindGroupLayout,
     default_mask_bind_group: wgpu::BindGroup,
 }
 
 impl SpritePipeline {
-    pub fn unload_sheet(&mut self, id: AssetId<SpriteSheet>) {
-        self.sheets.remove(&id);
+    pub fn unload_sheet(&mut self, id: AssetId<SpriteSheet>) -> Option<SpriteRenderingData> {
+        self.sheets.remove(&id)
     }
 
     pub fn add_sheet(
         &mut self,
         id: AssetId<SpriteSheet>,
         sheet: &SpriteSheet,
-        renderer: &GraphicsState,
+        atlases: &mut TextureAtlasRegistry,
     ) {
-        let mask = sheet.mask.as_ref().map(|m| {
-            Texture::from_image(renderer.device(), renderer.queue(), m, None)
-                .expect("Failed to create mask texture")
-        });
-        let mask_bind_group = mask
+        let Some(texture_rect) = atlases.allocate(sheet.size.x as i32, sheet.size.y as i32) else {
+            #[cfg(feature = "tracing")]
+            tracing::error!(?id, "Failed to allocate texture for spritesheet");
+            return;
+        };
+        atlases.upload_image(&texture_rect, &sheet.image);
+        let texture_bind_group = atlases.get_bind_group(&texture_rect).1;
+
+        let mask_rect = sheet
+            .mask
             .as_ref()
-            .map(|m| texture_to_bindings(&renderer.device, m).1);
+            .and_then(|m| atlases.allocate(m.width() as i32, m.height() as i32));
+        if let (Some(m), Some(r)) = (sheet.mask.as_ref(), mask_rect.as_ref()) {
+            atlases.upload_image(r, m);
+        }
 
-        let texture = Texture::from_image(renderer.device(), renderer.queue(), &sheet.image, None)
-            .expect("Failed to create texture");
-
-        let (_, spritesheet_bind_group) = texture_to_bindings(&renderer.device, &texture);
-        let sheet_gpu = sheet.extract();
-
-        let spritesheet_buffer =
-            renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("SpriteSheet Instance Buffer {id:?}")),
-                    usage: wgpu::BufferUsages::UNIFORM,
-                    contents: bytemuck::cast_slice(&[sheet_gpu]),
-                });
-
-        let spritesheet_gpu = renderer
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &self.sprite_sheet_layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: spritesheet_buffer.as_entire_binding(),
-                }],
-                label: Some(&format!("spritesheet_bind_group {id:?}")),
-            });
+        let mask_bind_group = mask_rect.as_ref().map(|m| atlases.get_bind_group(m).1);
 
         self.sheets.insert(
             id,
             SpriteRenderingData {
-                spritesheet_gpu,
-                texture_bind_group: spritesheet_bind_group,
-                texture,
+                texture_bind_group,
                 mask_bind_group,
-                mask,
+                rect: texture_rect,
+                mask_rect,
             },
         );
     }
 
     pub fn new(renderer: &GraphicsState) -> Self {
-        let sprite_sheet_layout: wgpu::BindGroupLayout =
-            renderer
-                .device
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: Some("Sprite Sheet Uniform Layout"),
-                    entries: &[wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStages::all(),
-                        count: None,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                    }],
-                });
         let shader = renderer
             .device
             .create_shader_module(include_wgsl!("sprite-shader.wgsl"));
@@ -338,7 +333,6 @@ impl SpritePipeline {
                         Some(&renderer.camera_bind_group_layout),
                         Some(&texture_bind_group_layout),
                         Some(&texture_bind_group_layout),
-                        Some(&sprite_sheet_layout),
                     ],
                     ..Default::default()
                 });
@@ -432,7 +426,6 @@ impl SpritePipeline {
         SpritePipeline {
             sheets: Default::default(),
             meshes,
-            sprite_sheet_layout,
             render_pipeline,
             instances: Default::default(),
             default_mask_bind_group,
@@ -471,7 +464,6 @@ impl<'a> RenderCommand<'a> for SpriteRenderCommand {
                     render_pass.set_bind_group(2, &pipeline.default_mask_bind_group, &[]);
                 }
             }
-            render_pass.set_bind_group(3, &sheet.spritesheet_gpu, &[]);
             render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
             render_pass.set_vertex_buffer(1, instances.instance_gpu.slice(..));
             render_pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
@@ -487,6 +479,7 @@ struct SpriteInstanceRaw {
     pos: [f32; 3],
     scale: [f32; 2],
     uv: [f32; 4],
+    mask_uv: [f32; 4],
     /// rgb 24 bits, bool 8 bits
     color_flip: u32,
 }
@@ -519,6 +512,11 @@ impl SpriteInstanceRaw {
                 wgpu::VertexAttribute {
                     offset: POS_SIZE + SCALE_SIZE + UV_SIZE,
                     shader_location: 5,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: POS_SIZE + SCALE_SIZE + UV_SIZE * 2,
+                    shader_location: 6,
                     format: wgpu::VertexFormat::Uint32,
                 },
             ],

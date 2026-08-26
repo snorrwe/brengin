@@ -38,14 +38,16 @@ struct Instance {
     @location(2) pos: vec3<f32>,
     @location(3) scale: vec2<f32>,
     @location(4) uv: vec4<f32>,
-    @location(5) color_flip: u32,
+    @location(5) mask_uv: vec4<f32>,
+    @location(6) color_flip: u32,
 }
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
-    @location(1) color: vec3<f32>,
-    @location(2) mask_oklab: vec3<f32>,
+    @location(1) mask_uv: vec2<f32>,
+    @location(2) color: vec3<f32>,
+    @location(3) mask_oklab: vec3<f32>,
 }
 
 // cube root
@@ -128,6 +130,7 @@ fn vs_main(
         uv.x = 1.0 - uv.x;
     }
     out.uv = mix(instance.uv.xy, instance.uv.zw, uv);
+    out.mask_uv = mix(instance.mask_uv.xy, instance.mask_uv.zw, uv);
 
     // billboarding
     let scale_x = instance.scale.x;
@@ -149,7 +152,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    let mask = textureSample(mask, mask_sampler, in.uv);
+    let mask = textureSample(mask, mask_sampler, in.mask_uv);
     let mask_alpha = mask.r;
     let rgb = mix(color.rgb, in.color, mask_alpha);
     // premultiply in linear space, the pipeline blends with
