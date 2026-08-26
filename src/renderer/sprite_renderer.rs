@@ -135,15 +135,21 @@ fn compute_sprite_instances(
             &crate::transform::GlobalTransform,
             &SpriteInstance,
             &mut SpriteInstanceRaw,
+            &Handle<SpriteSheet>,
         ),
         With<Visible>,
     >,
+    sheets: Res<crate::assets::Assets<SpriteSheet>>,
 ) {
-    q.par_for_each_mut(|(tr, i, instance)| {
+    q.par_for_each_mut(|(tr, i, instance, sheet)| {
         let pos = tr.0.pos.to_array();
         let scale = tr.0.scale.truncate().to_array();
+        let Some(sheet) = sheets.get(sheet) else {
+            return;
+        };
+        let uv = sheet.get_instance_uv(*i);
         *instance = SpriteInstanceRaw {
-            index: i.index,
+            uv: bytemuck::cast(uv),
             pos,
             scale,
             color_flip: (i.color.0 & 0xFFFFFF00) | i.flip as u32,
@@ -480,7 +486,7 @@ impl<'a> RenderCommand<'a> for SpriteRenderCommand {
 struct SpriteInstanceRaw {
     pos: [f32; 3],
     scale: [f32; 2],
-    index: u32,
+    uv: [f32; 4],
     /// rgb 24 bits, bool 8 bits
     color_flip: u32,
 }
@@ -490,6 +496,7 @@ impl SpriteInstanceRaw {
         use std::mem;
         const POS_SIZE: wgpu::BufferAddress = mem::size_of::<[f32; 3]>() as wgpu::BufferAddress;
         const SCALE_SIZE: wgpu::BufferAddress = mem::size_of::<[f32; 2]>() as wgpu::BufferAddress;
+        const UV_SIZE: wgpu::BufferAddress = mem::size_of::<[f32; 4]>() as wgpu::BufferAddress;
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<SpriteInstanceRaw>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
@@ -507,10 +514,10 @@ impl SpriteInstanceRaw {
                 wgpu::VertexAttribute {
                     offset: POS_SIZE + SCALE_SIZE,
                     shader_location: 4,
-                    format: wgpu::VertexFormat::Uint32,
+                    format: wgpu::VertexFormat::Float32x4,
                 },
                 wgpu::VertexAttribute {
-                    offset: POS_SIZE + SCALE_SIZE + 4,
+                    offset: POS_SIZE + SCALE_SIZE + UV_SIZE,
                     shader_location: 5,
                     format: wgpu::VertexFormat::Uint32,
                 },

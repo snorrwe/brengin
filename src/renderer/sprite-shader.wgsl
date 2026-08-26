@@ -37,7 +37,7 @@ struct Vertex {
 struct Instance {
     @location(2) pos: vec3<f32>,
     @location(3) scale: vec2<f32>,
-    @location(4) sprite_index: u32,
+    @location(4) uv: vec4<f32>,
     @location(5) color_flip: u32,
 }
 
@@ -122,19 +122,12 @@ fn vs_main(
     var out: VertexOutput;
     out.color = parse_rgb(instance.color_flip >> 8);
 
-    let row: u32 = instance.sprite_index / sprite_sheet.num_cols;
-    let col: u32 = instance.sprite_index - sprite_sheet.num_cols * row;
-
-    let offset = sprite_sheet.box_size.xy * vec2<f32>(f32(col), f32(row)) + sprite_sheet.padding;
-
     var uv = model.uv;
     let flip = instance.color_flip & 0xFF;
     if flip != 0u {
         uv.x = 1.0 - uv.x;
     }
-    let box_uv = lerp_vec2(vec2(0.0), sprite_sheet.box_size - sprite_sheet.padding * 2.0, uv) + offset;
-    let total_uv = inv_lerp_vec2(vec2(0.0), sprite_sheet.image_size, box_uv);
-    out.uv = total_uv;
+    out.uv = mix(instance.uv.xy, instance.uv.zw, uv);
 
     // billboarding
     let scale_x = instance.scale.x;
