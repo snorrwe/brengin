@@ -28,7 +28,7 @@ use crate::{
 
 use super::{
     GraphicsState, RenderCommand, RenderCommandInput, RenderCommandPlugin, RenderPass, Vertex,
-    texture::{Texture, texture_bind_group_layout, texture_to_bindings},
+    texture::texture_bind_group_layout,
 };
 
 pub use sprite_sheet::{SpriteInstance, SpriteSheet, sprite_sheet_bundle};
@@ -175,7 +175,7 @@ fn compute_sprite_instances(
         let uv = spritesheet_uv_in_atlas(&spritesheet_uv, &atlas_uv);
         let mask_uv = mask_uv
             .map(|atlas_uv| spritesheet_uv_in_atlas(&spritesheet_uv, &atlas_uv))
-            .unwrap_or_default();
+            .unwrap_or_else(|| pipeline.default_mask_rect.uv());
 
         *instance = SpriteInstanceRaw {
             mask_uv,
@@ -324,6 +324,9 @@ pub struct SpritePipeline {
     meshes: BTreeMap<MeshKey, SpriteMeshGpu>,
     // shared
     render_pipeline: wgpu::RenderPipeline,
+    // TODO: this 1x1 allocation is leaked by the renderer but it's
+    // not a big deal, the renderer should only be destroyed on program exit anyway
+    default_mask_rect: AtlasRect,
     default_mask_bind_group: wgpu::BindGroup,
 }
 
@@ -367,7 +370,7 @@ impl SpritePipeline {
         );
     }
 
-    pub fn new(renderer: &GraphicsState) -> Self {
+    pub fn new(renderer: &GraphicsState, reg: &mut TextureAtlasRegistry) -> Self {
         let shader = renderer
             .device
             .create_shader_module(include_wgsl!("sprite-shader.wgsl"));
@@ -468,17 +471,20 @@ impl SpritePipeline {
             },
         );
 
-        let texture =
-            Texture::from_rgba8(&renderer.device, &renderer.queue, &[0x0; 4], (1, 1), None)
-                .unwrap();
+        let default_texture = reg
+            .allocate(1, 1)
+            .expect("Failed to allocate initial texture");
 
-        let (_, default_mask_bind_group) = texture_to_bindings(&renderer.device, &texture);
+        reg.upload_rgba(&default_texture, &[0; 4], 1, 1);
+
+        let (_, default_mask_bind_group) = reg.get_bind_group(&default_texture);
 
         SpritePipeline {
             sheets: Default::default(),
             meshes,
             render_pipeline,
             instances: Default::default(),
+            default_mask_rect: default_texture,
             default_mask_bind_group,
         }
     }
@@ -600,8 +606,8 @@ const SQUARE_VERTICES: &[Vertex] = &[
 
 const SQUARE_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
-fn setup(mut cmd: Commands, graphics_state: Res<GraphicsState>) {
-    let sprite_pipeline = SpritePipeline::new(&graphics_state);
+fn setup(mut cmd: Commands, graphics_state: Res<GraphicsState>, mut reg: TextureAtlasRegistry) {
+    let sprite_pipeline = SpritePipeline::new(&graphics_state, &mut reg);
     cmd.insert_resource(sprite_pipeline);
 }
 
