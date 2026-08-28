@@ -1394,9 +1394,7 @@ impl<'a> Ui<'a> {
             .skip(1)
             .find(|i| **i != SENTINEL)
             .map(|i| *i as usize)
-            .and_then(|parent| {
-                let parent_idx = *self.ui_state.id_stack.get(parent)? as usize;
-
+            .and_then(|parent_idx| {
                 let parent_id = self.ui_state.widget_ids.get(parent_idx).copied()?;
                 let ch = &mut self.ui_state.widget_properties[parent_idx].children;
                 *ch += 1;
