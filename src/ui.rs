@@ -3060,6 +3060,7 @@ impl<'a> Ui<'a> {
         self.submit_rect(id, bounds, self.theme.padding);
     }
 
+    /// A child widget that represents a fork in the UI tree
     pub fn child(&mut self, contents: impl FnOnce(&mut Self)) {
         self.begin_widget();
         self.children_content(contents);
