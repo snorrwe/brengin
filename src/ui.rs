@@ -1429,6 +1429,10 @@ impl<'a> Ui<'a> {
         self.ui_state
             .widget_properties
             .push(WidgetProperties::default());
+        debug_assert_eq!(
+            self.ui_state.widget_ids.len(),
+            self.ui_state.widget_properties.len()
+        );
         if let Some(i) = self.ui_state.id_stack.last_mut() {
             *i = index;
         }
