@@ -1445,6 +1445,7 @@ impl<'a> Ui<'a> {
             parent,
             is_hovered,
             is_active: self.is_active(id),
+            rect: self.widget_bounds(id).unwrap_or_default(),
         }
     }
 
@@ -4419,6 +4420,7 @@ pub struct WidgetInfo {
     pub parent: UiId,
     pub is_hovered: bool,
     pub is_active: bool,
+    pub rect: UiRect,
 }
 
 #[derive(Debug, Default)]
