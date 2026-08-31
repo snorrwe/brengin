@@ -369,7 +369,6 @@ pub struct UiState {
 
     layout_dir: LayoutDirection,
 
-    /// TODO: gc?
     windows: HashMap<String, WindowState>,
     fallback_font: OwnedTypeFace,
 
