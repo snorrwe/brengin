@@ -1416,11 +1416,7 @@ impl<'a> Ui<'a> {
             });
 
         let index = self.ui_state.widget_ids.len() as IdxType;
-        let hash = fnv_1a(bytemuck::cast_slice(&[
-            parent.uid,
-            (children >> 32) as u32,
-            (children & 0xFFFFFFFF) as u32,
-        ]));
+        let hash = fnv_1a_hash(&(parent.uid, children));
         let id = UiId {
             parent: parent.uid,
             uid: hash,
