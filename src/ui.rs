@@ -706,6 +706,7 @@ impl<'a> Ui<'a> {
             id: drag_id,
             is_active,
             is_hovered,
+            ..
         } = self.begin_widget();
         if is_active {
             if self.mouse_down() {
@@ -1244,6 +1245,7 @@ impl<'a> Ui<'a> {
             id,
             is_hovered,
             is_active,
+            ..
         } = self.begin_widget();
         let layer = self.ui_state.layer;
 
@@ -1275,6 +1277,7 @@ impl<'a> Ui<'a> {
             id,
             is_hovered,
             is_active,
+            ..
         } = self.begin_widget();
         let layer = self.ui_state.layer;
         let label = label.into();
@@ -1439,6 +1442,7 @@ impl<'a> Ui<'a> {
         }
         WidgetInfo {
             id,
+            parent,
             is_hovered,
             is_active: self.is_active(id),
         }
@@ -1468,6 +1472,7 @@ impl<'a> Ui<'a> {
                 id,
                 is_hovered,
                 is_active,
+                ..
             } = ui.begin_widget();
             let layer = ui.ui_state.layer;
 
@@ -1720,6 +1725,7 @@ impl<'a> Ui<'a> {
             id,
             is_active,
             is_hovered,
+            ..
         } = self.begin_widget();
 
         // bar
@@ -1782,6 +1788,7 @@ impl<'a> Ui<'a> {
             id,
             is_active,
             is_hovered,
+            ..
         } = self.begin_widget();
 
         // bar
@@ -2016,6 +2023,7 @@ impl<'a> Ui<'a> {
             id,
             is_hovered,
             is_active,
+            ..
         } = self.begin_widget();
         self.submit_rect(id, bounds, self.theme.padding);
         Response {
@@ -2032,6 +2040,7 @@ impl<'a> Ui<'a> {
             id,
             is_hovered,
             is_active,
+            ..
         } = self.begin_widget();
         let old_bounds = self.padd_bounds();
 
@@ -2231,6 +2240,7 @@ impl<'a> Ui<'a> {
             id,
             is_hovered,
             mut is_active,
+            ..
         } = self.begin_widget();
         let last_layer = self.push_layer();
         let layer = self.ui_state.layer;
@@ -2750,6 +2760,7 @@ impl<'a> Ui<'a> {
             id,
             is_hovered,
             mut is_active,
+            ..
         } = self.begin_widget();
         let layer = self.push_layer();
 
@@ -4405,6 +4416,7 @@ impl<'a> From<&'a str> for ButtonDescriptor<'a> {
 
 pub struct WidgetInfo {
     pub id: UiId,
+    pub parent: UiId,
     pub is_hovered: bool,
     pub is_active: bool,
 }
