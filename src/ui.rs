@@ -1443,12 +1443,16 @@ impl<'a> Ui<'a> {
             self.set_hovered(id);
         }
 
-        let entity = self.entity_mapping.0.get(&id).copied();
+        let mut entity = self.entity_mapping.0.get(&id).copied();
 
-        if entity.is_none() {
-            self.with_entity_commands(id, |cmd| {
-                cmd.insert_bundle(widget_archetype(id, ParentWidget(parent)));
-            });
+        if entity.is_none()
+            && let Ok(id) = self
+                .cmd
+                .spawn()
+                .insert_bundle(widget_archetype(id, ParentWidget(parent)))
+                .id()
+        {
+            let _ = entity.insert(id);
         }
 
         WidgetInfo {
@@ -1459,15 +1463,6 @@ impl<'a> Ui<'a> {
             rect: self.widget_bounds(id).unwrap_or_default(),
             entity,
         }
-    }
-
-    fn with_entity_commands(&mut self, id: UiId, callback: impl FnOnce(&mut EntityCommands)) {
-        let cmd = match self.entity_mapping.0.get(&id) {
-            Some(id) => self.cmd.entity(*id),
-            None => self.cmd.spawn(),
-        };
-
-        callback(cmd);
     }
 
     fn submit_widget(&mut self, id: UiId) {
