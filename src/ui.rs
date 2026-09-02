@@ -73,6 +73,7 @@ impl Plugin for UiPlugin {
         app.insert_resource(UiMemory::default());
         app.insert_resource(UiInputs::default());
         app.insert_resource(NextUiInputs::default());
+        app.insert_resource(WidgetTree::default());
         match clipboard_rs::ClipboardContext::new() {
             Ok(ctx) => {
                 app.insert_resource(ctx);
@@ -1449,9 +1450,8 @@ impl<'a> Ui<'a> {
         }
     }
 
-    #[expect(unused)]
     fn submit_widget(&mut self, id: UiId) {
-        // TODO:
+        self.tree.0.push(id);
     }
 
     fn push_child(&mut self) {
@@ -3597,6 +3597,7 @@ fn begin_frame(
     mut ui: ResMut<UiState>,
     window_size: Res<crate::renderer::WindowSize>,
     mut next_inputs: ResMut<NextUiInputs>,
+    mut tree: ResMut<WidgetTree>,
 ) {
     let ui = &mut *ui;
 
@@ -3625,6 +3626,7 @@ fn begin_frame(
     ui.scissor_idx = 0;
     ui.layer = 0;
     next_inputs.0.clear();
+    tree.0.clear();
 }
 
 query_collection! {
@@ -3643,6 +3645,7 @@ query_collection! {
         tick: Res<'a, Tick>,
         ui_inputs: ResMut<'a, NextUiInputs>,
         pub clipboard: Option<Res<'a, clipboard_rs::ClipboardContext>>,
+        tree: ResMut<'a, WidgetTree>,
     }
 }
 
@@ -4483,3 +4486,7 @@ struct PanelState {
     pub content_width: i32,
     pub content_height: i32,
 }
+
+/// Reverse-BFS order of UI widgets created in this frame
+#[derive(Default)]
+struct WidgetTree(pub Vec<UiId>);
