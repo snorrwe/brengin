@@ -99,6 +99,7 @@ impl Plugin for UiPlugin {
                     })
                     .with_system(draw_bounding_boxes),
             )
+            .add_nested_stage(SystemStage::new("size").with_system(shape_text))
             .add_system(update_ids)
             .add_system(shaping_gc_system)
             .add_system(update_ui_inputs.after(update_ids))
@@ -1281,11 +1282,22 @@ impl<'a> Ui<'a> {
         let WidgetInfo {
             id,
             is_hovered,
+            entity,
             is_active,
             ..
         } = self.begin_widget();
         let layer = self.ui_state.layer;
         let label = label.into();
+
+        if let Some(entity) = entity {
+            self.cmd.entity(entity).insert_bundle((
+                Text {
+                    text: label.clone(),
+                    font_size: self.theme.font_size,
+                },
+                ShapeText,
+            ));
+        }
 
         // shape the text
         // shape it at the origin and translate later, when the full rect is layouted
@@ -3663,6 +3675,8 @@ query_collection! {
         tree: ResMut<'a, WidgetTree>,
         entity_mapping: ResMut<'a, WidgetEntities>,
         cmd: Commands<'a>,
+        /// q0 = text widget data
+        widget_data: QuerySet<(Query<'a, &'static Text>, Query<'a, &'static ()>)>
     }
 }
 
@@ -4539,4 +4553,96 @@ pub struct ParentWidget(pub UiId);
 
 fn widget_archetype(id: UiId, parent: ParentWidget) -> impl Bundle {
     (id, parent)
+}
+
+struct Text {
+    pub text: String,
+    pub font_size: u16,
+}
+
+struct ShapeText;
+
+fn shape_text(
+    mut cmd: Commands,
+    q: Query<(EntityId, &Text, &Handle<OwnedTypeFace>), With<ShapeText>>,
+    mut texture_cache: ResMut<TextTextureCache>,
+    fonts: Res<Assets<OwnedTypeFace>>,
+    mut shaping_results: ResMut<Assets<ShapingResult>>,
+    tick: Res<Tick>,
+) {
+    for (id, text, font) in q.iter() {
+        cmd.entity(id).remove::<ShapeText>();
+        // shape the text
+        // shape it at the origin and translate later, when the full rect is layouted
+        let mut w = 0;
+        let mut h = 0;
+        let mut line_height = 0;
+        for line in text.text.split('\n') {
+            if line.is_empty() {
+                h += line_height;
+                continue;
+            }
+            let (handle, e) = shape_and_draw_line(
+                line.to_owned(),
+                text.font_size as u32,
+                font,
+                &mut texture_cache,
+                &fonts,
+                &mut shaping_results,
+                &tick,
+            );
+            let pic = &e.texture;
+            let line_width = pic.width() as i32;
+            line_height = pic.height() as i32;
+            w = w.max(line_width);
+            h += line_height;
+        }
+    }
+}
+
+fn shape_and_draw_line<'a>(
+    line: String,
+    size: u32,
+    font: &Handle<OwnedTypeFace>,
+    texture_cache: &mut TextTextureCache,
+    fonts: &Assets<OwnedTypeFace>,
+    shaping_results: &'a mut Assets<ShapingResult>,
+    tick: &Tick,
+) -> (Handle<ShapingResult>, &'a mut ShapingResult) {
+    let handle = texture_cache
+        .0
+        .entry(ShapeKey {
+            text: line.clone(),
+            size,
+            font: font.downgrade(),
+        })
+        .or_insert_with(|| {
+            let mut buffer = harfrust::UnicodeBuffer::new();
+            buffer.push_str(&line);
+            // harfrust does not infer direction/script/language on its own
+            buffer.guess_segment_properties();
+            let font = if fonts.contains(font.id())
+                && let Some(f) = fonts.get(&font)
+            {
+                f
+            } else {
+                return Default::default();
+            };
+
+            let shaper = font.shaper();
+            let glyphs = shaper.shape(buffer, harfrust::ShapeOptions::new());
+            let pic = text::draw_glyph_buffer(font.face(), &glyphs, size).unwrap();
+
+            let shaping = ShapingResult {
+                glyphs,
+                texture: pic,
+                last_access: 0,
+            };
+
+            shaping_results.insert(shaping)
+        });
+
+    let shape = shaping_results.get_mut(handle).unwrap();
+    shape.last_access = tick.0;
+    (handle.clone(), shape)
 }
