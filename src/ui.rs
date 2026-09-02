@@ -1387,7 +1387,7 @@ impl<'a> Ui<'a> {
         self.ui_state.rect_history.push(rect_original);
     }
 
-    pub fn begin_widget(&mut self) -> WidgetInfo {
+    fn begin_widget(&mut self) -> WidgetInfo {
         let (parent, children) = self
             .ui_state
             .id_stack
@@ -1443,6 +1443,11 @@ impl<'a> Ui<'a> {
             is_active: self.is_active(id),
             rect: self.widget_bounds(id).unwrap_or_default(),
         }
+    }
+
+    #[expect(unused)]
+    fn submit_widget(&mut self, id: UiId) {
+        // TODO:
     }
 
     fn push_child(&mut self) {
@@ -3068,9 +3073,11 @@ impl<'a> Ui<'a> {
     }
 
     /// A child widget that represents a fork in the UI tree
-    pub fn child(&mut self, contents: impl FnOnce(&mut Self)) {
-        self.begin_widget();
-        self.children_content(contents);
+    pub fn child(&mut self, contents: impl FnOnce(&mut Self, WidgetInfo)) {
+        let info = self.begin_widget();
+        let id = info.id;
+        self.children_content(|ui| contents(ui, info));
+        self.submit_widget(id);
     }
 
     fn children_content(&mut self, contents: impl FnOnce(&mut Self)) {
