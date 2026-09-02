@@ -995,6 +995,7 @@ impl<'a> Ui<'a> {
             .iter()
             .for_each(|r| rect = rect.grow_over(*r));
         self.submit_rect(id, rect, self.theme.padding);
+        self.submit_widget(id);
         rect
     }
 
@@ -1263,6 +1264,7 @@ impl<'a> Ui<'a> {
 
         self.image_rect(rect.min_x, rect.min_y, width, height, image, layer);
         self.submit_rect(id, rect, self.theme.padding);
+        self.submit_widget(id);
 
         Response {
             id,
@@ -1327,6 +1329,7 @@ impl<'a> Ui<'a> {
         });
 
         self.submit_rect(id, rect, self.theme.padding);
+        self.submit_widget(id);
 
         let offset = layout_rect(RectLayoutDescriptor {
             padding: Some(Padding::splat(text_padding)),
@@ -1649,6 +1652,7 @@ impl<'a> Ui<'a> {
                 bg_color,
             );
             ui.submit_rect(id, rect, ui.theme.padding);
+            ui.submit_widget(id);
 
             ButtonResponse {
                 id,
@@ -1778,6 +1782,7 @@ impl<'a> Ui<'a> {
         };
         self.color_rect_from_rect(control_box, self.theme.secondary_color, layer + 1);
         self.ui_state.next_bounding_boxes.insert(id, control_box);
+        self.submit_widget(id);
     }
 
     fn horizontal_scroll_bar(
@@ -1841,6 +1846,7 @@ impl<'a> Ui<'a> {
         };
         self.color_rect_from_rect(control_box, self.theme.secondary_color, layer + 1);
         self.ui_state.next_bounding_boxes.insert(id, control_box);
+        self.submit_widget(id);
     }
 
     pub fn scroll_area(&mut self, desc: ScrollDescriptor, contents: impl FnOnce(&mut Self)) {
@@ -1963,6 +1969,7 @@ impl<'a> Ui<'a> {
         }
         self.ui_state.bounds = old_bounds;
         self.submit_rect(id, area_bounds, self.theme.padding);
+        self.submit_widget(id);
     }
 
     fn update_scroll_state(
@@ -2029,6 +2036,7 @@ impl<'a> Ui<'a> {
             ..
         } = self.begin_widget();
         self.submit_rect(id, bounds, self.theme.padding);
+        self.submit_widget(id);
         Response {
             id,
             hovered: is_hovered,
@@ -2122,6 +2130,7 @@ impl<'a> Ui<'a> {
         self.ui_state.scissor_idx = last_scissor;
 
         self.submit_rect(id, content_bounds, self.theme.padding);
+        self.submit_widget(id);
 
         DragResponse {
             is_being_dragged,
@@ -2177,6 +2186,7 @@ impl<'a> Ui<'a> {
 
         let content_bounds = self.history_bounding_rect(history_start);
         self.submit_rect(id, content_bounds, self.theme.padding);
+        self.submit_widget(id);
 
         let background = if state.hovered {
             self.theme.drop_target_hovered.as_ref()
@@ -2506,6 +2516,7 @@ impl<'a> Ui<'a> {
         rect.max_x += p_right;
         rect.max_y += p_bot;
         self.submit_rect(id, rect, self.theme.padding);
+        self.submit_widget(id);
         self.ui_state.layer = last_layer;
         Response {
             hovered: is_hovered,
@@ -2555,6 +2566,7 @@ impl<'a> Ui<'a> {
         let mut rect = self.history_bounding_rect(history_start);
         self.ui_state.bounds = bounds;
         self.submit_rect(id, rect, self.theme.padding);
+        self.submit_widget(id);
         self.ui_state.layer = last_layer;
 
         rect.min_x -= r;
@@ -2679,6 +2691,7 @@ impl<'a> Ui<'a> {
                 context_bounds.max_y + p_bot + outline_size,
             );
             self.submit_rect(id, bounds, self.theme.padding);
+            self.submit_widget(id);
             if self.contains_mouse(id) {
                 self.next_ids
                     .push(id, CONTEXT_LAYER)
@@ -2805,6 +2818,7 @@ impl<'a> Ui<'a> {
         self.ui_state.layer = layer;
 
         self.submit_rect(id, toggle_rect, None);
+        self.submit_widget(id);
         Response {
             id,
             hovered: is_hovered,
@@ -2891,6 +2905,7 @@ impl<'a> Ui<'a> {
                 context_bounds.max_y + p_bot + outline_size,
             );
             self.submit_rect(id, bounds, self.theme.padding);
+            self.submit_widget(id);
             if self.contains_mouse(id) {
                 self.next_ids
                     .push(id, CONTEXT_LAYER)
@@ -3026,6 +3041,7 @@ impl<'a> Ui<'a> {
         self.ui_state.scissor_idx = scissor;
 
         self.submit_rect(id, target_bounds, self.theme.padding);
+        self.submit_widget(id);
     }
 
     /// Add a margin around the inner contents
@@ -3049,6 +3065,7 @@ impl<'a> Ui<'a> {
 
         let bounds = self.history_bounding_rect(history_start);
         self.submit_rect(id, bounds, m);
+        self.submit_widget(id);
     }
 
     /// Add background to the widget. If background is None, then the Theme background is used
@@ -3071,6 +3088,7 @@ impl<'a> Ui<'a> {
             background.unwrap_or_else(|| self.theme.background.clone()),
         );
         self.submit_rect(id, bounds, self.theme.padding);
+        self.submit_widget(id);
     }
 
     /// A child widget that represents a fork in the UI tree
@@ -3142,6 +3160,7 @@ impl<'a> Ui<'a> {
         let bounds = self.history_bounding_rect(history_start);
 
         self.submit_rect(id, bounds, self.theme.padding);
+        self.submit_widget(id);
 
         let mut state = self.get_memory_or_default::<TooltipState>(id).borrow_mut();
 
@@ -4028,6 +4047,7 @@ fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'
     );
 
     ui.submit_rect(title_id, title_bounds, ui.theme.padding);
+    ui.submit_widget(title_id);
     ui.color_rect_from_rect(title_bounds, ui.theme.window_title_color, WINDOW_LAYER);
 
     request_close
