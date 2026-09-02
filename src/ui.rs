@@ -73,6 +73,7 @@ impl Plugin for UiPlugin {
         app.insert_resource(UiInputs::default());
         app.insert_resource(NextUiInputs::default());
         app.insert_resource(WidgetTree::default());
+        app.insert_resource(WidgetEntities::default());
         match clipboard_rs::ClipboardContext::new() {
             Ok(ctx) => {
                 app.insert_resource(ctx);
@@ -88,7 +89,7 @@ impl Plugin for UiPlugin {
         }
 
         app.with_stage(Stage::PreUpdate, |s| {
-            s.add_system(begin_frame);
+            s.add_system(begin_frame).add_system(insert_entities);
         });
         app.with_stage(Stage::PostUpdate, |s| {
             s.add_nested_stage(
@@ -101,7 +102,8 @@ impl Plugin for UiPlugin {
             .add_system(update_ids)
             .add_system(shaping_gc_system)
             .add_system(update_ui_inputs.after(update_ids))
-            .add_system(gc_memory);
+            .add_system(gc_memory)
+            .add_system(gc_stale_entities);
         });
     }
 }
@@ -1440,13 +1442,32 @@ impl<'a> Ui<'a> {
         if is_hovered {
             self.set_hovered(id);
         }
+
+        let entity = self.entity_mapping.0.get(&id).copied();
+
+        if entity.is_none() {
+            self.with_entity_commands(id, |cmd| {
+                cmd.insert_bundle(widget_archetype(id, ParentWidget(parent)));
+            });
+        }
+
         WidgetInfo {
             id,
             parent,
             is_hovered,
             is_active: self.is_active(id),
             rect: self.widget_bounds(id).unwrap_or_default(),
+            entity,
         }
+    }
+
+    fn with_entity_commands(&mut self, id: UiId, callback: impl FnOnce(&mut EntityCommands)) {
+        let cmd = match self.entity_mapping.0.get(&id) {
+            Some(id) => self.cmd.entity(*id),
+            None => self.cmd.spawn(),
+        };
+
+        callback(cmd);
     }
 
     fn submit_widget(&mut self, id: UiId) {
@@ -3645,6 +3666,8 @@ query_collection! {
         ui_inputs: ResMut<'a, NextUiInputs>,
         pub clipboard: Option<Res<'a, clipboard_rs::ClipboardContext>>,
         tree: ResMut<'a, WidgetTree>,
+        entity_mapping: ResMut<'a, WidgetEntities>,
+        cmd: Commands<'a>,
     }
 }
 
@@ -4447,6 +4470,8 @@ pub struct WidgetInfo {
     pub is_hovered: bool,
     pub is_active: bool,
     pub rect: UiRect,
+    /// None the first time this widget is called
+    pub entity: Option<EntityId>,
 }
 
 #[derive(Debug, Default)]
@@ -4489,3 +4514,34 @@ struct PanelState {
 /// Reverse-BFS order of UI widgets created in this frame
 #[derive(Default)]
 struct WidgetTree(pub Vec<UiId>);
+
+#[derive(Default)]
+struct WidgetEntities(pub HashMap<UiId, EntityId>);
+
+fn gc_stale_entities(
+    mut cmd: Commands,
+    tree: Res<WidgetTree>,
+    mut mapping: ResMut<WidgetEntities>,
+) {
+    let tree: HashSet<&UiId> = tree.0.iter().collect();
+
+    mapping.0.retain(|k, v| {
+        let retain = tree.contains(k);
+        if !retain {
+            cmd.delete(*v);
+        }
+        retain
+    });
+}
+
+fn insert_entities(q: Query<(EntityId, &UiId)>, mut mapping: ResMut<WidgetEntities>) {
+    for (v, k) in q.iter() {
+        *mapping.0.entry(*k).or_default() = v;
+    }
+}
+
+pub struct ParentWidget(pub UiId);
+
+fn widget_archetype(id: UiId, parent: ParentWidget) -> impl Bundle {
+    (id, parent)
+}
