@@ -38,7 +38,6 @@ use winit::{
 use parking_lot::Mutex;
 use std::{
     any::{TypeId, type_name},
-    collections::{HashMap, HashSet},
     sync::{Arc, atomic::AtomicBool},
     thread::JoinHandle,
     time::Duration,
@@ -52,6 +51,9 @@ use winit::event_loop::EventLoop;
 use cecs::{prelude::*, systems::SystemStageBuilder};
 
 use crate::asset_registry::AssetRegistryPlugin;
+
+pub type HashMap<K, V> = rustc_hash::FxHashMap<K, V>;
+pub type HashSet<T> = rustc_hash::FxHashSet<T>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Time(pub instant::Instant);

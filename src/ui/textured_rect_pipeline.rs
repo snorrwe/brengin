@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use crate::HashMap;
 use std::mem::size_of;
 
 use crate::assets::{AssetId, Assets, Handle, WeakHandle};

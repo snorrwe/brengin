@@ -3,6 +3,7 @@ use crate::{
     assets::{self, Assets, AssetsPlugin, Handle, WeakHandle},
     color::Color,
 };
+use crate::{HashMap, HashSet};
 
 pub mod color_rect_pipeline;
 pub mod rect;
@@ -19,7 +20,6 @@ mod tests;
 use std::{
     any::TypeId,
     cell::RefCell,
-    collections::{HashMap, HashSet},
     ffi::c_void,
     hash::Hash,
     mem,

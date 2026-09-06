@@ -12,7 +12,8 @@ pub mod sprite_sheet;
 #[cfg(test)]
 mod tests;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use crate::{HashMap, HashSet};
+use std::collections::BTreeMap;
 
 use cecs::prelude::*;
 use glam::{FloatExt as _, Vec2};
@@ -748,7 +749,7 @@ fn add_missing_instance_buffers(
                 mesh: mesh.into(),
             })
         })
-        .fold(HashSet::new(), |mut a, b| {
+        .fold(HashSet::default(), |mut a, b| {
             a.insert(b);
             a
         });

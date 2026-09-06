@@ -3,11 +3,11 @@ pub mod asset_stats;
 
 pub mod asset_id;
 
+use crate::HashMap;
 pub use asset_id::AssetId;
 
 use cecs::{Component, prelude::*};
 use std::{
-    collections::HashMap,
     marker::PhantomData,
     ptr::NonNull,
     sync::atomic::{AtomicU64, AtomicUsize, Ordering},

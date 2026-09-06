@@ -4,9 +4,9 @@ pub mod font_loader;
 pub mod image_loader;
 pub mod sprite_sheet_loader;
 
-use std::{
-    any::TypeId, collections::HashMap, path::PathBuf, sync::Arc, thread::available_parallelism,
-};
+use crate::HashMap;
+
+use std::{any::TypeId, path::PathBuf, sync::Arc, thread::available_parallelism};
 
 use cecs::systems::SystemStageBuilder;
 
