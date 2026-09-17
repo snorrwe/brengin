@@ -21,6 +21,7 @@ use std::{
     any::TypeId,
     cell::RefCell,
     ffi::c_void,
+    fmt::Display,
     hash::Hash,
     mem,
     ops::{Deref, DerefMut, RangeBounds},
@@ -2815,9 +2816,9 @@ impl<'a> Ui<'a> {
 
     pub fn select<'b, T>(&mut self, current: &'b T, options: &'b [T]) -> SelectResponse
     where
-        &'b T: Eq + AsRef<str>,
+        &'b T: Eq + Display,
     {
-        let resp = self.button(format!("{}", current.as_ref()));
+        let resp = self.button(format!("{}", current));
 
         let parent_id = resp.id;
 
@@ -2868,7 +2869,7 @@ impl<'a> Ui<'a> {
                 ui.vertical(None, |ui| {
                     // TODO: highlight if matches current
                     for (i, t) in options.iter().enumerate() {
-                        if ui.button(t.as_ref()).pressed() {
+                        if ui.button(t.to_string()).pressed() {
                             selected = Some(i);
                             state.open = false;
                         }
