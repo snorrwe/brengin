@@ -1940,15 +1940,15 @@ impl<'a> Ui<'a> {
         self.ui_state.layer = layer;
         self.ui_state.scissor_idx = scissor_idx;
 
-        let p_horizontal = self.theme.padding.horizonal(bounds.width());
-        let p_vertical = self.theme.padding.vertical(bounds.height());
+        let p_horizontal = self.theme.padding.horizonal(area_bounds.width());
+        let p_vertical = self.theme.padding.vertical(area_bounds.height());
 
         // compute the area of the scroll. Area = content bounds - viewport, so only the overlap is
         // counted
-        state.scroll_width =
-            (children_bounds.width() - width + p_horizontal + scroll_bar_size).max(0);
-        state.scroll_height =
-            (children_bounds.height() - height + p_vertical + scroll_bar_size).max(0);
+        let content_width = children_bounds.max_x + offset_x as i32 - area_bounds.min_x;
+        let content_height = children_bounds.max_y + offset_y as i32 - area_bounds.min_y;
+        state.scroll_width = (content_width - width + p_horizontal + scroll_bar_size).max(0);
+        state.scroll_height = (content_height - height + p_vertical + scroll_bar_size).max(0);
 
         if desc.width.is_some() {
             let mut scissor_bounds = scissor_bounds;
