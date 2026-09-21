@@ -2249,7 +2249,10 @@ impl<'a> Ui<'a> {
         let layer = self.ui_state.layer;
 
         let mut state = self
-            .get_memory_or_default::<TextInputState>(id)
+            .get_memory_or_insert::<TextInputState>(id, || TextInputState {
+                cursor: desc.content.len(),
+                ..Default::default()
+            })
             .borrow_mut();
 
         let mut changed = false;
