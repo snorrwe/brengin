@@ -10,7 +10,7 @@ pub mod rect;
 pub mod text;
 pub mod text_rect_pipeline;
 pub mod textured_rect_pipeline;
-pub(crate) mod window_order;
+pub mod window_order;
 
 pub use clipboard_rs;
 
@@ -35,7 +35,7 @@ use glam::IVec2;
 use image::DynamicImage;
 use text_rect_pipeline::DrawTextRect;
 use textured_rect_pipeline::DrawTextureRect;
-pub(crate) use window_order::{WindowOrder, layer_in_band, next_base};
+use window_order::{WindowOrder, layer_in_band, next_base};
 use winit::{
     dpi::PhysicalPosition,
     event::{MouseButton, MouseScrollDelta},
@@ -524,6 +524,10 @@ impl UiState {
                 next: IVec2::new(100, 100),
             },
         }
+    }
+
+    pub fn window_order(&self) -> &WindowOrder {
+        &self.window_order
     }
 }
 
