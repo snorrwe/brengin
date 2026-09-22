@@ -10,9 +10,9 @@ pub mod rect;
 pub mod text;
 pub mod text_rect_pipeline;
 pub mod textured_rect_pipeline;
+pub(crate) mod window_order;
 
 pub use clipboard_rs;
-use clipboard_rs::Clipboard;
 
 #[cfg(test)]
 mod tests;
@@ -30,10 +30,12 @@ use std::{
 };
 
 use cecs::{prelude::*, query_collection};
+use clipboard_rs::Clipboard;
 use glam::IVec2;
 use image::DynamicImage;
 use text_rect_pipeline::DrawTextRect;
 use textured_rect_pipeline::DrawTextureRect;
+pub(crate) use window_order::{WindowOrder, layer_in_band, next_base};
 use winit::{
     dpi::PhysicalPosition,
     event::{MouseButton, MouseScrollDelta},
@@ -184,6 +186,7 @@ fn update_ids(
         if idset.has_added_flag(InteractionFlag::Hovered) {
             lhs.hovered.insert(idset.id);
             lhs.top_hovered = idset.id;
+            lhs.top_hovered_layer = idset.layer;
         }
         if idset.has_added_flag(InteractionFlag::Active) {
             lhs.active = idset.id;
@@ -209,6 +212,8 @@ pub struct UiIds {
     hovered: HashSet<UiId>,
     /// Topmost hovered widget
     top_hovered: UiId,
+    /// Layer of the topmost hovered widget
+    top_hovered_layer: u16,
     active: UiId,
     dragged: UiId,
     context_menu: UiId,
@@ -219,6 +224,7 @@ impl UiIds {
     pub fn clear(&mut self) {
         self.hovered.clear();
         self.top_hovered = UiId::SENTINEL;
+        self.top_hovered_layer = 0;
         self.active = UiId::SENTINEL;
         self.dragged = UiId::SENTINEL;
         self.context_menu = UiId::SENTINEL;
@@ -356,6 +362,9 @@ pub struct UiState {
 
     /// Layers go from back to front
     layer: u16,
+    /// Highest layer emitted since this was last reset, ignoring layers at or
+    /// above `CONTEXT_LAYER`. Used to measure a window's band height.
+    max_layer: u16,
 
     /// used for writing
     next_bounding_boxes: NextBoundingBoxes,
@@ -371,6 +380,10 @@ pub struct UiState {
     layout_dir: LayoutDirection,
 
     windows: HashMap<String, WindowState>,
+    window_order: WindowOrder,
+    /// First free layer above every window's band, for windows created
+    /// mid-frame.
+    next_window_base: u16,
     fallback_font: OwnedTypeFace,
 
     window_allocator: WindowAllocator,
@@ -490,6 +503,7 @@ impl UiState {
             bounds: Default::default(),
             viewport: Default::default(),
             layer: 0,
+            max_layer: 0,
             next_bounding_boxes: Default::default(),
             last_bounding_boxes: Default::default(),
             rect_history: Default::default(),
@@ -497,6 +511,8 @@ impl UiState {
             root_children: 0,
             layout_dir: LayoutDirection::TopDown(HorizontalAlignment::Left),
             windows: Default::default(),
+            window_order: Default::default(),
+            next_window_base: WINDOW_LAYER,
             fallback_font: text::parse_font(
                 include_bytes!("./ui/Roboto-Regular.ttf")
                     .to_vec()
@@ -674,6 +690,8 @@ impl<'a> Ui<'a> {
         &mut self,
         window_bounds: UiRect,
         desc: &WindowDescriptor,
+        base: u16,
+        height: u16,
         horizontal: bool,
         vertical: bool,
     ) {
@@ -706,9 +724,9 @@ impl<'a> Ui<'a> {
         let WidgetInfo {
             id: drag_id,
             is_active,
-            is_hovered,
             ..
         } = self.begin_widget();
+        let is_hovered = self.contains_mouse(drag_id) && self.is_top_hovered_window(base, height);
         if is_active {
             if self.mouse_down() {
                 self.set_active(drag_id);
@@ -739,7 +757,7 @@ impl<'a> Ui<'a> {
             }
         }
         if is_hovered {
-            self.color_rect_from_rect(drag_bounds, self.theme.primary_color, CONTEXT_LAYER);
+            self.color_rect_from_rect(drag_bounds, self.theme.primary_color, base + 1);
         }
         self.ui_state
             .next_bounding_boxes
@@ -747,10 +765,16 @@ impl<'a> Ui<'a> {
         ///////////////////////
     }
 
-    fn window_decorators(&mut self, window_bounds: UiRect, desc: &WindowDescriptor) {
-        self.window_resize(window_bounds, desc, false, true);
-        self.window_resize(window_bounds, desc, true, false);
-        self.window_resize(window_bounds, desc, true, true);
+    fn window_decorators(
+        &mut self,
+        window_bounds: UiRect,
+        desc: &WindowDescriptor,
+        base: u16,
+        height: u16,
+    ) {
+        self.window_resize(window_bounds, desc, base, height, false, true);
+        self.window_resize(window_bounds, desc, base, height, true, false);
+        self.window_resize(window_bounds, desc, base, height, true, true);
     }
 
     /// returns the last scissor_idx
@@ -860,6 +884,13 @@ impl<'a> Ui<'a> {
     #[inline]
     pub fn is_top_hovered(&self, id: UiId) -> bool {
         self.ids.top_hovered == id
+    }
+
+    /// True when the topmost hovered widget belongs to the window whose band
+    /// starts at `base`, so nothing from another window covers this point.
+    #[inline]
+    fn is_top_hovered_window(&self, base: u16, height: u16) -> bool {
+        layer_in_band(self.ids.top_hovered_layer, base, height)
     }
 
     #[inline]
@@ -1075,6 +1106,7 @@ impl<'a> Ui<'a> {
         color: Color,
         layer: u16,
     ) {
+        self.record_layer(layer);
         assert!(!self.ui_state.scissors.is_empty());
         let scissor = self.ui_state.scissor_idx;
         self.ui_state.color_rects.push(DrawColorRect {
@@ -1100,6 +1132,7 @@ impl<'a> Ui<'a> {
         outline_color: Color,
         layer: u16,
     ) {
+        self.record_layer(layer);
         assert!(!self.ui_state.scissors.is_empty());
         let scissor = self.ui_state.scissor_idx;
         self.ui_state.color_rects.push(DrawColorRect {
@@ -1125,6 +1158,7 @@ impl<'a> Ui<'a> {
         image: Handle<DynamicImage>,
         layer: u16,
     ) {
+        self.record_layer(layer);
         assert!(!self.ui_state.scissors.is_empty());
         let scissor = self.ui_state.scissor_idx;
         self.ui_state.texture_rects.push(DrawTextureRect {
@@ -1148,6 +1182,7 @@ impl<'a> Ui<'a> {
         layer: u16,
         shaping: Handle<ShapingResult>,
     ) {
+        self.record_layer(layer);
         assert!(!self.ui_state.scissors.is_empty());
         let scissor = self.ui_state.scissor_idx;
         self.ui_state.text_rects.push(DrawTextRect {
@@ -2135,10 +2170,24 @@ impl<'a> Ui<'a> {
         }
     }
 
+    /// Track the highest layer used, so a window can measure how tall its band
+    /// needs to be.
+    ///
+    /// Context menus, tooltips and dragged widgets draw at or above
+    /// `CONTEXT_LAYER` on purpose, above every window. Counting those would
+    /// inflate the band of whichever window happened to open them.
+    #[inline]
+    fn record_layer(&mut self, layer: u16) {
+        if layer < CONTEXT_LAYER {
+            self.ui_state.max_layer = self.ui_state.max_layer.max(layer);
+        }
+    }
+
     /// return the previous layer
     fn push_layer(&mut self) -> u16 {
         let l = self.ui_state.layer;
-        self.ui_state.layer += 1;
+        self.ui_state.layer = self.ui_state.layer.saturating_add(1);
+        self.record_layer(self.ui_state.layer);
         l
     }
 
@@ -3528,6 +3577,7 @@ impl<'a> Columns<'a> {
         let w = ctx.ui_state.bounds.width();
         let layer = ctx.ui_state.layer;
         ctx.ui_state.layer += 1;
+        ctx.record_layer(ctx.ui_state.layer);
         ctx.push_child();
         ctx.begin_widget();
         let history_start = ctx.ui_state.rect_history.len();
@@ -3583,6 +3633,33 @@ fn begin_frame(
     mut next_inputs: ResMut<NextUiInputs>,
 ) {
     let ui = &mut *ui;
+
+    ui.window_order.apply_raise();
+    {
+        let UiState {
+            window_order,
+            windows,
+            next_window_base,
+            ..
+        } = &mut *ui;
+        window_order
+            .order
+            .retain(|name| (|name| windows.get(name).map(|w| w.drawn).unwrap_or(false))(name));
+
+        let mut base = WINDOW_LAYER;
+        for name in {
+            let this = &window_order;
+            this.order.iter().map(|n| n.as_str())
+        } {
+            let Some(state) = windows.get_mut(name) else {
+                continue;
+            };
+            state.base = base;
+            state.drawn = false;
+            base = next_base(base, state.height);
+        }
+        *next_window_base = base;
+    }
 
     ui.layout_dir = LayoutDirection::TopDown(HorizontalAlignment::Left);
     ui.root_hash = 0;
@@ -3644,6 +3721,12 @@ struct WindowState {
     drag_start: PhysicalPosition<f64>,
     content_size: IVec2,
     size: IVec2,
+    /// First layer of this window's band, assigned by `begin_frame`.
+    base: u16,
+    /// Layers this window used. Only ever grows.
+    height: u16,
+    /// Set while the window is drawn, cleared by `begin_frame`.
+    drawn: bool,
 }
 
 pub struct WindowDescriptor<'a> {
@@ -3671,6 +3754,10 @@ impl<'a> Default for WindowDescriptor<'a> {
 }
 
 pub const WINDOW_LAYER: u16 = 100;
+/// Layers of headroom added to a window's measured band height.
+pub const WINDOW_LAYER_SLACK: u16 = 4;
+/// Band height assumed for a window on the frame it is created.
+pub const DEFAULT_WINDOW_HEIGHT: u16 = 8;
 pub const CONTEXT_LAYER: u16 = 10000;
 pub const DRAG_LAYER: u16 = 10000;
 
@@ -3706,6 +3793,7 @@ impl<'a> UiRoot<'a> {
         contents: impl FnOnce(&mut Ui),
     ) -> WindowResponse {
         let mut allocator = mem::take(&mut self.ui.ui_state.window_allocator);
+        let mut next_window_base = self.ui.ui_state.next_window_base;
         let old_bounds = self.ui.ui_state.bounds;
         let state: &mut WindowState = self
             .ui
@@ -3722,6 +3810,9 @@ impl<'a> UiRoot<'a> {
                     drag_anchor: Default::default(),
                     drag_start: Default::default(),
                     content_size: IVec2::ZERO,
+                    base: WINDOW_LAYER,
+                    height: DEFAULT_WINDOW_HEIGHT,
+                    drawn: true,
                 }
             });
 
@@ -3742,6 +3833,24 @@ impl<'a> UiRoot<'a> {
             max_y: state.pos.y + self.ui.theme.window_title_height as i32,
         };
 
+        let z = self.ui.ui_state.window_order.z_of(desc.name);
+
+        if !self
+            .ui
+            .ui_state
+            .window_order
+            .order
+            .iter()
+            .any(|n| n == desc.name)
+        {
+            let state = self.ui.ui_state.windows.get_mut(desc.name).unwrap();
+            state.base = next_window_base;
+            next_window_base = next_base(next_window_base, state.height);
+        }
+        let base_layer = self.ui.ui_state.windows.get(desc.name).unwrap().base;
+        let band_height = self.ui.ui_state.windows.get(desc.name).unwrap().height;
+        self.ui.ui_state.max_layer = base_layer;
+
         self.ui.ui_state.root_hash = fnv_1a(desc.name.as_bytes());
         self.ui.ui_state.root_children = 0;
         self.ui.push_child();
@@ -3752,13 +3861,21 @@ impl<'a> UiRoot<'a> {
         let mut close_requested = false;
 
         self.ui.children_content(|ui| {
-            ui.ui_state.layer = WINDOW_LAYER;
+            ui.ui_state.layer = base_layer;
             // window background
             let window_bounds = UiRect {
                 max_x: bounds.min_x + width + padding * 2,
                 max_y: bounds.min_y + height + padding * 2,
                 ..bounds
             };
+            let cursor = ui.mouse.cursor_position;
+            if ui.mouse.just_pressed.contains(&MouseButton::Left)
+                && window_bounds
+                    .grow_over(title_bounds)
+                    .contains_point(cursor.x as i32, cursor.y as i32)
+            {
+                ui.ui_state.window_order.raise(z, desc.name);
+            }
             ui.color_rect_with_outline(
                 title_bounds.min_x,
                 title_bounds.min_y,
@@ -3767,20 +3884,20 @@ impl<'a> UiRoot<'a> {
                 Color::TRANSPARENT_BLACK,
                 2,
                 ui.theme.window_outline_color,
-                WINDOW_LAYER,
+                base_layer,
             );
             ui.theme_rect(
                 bounds.min_x,
                 bounds.min_y,
                 width + padding * 2,
                 height + padding * 2,
-                WINDOW_LAYER,
+                base_layer,
                 ui.theme().window_background.clone(),
             );
             ///////////////////////
             // Title
             if desc.show_title {
-                close_requested = window_title(&desc, title_bounds, ui);
+                close_requested = window_title(&desc, title_bounds, base_layer, ui);
             }
             ///////////////////////
             ///////////////////////
@@ -3795,12 +3912,13 @@ impl<'a> UiRoot<'a> {
                 content_bounds.shrink_x(2 * padding);
                 content_bounds.shrink_y(2 * padding);
                 ui.ui_state.bounds = content_bounds;
-                ui.ui_state.layer = WINDOW_LAYER + 2;
+                ui.ui_state.layer = base_layer + 2;
                 ui.children_content(contents);
             }
             let child_history = mem::replace(&mut ui.ui_state.rect_history, history);
             let children_bounds = bounding_rect(&child_history);
             let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
+            state.drawn = true;
             let size = children_bounds.size();
             if size.x > state.content_size.x || size.y > state.content_size.y {
                 state.content_size = size;
@@ -3808,12 +3926,18 @@ impl<'a> UiRoot<'a> {
                 state.size.y = (size.y).max(5) + ui.theme.window_title_height as i32;
             }
             ui.ui_state.scissor_idx = scissor;
-            ui.window_decorators(window_bounds, &desc);
+            ui.window_decorators(window_bounds, &desc, base_layer, band_height);
+
+            let measured =
+                ui.ui_state.max_layer.saturating_sub(base_layer) + 1 + WINDOW_LAYER_SLACK;
+            let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
+            state.height = state.height.max(measured);
         });
         ///////////////////////
         self.ui.ui_state.bounds = old_bounds;
 
         self.ui.ui_state.window_allocator = allocator;
+        self.ui.ui_state.next_window_base = next_window_base;
         self.ui.pop_child();
 
         WindowResponse { close_requested }
@@ -3984,7 +4108,12 @@ impl<'a> UiRoot<'a> {
 }
 
 /// Return true if close was requested
-fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'_>) -> bool {
+fn window_title(
+    desc: &WindowDescriptor<'_>,
+    title_bounds: UiRect,
+    base: u16,
+    ui: &mut Ui<'_>,
+) -> bool {
     ui.ui_state.bounds = title_bounds;
     ui.push_scissor(title_bounds);
     let WidgetInfo {
@@ -3992,6 +4121,7 @@ fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'
         is_active,
         ..
     } = ui.begin_widget();
+    let height = ui.ui_state.windows.get(desc.name).unwrap().height;
     if is_active {
         if ui.mouse_down() {
             ui.set_active(title_id);
@@ -4008,7 +4138,11 @@ fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'
 
         state.pos = drag_anchor + offset;
     } else {
-        if !ui.is_anything_active() && ui.contains_mouse(title_id) && ui.mouse_down() {
+        if !ui.is_anything_active()
+            && ui.contains_mouse(title_id)
+            && ui.is_top_hovered_window(base, height)
+            && ui.mouse_down()
+        {
             let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
             state.drag_start = ui.mouse.cursor_position;
             state.drag_anchor = state.pos;
@@ -4031,7 +4165,7 @@ fn window_title(desc: &WindowDescriptor<'_>, title_bounds: UiRect, ui: &mut Ui<'
     );
 
     ui.submit_rect(title_id, title_bounds, ui.theme.padding);
-    ui.color_rect_from_rect(title_bounds, ui.theme.window_title_color, WINDOW_LAYER);
+    ui.color_rect_from_rect(title_bounds, ui.theme.window_title_color, base);
 
     request_close
 }
