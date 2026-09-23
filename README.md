@@ -80,4 +80,4 @@ Linux Windows MacOS
 
 ## License
 
-MIT, see [LICENSE].
+MIT, see [LICENSE](LICENSE).
