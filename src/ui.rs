@@ -1989,7 +1989,7 @@ impl<'a> Ui<'a> {
         state.scroll_width = (content_width - width + p_horizontal + scroll_bar_size).max(0);
         state.scroll_height = (content_height - height + p_vertical + scroll_bar_size).max(0);
 
-        if desc.width.is_some() {
+        if desc.width.is_some() && content_width > width {
             let mut scissor_bounds = scissor_bounds;
             if desc.height.is_some() {
                 // prevent overlap
@@ -1997,7 +1997,7 @@ impl<'a> Ui<'a> {
             }
             self.horizontal_scroll_bar(&scissor_bounds, scroll_bar_size, layer, &mut state);
         }
-        if desc.height.is_some() {
+        if desc.height.is_some() && content_height > height {
             self.vertical_scroll_bar(&scissor_bounds, scroll_bar_size, layer, &mut state);
         }
         self.ui_state.bounds = old_bounds;
