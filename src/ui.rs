@@ -1403,24 +1403,8 @@ impl<'a> Ui<'a> {
         rect_inflated.min_y -= p_top;
         rect_inflated.max_y += p_bot;
 
-        match self.ui_state.layout_dir {
-            LayoutDirection::TopDown(_) => {
-                self.ui_state.bounds.min_y = rect_inflated.max_y;
-            }
-            LayoutDirection::LeftRight(_) => {
-                self.ui_state.bounds.min_x = rect_inflated.max_x;
-            }
-            LayoutDirection::BottomUp(_) => {
-                self.ui_state.bounds.max_y = rect_inflated.min_y;
-            }
-            LayoutDirection::RightLeft(_) => {
-                self.ui_state.bounds.max_x = rect_inflated.min_x;
-            }
-            LayoutDirection::Center => { /*noop*/ }
-        }
-
-        self.ui_state.bounds.min_x = self.ui_state.bounds.min_x.min(self.ui_state.bounds.max_x);
-        self.ui_state.bounds.min_y = self.ui_state.bounds.min_y.min(self.ui_state.bounds.max_y);
+        let dir = self.ui_state.layout_dir;
+        advance_layout_bounds(&mut self.ui_state.bounds, dir, rect_inflated);
 
         // these are considered during interactions, no padding is added
         self.ui_state.next_bounding_boxes.insert(id, rect_original);
@@ -1931,38 +1915,7 @@ impl<'a> Ui<'a> {
         bounds.offset_x(-offset_x as i32);
         bounds.offset_y(-offset_y as i32);
 
-        const BOUNDS_LIMIT: i32 = i32::MAX / 4;
-
-        if desc.width.is_some() {
-            match self.ui_state.layout_dir {
-                LayoutDirection::LeftRight(_) => {
-                    bounds.max_x = BOUNDS_LIMIT;
-                }
-                LayoutDirection::RightLeft(_) => {
-                    bounds.min_x = -BOUNDS_LIMIT;
-                }
-                LayoutDirection::Center => {
-                    bounds.min_x = -BOUNDS_LIMIT;
-                    bounds.max_x = BOUNDS_LIMIT;
-                }
-                _ => {}
-            }
-        }
-        if desc.height.is_some() {
-            match self.ui_state.layout_dir {
-                LayoutDirection::TopDown(_) => {
-                    bounds.max_y = BOUNDS_LIMIT;
-                }
-                LayoutDirection::BottomUp(_) => {
-                    bounds.min_y = -BOUNDS_LIMIT;
-                }
-                LayoutDirection::Center => {
-                    bounds.min_y = -BOUNDS_LIMIT;
-                    bounds.max_y = BOUNDS_LIMIT;
-                }
-                _ => {}
-            }
-        }
+        expand_scroll_bounds(&mut bounds, desc, self.ui_state.layout_dir);
 
         self.ui_state.bounds = bounds;
         let scissor_idx = self.push_scissor(scissor_bounds);
@@ -3221,6 +3174,58 @@ impl<'a> Ui<'a> {
         } else {
             state.hovered_seconds = 0.0;
             state.anchor.take();
+        }
+    }
+}
+
+fn advance_layout_bounds(bounds: &mut UiRect, dir: LayoutDirection, rect: UiRect) {
+    match dir {
+        LayoutDirection::TopDown(_) => bounds.min_y = rect.max_y,
+        LayoutDirection::LeftRight(_) => bounds.min_x = rect.max_x,
+        LayoutDirection::BottomUp(_) => bounds.max_y = rect.min_y,
+        LayoutDirection::RightLeft(_) => bounds.max_x = rect.min_x,
+        LayoutDirection::Center => {}
+    }
+
+    bounds.min_x = bounds.min_x.min(bounds.max_x);
+    bounds.min_y = bounds.min_y.min(bounds.max_y);
+}
+
+/// Give scrollable axes room to grow regardless of the parent's primary layout axis.
+/// On a cross axis, keep the edge used for alignment anchored to the viewport.
+fn expand_scroll_bounds(bounds: &mut UiRect, desc: ScrollDescriptor, dir: LayoutDirection) {
+    const BOUNDS_LIMIT: i32 = i32::MAX / 4;
+
+    if desc.width.is_some() {
+        match dir {
+            LayoutDirection::LeftRight(_)
+            | LayoutDirection::TopDown(HorizontalAlignment::Left)
+            | LayoutDirection::BottomUp(HorizontalAlignment::Left) => bounds.max_x = BOUNDS_LIMIT,
+            LayoutDirection::RightLeft(_)
+            | LayoutDirection::TopDown(HorizontalAlignment::Right)
+            | LayoutDirection::BottomUp(HorizontalAlignment::Right) => bounds.min_x = -BOUNDS_LIMIT,
+            LayoutDirection::Center
+            | LayoutDirection::TopDown(HorizontalAlignment::Center)
+            | LayoutDirection::BottomUp(HorizontalAlignment::Center) => {
+                bounds.min_x = -BOUNDS_LIMIT;
+                bounds.max_x = BOUNDS_LIMIT;
+            }
+        }
+    }
+    if desc.height.is_some() {
+        match dir {
+            LayoutDirection::TopDown(_)
+            | LayoutDirection::LeftRight(VerticalAlignment::Top)
+            | LayoutDirection::RightLeft(VerticalAlignment::Top) => bounds.max_y = BOUNDS_LIMIT,
+            LayoutDirection::BottomUp(_)
+            | LayoutDirection::LeftRight(VerticalAlignment::Bottom)
+            | LayoutDirection::RightLeft(VerticalAlignment::Bottom) => bounds.min_y = -BOUNDS_LIMIT,
+            LayoutDirection::Center
+            | LayoutDirection::LeftRight(VerticalAlignment::Center)
+            | LayoutDirection::RightLeft(VerticalAlignment::Center) => {
+                bounds.min_y = -BOUNDS_LIMIT;
+                bounds.max_y = BOUNDS_LIMIT;
+            }
         }
     }
 }
