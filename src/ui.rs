@@ -1915,8 +1915,7 @@ impl<'a> Ui<'a> {
         bounds.offset_x(-offset_x as i32);
         bounds.offset_y(-offset_y as i32);
 
-        expand_scroll_bounds(&mut bounds, desc, self.ui_state.layout_dir);
-
+        // Grids and percentage sizes need finite bounds, even when scrolling.
         self.ui_state.bounds = bounds;
         let scissor_idx = self.push_scissor(scissor_bounds);
 
@@ -3179,54 +3178,25 @@ impl<'a> Ui<'a> {
 }
 
 fn advance_layout_bounds(bounds: &mut UiRect, dir: LayoutDirection, rect: UiRect) {
+    // Collapse exhausted space at the cursor instead of clamping the cursor back.
     match dir {
-        LayoutDirection::TopDown(_) => bounds.min_y = rect.max_y,
-        LayoutDirection::LeftRight(_) => bounds.min_x = rect.max_x,
-        LayoutDirection::BottomUp(_) => bounds.max_y = rect.min_y,
-        LayoutDirection::RightLeft(_) => bounds.max_x = rect.min_x,
+        LayoutDirection::TopDown(_) => {
+            bounds.min_y = rect.max_y;
+            bounds.max_y = bounds.max_y.max(bounds.min_y);
+        }
+        LayoutDirection::LeftRight(_) => {
+            bounds.min_x = rect.max_x;
+            bounds.max_x = bounds.max_x.max(bounds.min_x);
+        }
+        LayoutDirection::BottomUp(_) => {
+            bounds.max_y = rect.min_y;
+            bounds.min_y = bounds.min_y.min(bounds.max_y);
+        }
+        LayoutDirection::RightLeft(_) => {
+            bounds.max_x = rect.min_x;
+            bounds.min_x = bounds.min_x.min(bounds.max_x);
+        }
         LayoutDirection::Center => {}
-    }
-
-    bounds.min_x = bounds.min_x.min(bounds.max_x);
-    bounds.min_y = bounds.min_y.min(bounds.max_y);
-}
-
-/// Give scrollable axes room to grow regardless of the parent's primary layout axis.
-/// On a cross axis, keep the edge used for alignment anchored to the viewport.
-fn expand_scroll_bounds(bounds: &mut UiRect, desc: ScrollDescriptor, dir: LayoutDirection) {
-    const BOUNDS_LIMIT: i32 = i32::MAX / 4;
-
-    if desc.width.is_some() {
-        match dir {
-            LayoutDirection::LeftRight(_)
-            | LayoutDirection::TopDown(HorizontalAlignment::Left)
-            | LayoutDirection::BottomUp(HorizontalAlignment::Left) => bounds.max_x = BOUNDS_LIMIT,
-            LayoutDirection::RightLeft(_)
-            | LayoutDirection::TopDown(HorizontalAlignment::Right)
-            | LayoutDirection::BottomUp(HorizontalAlignment::Right) => bounds.min_x = -BOUNDS_LIMIT,
-            LayoutDirection::Center
-            | LayoutDirection::TopDown(HorizontalAlignment::Center)
-            | LayoutDirection::BottomUp(HorizontalAlignment::Center) => {
-                bounds.min_x = -BOUNDS_LIMIT;
-                bounds.max_x = BOUNDS_LIMIT;
-            }
-        }
-    }
-    if desc.height.is_some() {
-        match dir {
-            LayoutDirection::TopDown(_)
-            | LayoutDirection::LeftRight(VerticalAlignment::Top)
-            | LayoutDirection::RightLeft(VerticalAlignment::Top) => bounds.max_y = BOUNDS_LIMIT,
-            LayoutDirection::BottomUp(_)
-            | LayoutDirection::LeftRight(VerticalAlignment::Bottom)
-            | LayoutDirection::RightLeft(VerticalAlignment::Bottom) => bounds.min_y = -BOUNDS_LIMIT,
-            LayoutDirection::Center
-            | LayoutDirection::LeftRight(VerticalAlignment::Center)
-            | LayoutDirection::RightLeft(VerticalAlignment::Center) => {
-                bounds.min_y = -BOUNDS_LIMIT;
-                bounds.max_y = BOUNDS_LIMIT;
-            }
-        }
     }
 }
 

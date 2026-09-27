@@ -1,5 +1,150 @@
 use super::*;
 
+fn with_scroll_area(contents: impl FnOnce(&mut Ui)) {
+    let mut world = World::new(0);
+    let mut state = UiState::new();
+    state.bounds = UiRect::from_pos_size(200, 150, 400, 300);
+    state.viewport = state.bounds;
+    state.scissors.push(state.bounds);
+    world.insert_resource(state);
+    world.insert_resource(UiIds::default());
+    world.insert_resource(NextUiIds(Default::default()));
+    world.insert_resource(TextTextureCache::default());
+    world.insert_resource(Assets::<ShapingResult>::default());
+    world.insert_resource(Assets::<OwnedTypeFace>::default());
+    world.insert_resource(Theme::default());
+    world.insert_resource(MouseInputs::default());
+    world.insert_resource(KeyBoardInputs::default());
+    world.insert_resource(UiMemory::default());
+    world.insert_resource(DeltaTime(Duration::ZERO));
+    world.insert_resource(Tick(0));
+    world.insert_resource(NextUiInputs::default());
+    world
+        .run_system(|mut ui: Ui| {
+            ui.scroll_area(
+                ScrollDescriptor {
+                    width: Some(UiCoord::Percent(100)),
+                    height: Some(UiCoord::Percent(100)),
+                },
+                contents,
+            );
+        })
+        .unwrap();
+}
+
+#[test]
+fn test_scroll_grid_uses_viewport_width() {
+    with_scroll_area(|ui| {
+        ui.margin(
+            Padding {
+                left: Some(UiCoord::Absolute(50)),
+                top: Some(UiCoord::Absolute(50)),
+                ..Default::default()
+            },
+            |ui| {
+                ui.grid(2, |cols| {
+                    cols.label_span(.., "Room: 0, 0");
+                    cols.end_row();
+                    let mut bottom = 0;
+                    for _ in 0..20 {
+                        cols.label(0, "Level");
+                        cols.column(1, |ui| {
+                            let rect = ui.label("42").rect;
+                            assert!(rect.min_x > 200 && rect.max_x < 400, "{rect:?}");
+                            assert!(rect.min_y >= bottom, "{rect:?}");
+                            bottom = rect.max_y;
+                        });
+                        cols.end_row();
+                    }
+                    assert!(bottom > 300);
+                });
+            },
+        );
+    });
+}
+
+#[test]
+fn test_scroll_nested_horizontal_content_keeps_advancing() {
+    with_scroll_area(|ui| {
+        ui.horizontal(None, |ui| {
+            let mut right = 0;
+            for _ in 0..20 {
+                let rect = ui.button("Wide button").rect;
+                assert!(rect.min_x > right, "{rect:?}");
+                right = rect.max_x;
+            }
+            assert!(right > 400);
+        });
+    });
+}
+
+#[test]
+fn test_advance_layout_bounds_preserves_overflow_cursor() {
+    let viewport = UiRect::from_pos_size(200, 150, 400, 300);
+    let overflow = UiRect {
+        min_x: -100,
+        min_y: -100,
+        max_x: 500,
+        max_y: 400,
+    };
+    for (dir, expected) in [
+        (
+            LayoutDirection::TopDown(HorizontalAlignment::Left),
+            UiRect {
+                min_y: 400,
+                max_y: 400,
+                ..viewport
+            },
+        ),
+        (
+            LayoutDirection::BottomUp(HorizontalAlignment::Left),
+            UiRect {
+                min_y: -100,
+                max_y: -100,
+                ..viewport
+            },
+        ),
+        (
+            LayoutDirection::LeftRight(VerticalAlignment::Top),
+            UiRect {
+                min_x: 500,
+                max_x: 500,
+                ..viewport
+            },
+        ),
+        (
+            LayoutDirection::RightLeft(VerticalAlignment::Top),
+            UiRect {
+                min_x: -100,
+                max_x: -100,
+                ..viewport
+            },
+        ),
+        (LayoutDirection::Center, viewport),
+    ] {
+        let mut bounds = viewport;
+        advance_layout_bounds(&mut bounds, dir, overflow);
+        assert_eq!(bounds, expected);
+    }
+}
+
+#[test]
+fn test_scroll_percentage_area_uses_finite_bounds() {
+    with_scroll_area(|ui| {
+        ui.allocate_area(
+            AreaDescriptor {
+                width: UiCoord::Percent(100),
+                height: UiCoord::Absolute(200),
+                scroll_on_overflow: false,
+            },
+            |ui| {
+                assert_eq!(ui.ui_state.bounds.width(), 400);
+                assert_eq!(ui.ui_state.bounds.height(), 200);
+            },
+        );
+    });
+}
+
 #[test]
 fn test_align_left() {
     let bounds = dbg!(UiRect::from_pos_size(2, 3, 10, 10));
