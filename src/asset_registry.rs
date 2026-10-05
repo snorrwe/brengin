@@ -9,6 +9,7 @@ use crate::HashMap;
 use std::{any::TypeId, path::PathBuf, sync::Arc, thread::available_parallelism};
 
 use cecs::systems::SystemStageBuilder;
+use rustc_hash::FxHashSet;
 
 use crate::{asset_registry::erased_loader::ErasedLoader, oneshot::Oneshot, prelude::*};
 
@@ -90,6 +91,8 @@ impl Default for AssetBasePaths {
         if let Ok(v) = std::env::current_dir() {
             default_paths.push(v.join("assets"));
         }
+        let mut visited = FxHashSet::default();
+        default_paths.retain(|p| visited.insert(p.clone()));
         Self(default_paths)
     }
 }
