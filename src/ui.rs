@@ -168,7 +168,7 @@ pub struct TextTextureCache(pub HashMap<ShapeKey, assets::Handle<ShapingResult>>
 
 #[derive(Debug)]
 pub struct ShapingResult {
-    pub glyphs: harfrust::GlyphBuffer,
+    pub glyphs: harfrust::Buffer,
     pub texture: TextDrawResponse,
     last_access: u64,
 }
@@ -514,9 +514,7 @@ impl UiState {
             window_order: Default::default(),
             next_window_base: WINDOW_LAYER,
             fallback_font: text::parse_font(
-                include_bytes!("./ui/Roboto-Regular.ttf")
-                    .to_vec()
-                    .into_boxed_slice(),
+                include_bytes!("./ui/Roboto-Regular.ttf").as_slice(),
                 0,
             )
             .unwrap(),
@@ -1225,7 +1223,7 @@ impl<'a> Ui<'a> {
                 font: self.theme.font.downgrade(),
             })
             .or_insert_with(|| {
-                let mut buffer = harfrust::UnicodeBuffer::new();
+                let mut buffer = harfrust::Buffer::new();
                 buffer.push_str(&line);
                 // harfrust does not infer direction/script/language on its own
                 buffer.guess_segment_properties();
@@ -1237,12 +1235,16 @@ impl<'a> Ui<'a> {
                     &self.ui_state.fallback_font
                 };
 
-                let shaper = font.shaper();
-                let glyphs = shaper.shape(buffer, harfrust::ShapeOptions::new());
-                let pic = text::draw_glyph_buffer(font.face(), &glyphs, size).unwrap();
+                harfrust::shape(&font.shaper(), &mut buffer, harfrust::ShapeOptions::new())
+                    .expect("Failed to shape text");
+                assert!(
+                    buffer.allocation_successful(),
+                    "Text shaping exceeded limits"
+                );
+                let pic = text::draw_glyph_buffer(&font.face(), &buffer, size).unwrap();
 
                 let shaping = ShapingResult {
-                    glyphs,
+                    glyphs: buffer,
                     texture: pic,
                     last_access: 0,
                 };

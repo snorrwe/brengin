@@ -1,7 +1,8 @@
-use std::{path::Path, pin::Pin};
+use std::path::Path;
 
 use anyhow::Context;
-use harfrust::GlyphBuffer;
+use harfrust::{Buffer, Font, ShaperFont};
+use read_fonts::model::Blob;
 use skrifa::{
     MetadataProvider,
     instance::{LocationRef, Size},
@@ -11,10 +12,9 @@ use skrifa::{
 use super::rect::UiRect;
 
 pub struct OwnedTypeFace {
-    _data: Pin<Box<[u8]>>,
     face_index: u32,
-    face: read_fonts::FontRef<'static>,
-    shaper_data: harfrust::ShaperData,
+    data: Blob,
+    face: Font,
 }
 
 impl std::fmt::Debug for OwnedTypeFace {
@@ -25,15 +25,9 @@ impl std::fmt::Debug for OwnedTypeFace {
 }
 
 impl OwnedTypeFace {
-    pub fn face<'a>(&'a self) -> &'a read_fonts::FontRef<'a> {
-        &self.face
-    }
-
-    pub fn face_mut<'a>(&'a mut self) -> &'a mut read_fonts::FontRef<'a>
-    where
-        'a: 'static,
-    {
-        &mut self.face
+    pub fn face(&self) -> read_fonts::FontRef<'_> {
+        // Validated when the font was parsed.
+        read_fonts::FontRef::from_index(&self.data, self.face_index).expect("valid font")
     }
 
     pub fn face_index(&self) -> u32 {
@@ -41,31 +35,26 @@ impl OwnedTypeFace {
     }
 
     /// Build a shaper for this face
-    pub fn shaper<'a>(&'a self) -> harfrust::Shaper<'a> {
-        self.shaper_data.shaper(&self.face).build()
+    pub fn shaper(&self) -> ShaperFont<'_, '_> {
+        ShaperFont::new(&self.face)
     }
 }
 
 pub fn load_font(path: impl AsRef<Path>, face_index: u32) -> anyhow::Result<OwnedTypeFace> {
     let data = std::fs::read(path.as_ref())
         .with_context(|| format!("Failed to load {:?}", path.as_ref()))?;
-    let data = data.into_boxed_slice();
     parse_font(data, face_index)
 }
 
-pub fn parse_font(data: Box<[u8]>, face_index: u32) -> anyhow::Result<OwnedTypeFace> {
-    let data = Pin::new(data);
-    let face = read_fonts::FontRef::new(&data).context("Failed to parse font")?;
-
-    let face: read_fonts::FontRef<'static> = unsafe { std::mem::transmute(face) };
-
-    let shaper_data = harfrust::ShaperData::new(&face);
+pub fn parse_font(data: impl Into<Blob>, face_index: u32) -> anyhow::Result<OwnedTypeFace> {
+    let data = data.into();
+    read_fonts::FontRef::from_index(&data, face_index).context("Failed to parse font")?;
+    let face = Font::new(data.clone(), face_index).context("Failed to parse font")?;
 
     Ok(OwnedTypeFace {
-        _data: data,
         face_index,
+        data,
         face,
-        shaper_data,
     })
 }
 
@@ -78,7 +67,7 @@ pub struct GlyphBufferBounds {
     pub glyph_bounds: Vec<(u32, UiRect)>,
 }
 
-pub fn get_bounds(face: &read_fonts::FontRef, glyphs: &GlyphBuffer) -> GlyphBufferBounds {
+pub fn get_bounds(face: &read_fonts::FontRef, glyphs: &Buffer) -> GlyphBufferBounds {
     let info = glyphs.glyph_infos();
     let glyph_positions = glyphs.glyph_positions();
 
@@ -162,7 +151,7 @@ impl TextDrawResponse {
 
 pub fn draw_glyph_buffer(
     face: &read_fonts::FontRef,
-    glyphs: &GlyphBuffer,
+    glyphs: &Buffer,
     height: u32,
 ) -> anyhow::Result<TextDrawResponse> {
     let bounds = get_bounds(face, glyphs);
