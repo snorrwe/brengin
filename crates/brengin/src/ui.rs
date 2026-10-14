@@ -4744,7 +4744,8 @@ pub struct WidgetInfo {
     pub is_hovered: bool,
     pub is_active: bool,
     pub rect: UiRect,
-    /// None the first time this widget is called
+    /// None the first time this widget is called if the entity id could not be allocated.
+    /// Most of the time this should be set.
     pub entity: Option<EntityId>,
 }
 
