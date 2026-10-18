@@ -4,12 +4,17 @@ pub mod font_loader;
 pub mod image_loader;
 pub mod sprite_sheet_loader;
 
+#[cfg(feature = "tar")]
+pub mod tar_loader;
+
 use crate::HashMap;
 
-use std::{any::TypeId, path::PathBuf, sync::Arc, thread::available_parallelism};
+use std::{
+    any::TypeId, borrow::Cow, io::Read as _, path::PathBuf, sync::Arc,
+    thread::available_parallelism,
+};
 
 use cecs::systems::SystemStageBuilder;
-use rustc_hash::FxHashSet;
 
 use crate::{asset_registry::erased_loader::ErasedLoader, oneshot::Oneshot, prelude::*};
 
@@ -43,7 +48,7 @@ impl Plugin for AssetRegistryPlugin {
             );
         });
 
-        app.get_or_insert_resource(AssetBasePaths::default);
+        app.get_or_insert_resource(FileLoaders::default);
         app.insert_resource(AssetsLoadStatus::default());
         app.insert_resource(AssetLoaders::default());
         app.get_or_insert_resource(|| {
@@ -68,32 +73,57 @@ impl Plugin for AssetRegistryPlugin {
     }
 }
 
-/// Directories where AssetRegistry will attempt to load the requested assets
-/// You can override these by either inserting an AssetBasePaths resource before the
+/// File loaders that the AssetRegistry will try to use to load the requested assets
+/// You can override these by either inserting an FileAssetLoaders resource before the
 /// AssetRegistryPlugin or you can override the resource, but it will only take effect for loads
 /// _after_ the modification.
 ///
 /// It is recommended that you override before the plugin load
-pub struct AssetBasePaths(pub Vec<PathBuf>);
+pub struct FileLoaders(pub Vec<Arc<dyn FileLoader>>);
 
-impl Default for AssetBasePaths {
-    fn default() -> Self {
-        let mut default_paths = Vec::new();
-        if let Some(v) = std::env::var_os("CARGO_MANIFEST_DIR").map(|s| PathBuf::from(s)) {
-            default_paths.push(v.join("assets"));
+impl FileLoaders {
+    pub fn join(mut self, rhs: Self) -> Self {
+        self.0.extend(rhs.0.into_iter());
+        self
+    }
+
+    pub fn with(mut self, loader: impl FileLoader + 'static) -> Self {
+        self.0.push(Arc::new(loader));
+        self
+    }
+
+    pub fn default_dir_loaders() -> FileLoaders {
+        let mut default_paths = Vec::<Arc<dyn FileLoader>>::new();
+        if let Some(v) =
+            std::env::var_os("CARGO_MANIFEST_DIR").map(|s| PathBuf::from(s).join(ASSETS_PATH))
+            && v.is_dir()
+        {
+            default_paths.push(FsFileLoader::from_path(v));
         }
         if let Some(v) = std::env::current_exe()
             .ok()
-            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .and_then(|p| p.parent().map(|p| p.join(ASSETS_PATH)))
+            && v.is_dir()
         {
-            default_paths.push(v.join("assets"));
+            default_paths.push(FsFileLoader::from_path(v));
         }
-        if let Ok(v) = std::env::current_dir() {
-            default_paths.push(v.join("assets"));
+        if let Ok(v) = std::env::current_dir().map(|p| p.join(ASSETS_PATH))
+            && v.is_dir()
+        {
+            default_paths.push(FsFileLoader::from_path(v));
         }
-        let mut visited = FxHashSet::default();
-        default_paths.retain(|p| visited.insert(p.clone()));
+
         Self(default_paths)
+    }
+
+    // TODO: insert asset pack loaders here
+}
+
+const ASSETS_PATH: &'static str = "assets";
+
+impl Default for FileLoaders {
+    fn default() -> Self {
+        Self::default_dir_loaders()
     }
 }
 
@@ -144,7 +174,7 @@ impl AsRef<async_lock::Semaphore> for AssetLoadingSemaphore {
 
 cecs::query_collection! {
     pub struct AssetRegistry<'a> {
-        basepaths: Res<'a, AssetBasePaths>,
+        basepaths: Res<'a, FileLoaders>,
         state: ResMut<'a, AssetsLoadStatus>,
         recv: ResMut<'a, AssetsReceivers>,
         loaders: Res<'a, AssetLoaders>,
@@ -171,6 +201,7 @@ async fn try_load_asset<T, F>(
     handle: Handle<T>,
     result_channel: ReceiverChannel<T>,
     futures: Vec<(PathBuf, F)>,
+    path: PathBuf,
 ) where
     F: Future<Output = Result<T, AssetLoadError>>,
 {
@@ -195,24 +226,24 @@ async fn try_load_asset<T, F>(
             return;
         }
     }
+    result_channel.send((handle, Err(AssetLoadError::FileNotFound(path))));
 }
 
 impl<'a> AssetRegistry<'a> {
-    fn get_candidate_paths<'b>(
-        &'b self,
-        path: &'b std::path::Path,
-    ) -> impl Iterator<Item = PathBuf> + 'b {
-        self.basepaths.0.iter().map(move |p| p.join(path))
+    fn iter_file_loaders<'b>(&'b self) -> impl Iterator<Item = Arc<dyn FileLoader>> + 'b {
+        self.basepaths.0.iter().cloned()
     }
 
     /// waits for the asset load to complete before proceeding
     pub fn load_sync<T: 'static + Send>(&mut self, path: impl AsRef<std::path::Path>) -> Handle<T> {
         // TODO: only the future handling is different, could probably dedupe more
 
+        let path = path.as_ref().to_path_buf();
+
         let handle = Assets::<T>::allocate();
         let futures = self
-            .get_candidate_paths(path.as_ref())
-            .map(|path| (path.clone(), self.loaders.load::<T>(path)))
+            .iter_file_loaders()
+            .map(|loader| (path.clone(), self.loaders.load::<T>(path.clone(), loader)))
             .collect::<Vec<_>>();
         self.state
             .0
@@ -226,6 +257,7 @@ impl<'a> AssetRegistry<'a> {
             handle.clone(),
             Arc::clone(&result_channel),
             futures,
+            path,
         ));
 
         self.recv
@@ -238,10 +270,11 @@ impl<'a> AssetRegistry<'a> {
     }
 
     pub fn load<T: 'static + Send>(&mut self, path: impl AsRef<std::path::Path>) -> Handle<T> {
+        let path = path.as_ref().to_path_buf();
         let handle = Assets::<T>::allocate();
         let futures = self
-            .get_candidate_paths(path.as_ref())
-            .map(|path| (path.clone(), self.loaders.load::<T>(path)))
+            .iter_file_loaders()
+            .map(|loader| (path.clone(), self.loaders.load::<T>(path.clone(), loader)))
             .collect::<Vec<_>>();
         self.state
             .0
@@ -255,6 +288,7 @@ impl<'a> AssetRegistry<'a> {
             handle.clone(),
             Arc::clone(&result_channel),
             futures,
+            path,
         ));
 
         self.recv
@@ -271,6 +305,7 @@ pub trait AssetLoader<T> {
     fn load(
         &self,
         path: PathBuf,
+        loader: Arc<dyn FileLoader>,
     ) -> impl std::future::Future<Output = Result<T, AssetLoadError>> + Send;
 }
 
@@ -286,6 +321,7 @@ impl AssetLoaders {
     pub fn load<T: 'static>(
         &self,
         path: PathBuf,
+        file_loader: Arc<dyn FileLoader>,
     ) -> impl Future<Output = Result<T, AssetLoadError>> {
         let loader = self
             .0
@@ -293,7 +329,49 @@ impl AssetLoaders {
             .ok_or(AssetLoadError::LoaderNotFound)
             .map(Arc::clone);
 
-        async move { unsafe { loader?.load(path).await } }
+        async move { unsafe { loader?.load(path, file_loader).await } }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LoadError {
+    #[error("{0} not found")]
+    NotFound(std::path::PathBuf),
+    #[error("{0} could not be opened")]
+    OpenFailed(std::path::PathBuf),
+    #[error("Failed to load {0}")]
+    LoadFailed(std::path::PathBuf),
+}
+
+pub trait FileLoader: Sync + Send {
+    /// Load the entire file into memory
+    fn load_all<'a>(&'a self, p: &std::path::Path) -> Result<Cow<'a, [u8]>, LoadError>;
+}
+
+pub struct FsFileLoader {
+    pub base_path: PathBuf,
+}
+
+impl FsFileLoader {
+    pub fn from_path(p: impl Into<PathBuf>) -> Arc<Self> {
+        Arc::new(Self {
+            base_path: p.into(),
+        })
+    }
+}
+
+impl FileLoader for FsFileLoader {
+    fn load_all<'a>(&'a self, p: &std::path::Path) -> Result<Cow<'a, [u8]>, LoadError> {
+        let mut f = std::fs::OpenOptions::new()
+            .read(true)
+            .open(self.base_path.join(p))
+            .map_err(|_err| LoadError::OpenFailed(p.to_path_buf()))?;
+
+        let mut result = Vec::new();
+        f.read_to_end(&mut result)
+            .map_err(|_err| LoadError::LoadFailed(p.to_path_buf()))?;
+
+        Ok(std::borrow::Cow::Owned(result))
     }
 }
 
@@ -310,6 +388,7 @@ mod tests {
             fn load(
                 &self,
                 path: PathBuf,
+                _loader: Arc<dyn FileLoader>,
             ) -> impl std::future::Future<Output = Result<PathBuf, AssetLoadError>> + Send
             {
                 async move { Ok(path) }
@@ -318,7 +397,7 @@ mod tests {
 
         loaders.add_loader(NopLoader);
 
-        let fut = loaders.load::<PathBuf>("test".into());
+        let fut = loaders.load::<PathBuf>("test".into(), FsFileLoader::from_path("/"));
 
         let result = pollster::block_on(fut).expect("Load failed");
 
@@ -329,7 +408,12 @@ mod tests {
     fn test_unregistered_loader() {
         let loaders = AssetLoaders::default();
 
-        let fut = loaders.load::<i64>("test".into());
+        let fut = loaders.load::<i64>(
+            "test".into(),
+            Arc::new(FsFileLoader {
+                base_path: "/".into(),
+            }),
+        );
 
         let result = pollster::block_on(fut).expect_err("Load should fail");
         assert!(matches!(result, AssetLoadError::LoaderNotFound));

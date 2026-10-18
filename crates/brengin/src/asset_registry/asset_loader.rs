@@ -59,6 +59,8 @@ fn handle_loads<T: 'static>(
         unsafe {
             let recv: &mut ReceiverChannel<T> = recv.as_inner_mut();
             if let Some((id, result)) = recv.try_receive() {
+                #[cfg(feature = "tracing")]
+                tracing::debug!(id = id.id().id(), result=?result.as_ref().map(drop));
                 v.swap_remove(i);
 
                 let s = match result {

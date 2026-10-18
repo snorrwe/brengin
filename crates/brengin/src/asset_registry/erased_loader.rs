@@ -1,4 +1,6 @@
-use std::{ffi::c_void, mem::MaybeUninit, path::PathBuf, pin::Pin};
+use std::{ffi::c_void, mem::MaybeUninit, path::PathBuf, pin::Pin, sync::Arc};
+
+use crate::asset_registry::FileLoader;
 
 use super::{AssetLoadError, AssetLoader};
 
@@ -10,6 +12,7 @@ pub struct ErasedLoader {
     load: fn(
         &ErasedLoader,
         path: PathBuf,
+        loader: Arc<dyn FileLoader>,
         output: *mut c_void, // must be type T
     ) -> Pin<Box<dyn std::future::Future<Output = Result<(), AssetLoadError>> + Send>>,
 }
@@ -39,7 +42,7 @@ impl ErasedLoader {
                     resource.inner = std::ptr::null_mut();
                 }
             },
-            load: |resource, path, out: *mut c_void| unsafe {
+            load: |resource, path, loader, out: *mut c_void| unsafe {
                 assert!(!resource.inner.is_null());
                 let _inner: &L = &*resource.inner.cast::<L>();
                 struct Out<T>(*mut T);
@@ -49,7 +52,7 @@ impl ErasedLoader {
                     // move otherwise only out.0 is moved into the async
                     // block which is not Send
                     let out = out;
-                    let result = _inner.load(path).await?;
+                    let result = _inner.load(path, loader).await?;
                     std::ptr::write(out.0, result);
                     Ok(())
                 })
@@ -59,9 +62,13 @@ impl ErasedLoader {
 
     /// # SAFETY
     /// Must be called with the same type as `new`
-    pub async unsafe fn load<T>(&self, path: impl Into<PathBuf>) -> Result<T, AssetLoadError> {
+    pub async unsafe fn load<T>(
+        &self,
+        path: PathBuf,
+        loader: Arc<dyn FileLoader>,
+    ) -> Result<T, AssetLoadError> {
         let mut result = MaybeUninit::<T>::uninit();
-        (self.load)(self, path.into(), result.as_mut_ptr().cast())
+        (self.load)(self, path, loader, result.as_mut_ptr().cast())
             .await
             .map(move |_| unsafe { result.assume_init() })
     }

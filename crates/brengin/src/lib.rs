@@ -1,5 +1,6 @@
 #![recursion_limit = "256"]
 #![feature(debug_closure_helpers)]
+#![feature(trim_prefix_suffix)]
 
 pub mod asset_registry;
 pub mod assets;

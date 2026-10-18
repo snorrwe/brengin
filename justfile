@@ -5,15 +5,17 @@ export WAYLAND_DISPLAY := ""
 _default:
     @just --list
 
-boids flags="": (_example "boids" flags)
+boids *args: (_example "boids" args)
 
-sprites flags="": (_example "sprites" flags)
+sprites *args: (_example "sprites" args)
 
-simple_sprite flags="": (_example "simple_sprite" flags)
+simple_sprite *args: (_example "simple_sprite" args)
 
-mandelbrot flags="": (_example "mandelbrot" flags)
+mandelbrot *args: (_example "mandelbrot" args)
 
-ui flags="": (_example "ui" flags)
+ui *args: (_example "ui" args)
 
-_example name flags:
-    cargo r --example={{ name }} {{ flags }}
+tar_load *args: (_example "tar_load" args)
+
+_example name *args:
+    cargo r --example={{ name }} {{ args }}

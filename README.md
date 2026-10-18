@@ -76,7 +76,31 @@ Linux Windows MacOS
 - Tests: `cargo test`
 - Logging: `RUST_LOG`
 
-<!-- TODO: issues/PR expectations, or "personal project, not accepting contributions" -->
+## Tools
+
+Engine utilities are located in the `tools` crate and packaged as `brengin-tools`.
+
+To add them to a flake-based development shell, add brengin as an input and include its package in your shell:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+    brengin.url = "github:snorrwe/brengin";
+  };
+
+  outputs = { nixpkgs, flake-utils, brengin, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+      in {
+        devShells.default = pkgs.mkShell {
+          packages = [ brengin.packages.${system}.default ];
+        };
+      });
+}
+```
 
 ## License
 
