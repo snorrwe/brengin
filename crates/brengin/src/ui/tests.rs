@@ -146,6 +146,40 @@ fn test_scroll_percentage_area_uses_finite_bounds() {
 }
 
 #[test]
+fn test_select_popup_fits_viewport() {
+    let viewport = UiRect {
+        min_x: 100,
+        min_y: 50,
+        max_x: 500,
+        max_y: 350,
+    };
+    let margins = [4, 6, 8, 10];
+    assert_eq!(
+        popup_bounds(IVec2::new(400, 300), IVec2::new(120, 60), viewport, margins),
+        UiRect {
+            min_x: 374,
+            min_y: 280,
+            max_x: 494,
+            max_y: 340
+        }
+    );
+    assert_eq!(
+        popup_bounds(
+            IVec2::new(480, 310),
+            IVec2::new(800, 900),
+            viewport,
+            margins
+        ),
+        UiRect {
+            min_x: 104,
+            min_y: 58,
+            max_x: 494,
+            max_y: 340
+        }
+    );
+}
+
+#[test]
 fn test_align_left() {
     let bounds = dbg!(UiRect::from_pos_size(2, 3, 10, 10));
     let mut rect = dbg!(UiRect::from_pos_size(5, 5, 2, 2));

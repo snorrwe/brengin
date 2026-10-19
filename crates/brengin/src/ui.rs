@@ -2618,6 +2618,7 @@ impl<'a> Ui<'a> {
             .get_memory_or_default::<ContextMenuState>(id)
             .borrow_mut();
 
+        let pending_open = state.open;
         state.open = self.has_context_menu(parent_id);
         if state.open {
             let history_start = self.ui_state.rect_history.len();
@@ -2633,32 +2634,24 @@ impl<'a> Ui<'a> {
             let p_horizontal = p_left + p_right;
             let p_vertical = p_bot + p_top;
 
-            let mut bounds = resp.rect;
-            // layout
-            // first compute its ideal position,
-            // if it overshoots the screen on the bottom, move it up so it doesn't
-            // then, if it overshoots the screen on top, move it down so it doesn't
-            bounds.move_to_x(state.offset.x);
-            bounds.move_to_y(state.offset.y);
-            bounds.resize_w(state.context_size.x);
-            bounds.resize_h(state.context_size.y);
-            bounds.max_x = self.ui_state.scissors[0].max_x - p_horizontal - outline_size;
-            bounds.max_y = self.ui_state.scissors[0].max_y - p_vertical - outline_size;
-
-            if bounds.max_x > self.ui_state.viewport.max_x {
-                let offset = self.ui_state.viewport.max_x - bounds.max_x;
-                bounds.offset_x(offset);
-            }
-            if bounds.min_x < 0 {
-                bounds.offset_x(-bounds.min_x);
-            }
-            if bounds.max_y > self.ui_state.viewport.max_y {
-                let offset = self.ui_state.viewport.max_y - bounds.max_y;
-                bounds.offset_y(offset);
-            }
-            if bounds.min_y < 0 {
-                bounds.offset_y(-bounds.min_y);
-            }
+            let margins = [
+                p_horizontal + outline_size,
+                p_horizontal + outline_size,
+                p_vertical + outline_size,
+                p_vertical + outline_size,
+            ];
+            let available = self.ui_state.viewport.size()
+                - IVec2::new(margins[0] + margins[1], margins[2] + margins[3]);
+            let natural = state.context_size.unwrap_or_default();
+            let bar = self.theme.scroll_bar_size as i32;
+            let overflow = natural.x > available.x || natural.y > available.y;
+            let desired = natural
+                + if overflow {
+                    IVec2::splat(bar)
+                } else {
+                    IVec2::ZERO
+                };
+            let bounds = popup_bounds(state.offset, desired, self.ui_state.viewport, margins);
 
             let original_bounds = mem::replace(&mut self.ui_state.bounds, bounds);
 
@@ -2669,15 +2662,30 @@ impl<'a> Ui<'a> {
                 max_y: bounds.max_y + p_vertical + outline_size,
             });
 
+            let mut measured = None;
             ///////////////////////
             self.children_content(|ui| {
-                context_menu(ui, &mut state);
+                if overflow {
+                    ui.scroll_area(
+                        ScrollDescriptor {
+                            width: Some(UiCoord::Percent(100)),
+                            height: Some(UiCoord::Percent(100)),
+                        },
+                        |ui| {
+                            let start = ui.ui_state.rect_history.len();
+                            ui.children_content(|ui| context_menu(ui, &mut state));
+                            measured = Some(ui.history_bounding_rect(start).size());
+                        },
+                    );
+                } else {
+                    context_menu(ui, &mut state);
+                }
             });
             ///////////////////////
             self.ui_state.bounds = original_bounds;
 
             let context_bounds = self.history_bounding_rect(history_start);
-            state.context_size = context_bounds.size();
+            state.context_size = Some(measured.unwrap_or_else(|| context_bounds.size()));
 
             let mut bounds = context_bounds;
             bounds = bounds.grow_over_point(
@@ -2727,17 +2735,58 @@ impl<'a> Ui<'a> {
             self.ui_state.scissor_idx = old_scissor;
             self.ui_state.bounds = old_bounds;
         } else {
-            if contains_mouse
+            let right_click = contains_mouse
                 && self.mouse.just_released.contains(&MouseButton::Right)
-                && !self.is_context_menu_open()
-            {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("Opening context menu over {parent_id:?}");
+                && !self.is_context_menu_open();
+            if right_click || (pending_open && state.context_size.is_none()) {
+                // The callback is FnOnce, so we cannot measure and render it twice.
+                // Measure on the opening frame (which was not drawn previously),
+                // then discard the draw commands. The next frame opens at its final size.
                 state.open = true;
-                state.offset = IVec2::new(
-                    self.mouse.cursor_position.x as i32,
-                    self.mouse.cursor_position.y as i32,
+                if right_click {
+                    state.offset = IVec2::new(
+                        self.mouse.cursor_position.x as i32,
+                        self.mouse.cursor_position.y as i32,
+                    );
+                }
+                let outline_size = 2;
+                let [l, r, t, b] = self
+                    .theme
+                    .padding
+                    .as_abs(self.ui_state.bounds.width(), self.ui_state.bounds.height());
+                let margins = [
+                    l + r + outline_size,
+                    l + r + outline_size,
+                    t + b + outline_size,
+                    t + b + outline_size,
+                ];
+                let bounds = popup_bounds(
+                    state.offset,
+                    self.ui_state.viewport.size(),
+                    self.ui_state.viewport,
+                    margins,
                 );
+                let old_bounds = mem::replace(&mut self.ui_state.bounds, bounds);
+                let old_scissor = mem::replace(&mut self.ui_state.scissor_idx, 0);
+                let old_layer = mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
+                let history = self.ui_state.rect_history.len();
+                let child_ids = self.ui_state.widget_ids.len();
+                let colors = self.ui_state.color_rects.len();
+                let textures = self.ui_state.texture_rects.len();
+                let texts = self.ui_state.text_rects.len();
+                self.children_content(|ui| context_menu(ui, &mut state));
+                state.context_size = Some(self.history_bounding_rect(history).size());
+                self.ui_state.color_rects.truncate(colors);
+                self.ui_state.texture_rects.truncate(textures);
+                self.ui_state.text_rects.truncate(texts);
+                let measured_ids: Vec<_> = self.ui_state.widget_ids[child_ids..].to_vec();
+                for id in measured_ids {
+                    self.ui_state.next_bounding_boxes.remove(&id);
+                }
+                self.ui_state.rect_history.truncate(history);
+                self.ui_state.bounds = old_bounds;
+                self.ui_state.scissor_idx = old_scissor;
+                self.ui_state.layer = old_layer;
             }
         }
 
@@ -2846,6 +2895,36 @@ impl<'a> Ui<'a> {
         state.open = self.has_context_menu(parent_id);
         let mut selected = None;
         if state.open {
+            // Measure before drawing: a viewport-sized opening frame would visibly
+            // shrink to the options' size on the following frame.
+            let labels: Vec<String> = options.iter().map(|t| t.to_string()).collect();
+            let mut content_size = IVec2::ZERO;
+            let available = self.ui_state.viewport.size();
+            let [left, right, top, bottom] = self.theme.padding.as_abs(available.x, available.y);
+            for label in &labels {
+                let mut text_size = IVec2::ZERO;
+                for line in label.split('\n').filter(|line| !line.is_empty()) {
+                    let (_, shape) =
+                        self.shape_and_draw_line(line.to_owned(), self.theme.font_size as u32);
+                    text_size.x = text_size.x.max(shape.texture.width() as i32 + 1);
+                    text_size.y += shape.texture.height() as i32 + 1;
+                }
+                let width = match self.theme.button_width {
+                    WrapperSize::Content => text_size.x + 2 * self.theme.text_padding as i32,
+                    WrapperSize::Size(coord) => coord.as_abolute(available.x),
+                };
+                let height = match self.theme.button_height {
+                    WrapperSize::Content => text_size.y + 2 * self.theme.text_padding as i32,
+                    WrapperSize::Size(coord) => coord.as_abolute(available.y),
+                };
+                content_size.x = content_size.x.max(width + left + right);
+                content_size.y += height + top + bottom;
+            }
+            let bar_size = self.theme.scroll_bar_size as i32;
+            let desired_size = IVec2::new(
+                content_size.x.max(resp.rect.width()) + bar_size,
+                content_size.y + bar_size,
+            );
             let history_start = self.ui_state.rect_history.len();
             let old_layer = mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
             let old_bounds = self.ui_state.bounds;
@@ -2859,11 +2938,17 @@ impl<'a> Ui<'a> {
             let p_horizontal = p_left + p_right;
             let p_vertical = p_bot + p_top;
 
-            let mut bounds = resp.rect;
-            bounds.move_to_x(state.offset.x);
-            bounds.move_to_y(state.offset.y);
-            bounds.max_x = self.ui_state.scissors[0].max_x - p_horizontal - outline_size;
-            bounds.max_y = self.ui_state.scissors[0].max_y - p_vertical - outline_size;
+            let bounds = popup_bounds(
+                state.offset,
+                desired_size,
+                self.ui_state.viewport,
+                [
+                    p_horizontal + outline_size,
+                    p_horizontal + outline_size,
+                    p_vertical + outline_size,
+                    p_vertical + outline_size,
+                ],
+            );
 
             let new_bounds = mem::replace(&mut self.ui_state.bounds, bounds);
 
@@ -2876,15 +2961,23 @@ impl<'a> Ui<'a> {
 
             ///////////////////////
             self.children_content(|ui| {
-                ui.vertical(None, |ui| {
-                    // TODO: highlight if matches current
-                    for (i, t) in options.iter().enumerate() {
-                        if ui.button(t.to_string()).pressed() {
-                            selected = Some(i);
-                            state.open = false;
-                        }
-                    }
-                });
+                ui.scroll_area(
+                    ScrollDescriptor {
+                        width: Some(UiCoord::Percent(100)),
+                        height: Some(UiCoord::Percent(100)),
+                    },
+                    |ui| {
+                        ui.vertical(None, |ui| {
+                            // TODO: highlight if matches current
+                            for (i, label) in labels.iter().enumerate() {
+                                if ui.button(label.as_str()).pressed() {
+                                    selected = Some(i);
+                                    state.open = false;
+                                }
+                            }
+                        });
+                    },
+                );
             });
             ///////////////////////
             self.ui_state.bounds = new_bounds;
@@ -2990,6 +3083,7 @@ impl<'a> Ui<'a> {
             .borrow_mut();
         state.open = true;
         state.offset = offset;
+        state.context_size = None;
         self.next_ids
             .push(id, CONTEXT_LAYER)
             .add_flag(InteractionFlag::ContextMenu);
@@ -3100,42 +3194,76 @@ impl<'a> Ui<'a> {
     }
 
     pub fn tooltip(&mut self, desc: TooltipDescriptor) -> Response<()> {
-        let mut bounds = self.ui_state.scissors[0];
-        bounds.min_x = desc.x;
-        bounds.min_y = desc.y;
-
-        let old_bounds = mem::replace(&mut self.ui_state.bounds, bounds);
-        let old_scissor = std::mem::replace(&mut self.ui_state.scissor_idx, 0);
-        let old_layer = mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER);
+        // A tooltip only contains a label, so its final size can be measured
+        // before drawing; unlike arbitrary context menu callbacks it needs no
+        // hidden measurement frame.
+        let mut text_width = 0;
+        let mut text_height = 0;
+        let text_padding = self.theme.text_padding as i32;
+        for line in desc.label.split('\n').filter(|line| !line.is_empty()) {
+            let (_, shape) = self.shape_and_draw_line(line.to_owned(), self.theme.font_size as u32);
+            text_width = text_width.max(shape.texture.width() as i32 + text_padding);
+            text_height += shape.texture.height() as i32;
+        }
+        let outline = 1;
+        let natural = IVec2::new(
+            text_width + 2 * text_padding + 2 * outline,
+            text_height + 2 * text_padding + 2 * outline,
+        );
+        let viewport = self.ui_state.viewport;
+        let overflow = natural.x > viewport.width() || natural.y > viewport.height();
+        let bar = self.theme.scroll_bar_size as i32;
+        let desired = natural
+            + if overflow {
+                IVec2::splat(bar)
+            } else {
+                IVec2::ZERO
+            };
+        let bounds = popup_bounds(IVec2::new(desc.x, desc.y), desired, viewport, [0; 4]);
+        let content_bounds = UiRect {
+            min_x: bounds.min_x + outline,
+            min_y: bounds.min_y + outline,
+            max_x: (bounds.max_x - outline).max(bounds.min_x + outline),
+            max_y: (bounds.max_y - outline).max(bounds.min_y + outline),
+        };
+        let old_bounds = mem::replace(&mut self.ui_state.bounds, content_bounds);
+        let old_scissor = mem::replace(&mut self.ui_state.scissor_idx, 0);
+        self.push_scissor(bounds);
+        let old_layer = mem::replace(&mut self.ui_state.layer, CONTEXT_LAYER + 2);
         let history_start = self.ui_state.rect_history.len();
         let ids = self.ui_state.widget_ids.len();
+        let WidgetInfo { id, is_hovered, .. } = self.begin_widget();
 
-        let WidgetInfo { id, is_hovered, .. }: WidgetInfo = self.begin_widget();
-
-        ///////////////
-        self.with_outline(
-            OutlineDescriptor {
-                outline_color: Color::BLACK,
-                outline_radius: 1,
-            },
-            |ui| {
+        self.children_content(|ui| {
+            if overflow && content_bounds.width() > bar && content_bounds.height() > bar {
+                ui.scroll_area(
+                    ScrollDescriptor {
+                        width: Some(UiCoord::Percent(100)),
+                        height: Some(UiCoord::Percent(100)),
+                    },
+                    |ui| {
+                        ui.label(desc.label);
+                    },
+                );
+            } else {
                 ui.label(desc.label);
-            },
-        );
-        ///////////////
+            }
+        });
+        let color = match self.theme.context_background {
+            ThemeEntry::Color(color) => color,
+            ThemeEntry::Image(_) => self.theme.secondary_color,
+        };
+        self.color_rect_from_rect_with_outline(bounds, color, CONTEXT_LAYER + 1, Color::BLACK, 1);
 
-        // tooltip should not be considered in layouting
-        let children_ids: Vec<_> = self.ui_state.widget_ids[ids..].iter().copied().collect();
-        for id in children_ids {
+        // Tooltips do not participate in their parent's layout or hit testing.
+        let tooltip_ids: Vec<_> = self.ui_state.widget_ids[ids..].to_vec();
+        for id in tooltip_ids {
             self.ui_state.next_bounding_boxes.remove(&id);
         }
-        let bounds = self.history_bounding_rect(history_start);
-
         self.ui_state.rect_history.truncate(history_start);
         self.ui_state.bounds = old_bounds;
         self.ui_state.scissor_idx = old_scissor;
         self.ui_state.layer = old_layer;
-
         Response {
             hovered: is_hovered,
             active: false,
@@ -3379,7 +3507,7 @@ impl<'a, 'b> ContextMenuResponse<'a, 'b> {
 pub struct ContextMenuState {
     pub open: bool,
     pub offset: IVec2,
-    pub context_size: IVec2,
+    pub context_size: Option<IVec2>,
 }
 
 #[derive(Debug, Default)]
@@ -4216,6 +4344,25 @@ struct ScrollState {
     pub ty: f32,
     pub scroll_width: i32,
     pub scroll_height: i32,
+}
+
+/// Keep the popup (including its border and padding) inside the viewport.
+fn popup_bounds(anchor: IVec2, desired: IVec2, viewport: UiRect, margins: [i32; 4]) -> UiRect {
+    let [left, right, top, bottom] = margins;
+    let min_x = viewport.min_x + left;
+    let min_y = viewport.min_y + top;
+    let max_x = (viewport.max_x - right).max(min_x);
+    let max_y = (viewport.max_y - bottom).max(min_y);
+    let width = desired.x.clamp(0, max_x - min_x);
+    let height = desired.y.clamp(0, max_y - min_y);
+    let x = anchor.x.clamp(min_x, max_x - width);
+    let y = anchor.y.clamp(min_y, max_y - height);
+    UiRect {
+        min_x: x,
+        min_y: y,
+        max_x: x + width,
+        max_y: y + height,
+    }
 }
 
 fn bounding_rect(history: &[UiRect]) -> UiRect {
