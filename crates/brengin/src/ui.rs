@@ -4347,14 +4347,14 @@ struct ScrollState {
 }
 
 /// Keep the popup (including its border and padding) inside the viewport.
-fn popup_bounds(anchor: IVec2, desired: IVec2, viewport: UiRect, margins: [i32; 4]) -> UiRect {
+fn popup_bounds(anchor: IVec2, desired_size: IVec2, viewport: UiRect, margins: [i32; 4]) -> UiRect {
     let [left, right, top, bottom] = margins;
     let min_x = viewport.min_x + left;
     let min_y = viewport.min_y + top;
     let max_x = (viewport.max_x - right).max(min_x);
     let max_y = (viewport.max_y - bottom).max(min_y);
-    let width = desired.x.clamp(0, max_x - min_x);
-    let height = desired.y.clamp(0, max_y - min_y);
+    let width = desired_size.x.clamp(0, max_x - min_x);
+    let height = desired_size.y.clamp(0, max_y - min_y);
     let x = anchor.x.clamp(min_x, max_x - width);
     let y = anchor.y.clamp(min_y, max_y - height);
     UiRect {
