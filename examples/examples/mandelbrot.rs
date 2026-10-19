@@ -1,7 +1,7 @@
 use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
-use brengin::prelude::*;
 use brengin::renderer::{GraphicsState, RenderCommand, RenderCommandPlugin, texture};
 use brengin::{App, DefaultPlugins, Plugin};
+use brengin::{prelude::*, wgpu};
 use wgpu::include_wgsl;
 
 struct GamePlugin;
