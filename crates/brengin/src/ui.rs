@@ -2824,6 +2824,9 @@ impl<'a> Ui<'a> {
             mut is_active,
             ..
         } = self.begin_widget();
+
+        let state = self.get_memory_or_default::<ToggleState>(id);
+
         let layer = self.push_layer();
 
         if is_active {
@@ -2853,7 +2856,17 @@ impl<'a> Ui<'a> {
         let pip_size = toggle_rect.width() / 2;
         let mut button_rect = toggle_rect;
         button_rect.max_x -= pip_size;
-        button_rect.offset_x(if option { pip_size } else { 0 });
+
+        let mut s = state.borrow_mut();
+        let desired = if option { pip_size } else { 0 };
+        let offset = (desired - s.offset_x) / 2;
+        s.offset_x += offset;
+        button_rect.offset_x(s.offset_x);
+
+        if !option {
+            button_rect.shrink_x(3);
+            button_rect.shrink_y(3);
+        }
 
         self.color_rect_from_rect(
             button_rect,
@@ -4727,4 +4740,9 @@ fn padded_rect(padding: Padding, mut bounds: UiRect) -> UiRect {
 struct PanelState {
     pub content_width: i32,
     pub content_height: i32,
+}
+
+#[derive(Default)]
+struct ToggleState {
+    offset_x: i32,
 }
