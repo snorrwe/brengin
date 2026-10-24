@@ -3262,11 +3262,15 @@ impl<'a> Ui<'a> {
                 ui.label(desc.label);
             }
         });
+
+        // restore scissor before drawing the background
+        self.ui_state.scissor_idx = old_scissor;
+
         let color = match self.theme.context_background {
             ThemeEntry::Color(color) => color,
             ThemeEntry::Image(_) => self.theme.secondary_color,
         };
-        self.color_rect_from_rect_with_outline(bounds, color, CONTEXT_LAYER + 1, Color::BLACK, 1);
+        self.color_rect_from_rect_with_outline(bounds, color, CONTEXT_LAYER + 1, Color::BLACK, 2);
 
         // Tooltips do not participate in their parent's layout or hit testing.
         let tooltip_ids: Vec<_> = self.ui_state.widget_ids[ids..].to_vec();
@@ -3275,7 +3279,6 @@ impl<'a> Ui<'a> {
         }
         self.ui_state.rect_history.truncate(history_start);
         self.ui_state.bounds = old_bounds;
-        self.ui_state.scissor_idx = old_scissor;
         self.ui_state.layer = old_layer;
         Response {
             hovered: is_hovered,
