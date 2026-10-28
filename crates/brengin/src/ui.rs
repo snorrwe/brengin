@@ -4896,7 +4896,7 @@ fn shape_and_draw_line<'a>(
             // harfrust does not infer direction/script/language on its own
             buffer.guess_segment_properties();
             let font = if fonts.contains(font.id())
-                && let Some(f) = fonts.get(&font)
+                && let Some(f) = fonts.get(font)
             {
                 f
             } else {
