@@ -30,32 +30,30 @@ pub struct SpriteSheetDisk {
 
 pub struct SpriteSheetLoader;
 impl AssetLoader<SpriteSheet> for SpriteSheetLoader {
-    fn load(
+    async fn load(
         &self,
         path: PathBuf,
         loader: Arc<dyn FileLoader>,
-    ) -> impl std::future::Future<Output = Result<SpriteSheet, AssetLoadError>> + Send {
-        async move {
-            let data = loader.load_all(&path).map_err(|err| {
-                #[cfg(feature = "tracing")]
-                tracing::error!(?err, "Failed to load sprite sheet bytes");
-                AssetLoadError::FileNotFound(path.clone())
-            })?;
+    ) -> Result<SpriteSheet, AssetLoadError> {
+        let data = loader.load_all(&path).map_err(|err| {
+            #[cfg(feature = "tracing")]
+            tracing::error!(?err, "Failed to load sprite sheet bytes");
+            AssetLoadError::FileNotFound(path.clone())
+        })?;
 
-            let data: SpriteSheetDisk = serde_json::from_reader(std::io::Cursor::new(data))
-                .map_err(|err| AssetLoadError::LoadFailed(err.to_string()))?;
+        let data: SpriteSheetDisk = serde_json::from_reader(std::io::Cursor::new(data))
+            .map_err(|err| AssetLoadError::LoadFailed(err.to_string()))?;
 
-            // if load succeeded we assume that the path has a parent (directory)
-            let img_path = path.parent().unwrap().join(&data.image);
-            let image_bytes = loader
-                .load_all(&img_path)
-                .map_err(|_| AssetLoadError::FileNotFound(img_path))?;
-            let image = image::load_from_memory(&image_bytes)
-                .map_err(|err| AssetLoadError::LoadFailed(err.to_string()))?;
+        // if load succeeded we assume that the path has a parent (directory)
+        let img_path = path.parent().unwrap().join(&data.image);
+        let image_bytes = loader
+            .load_all(&img_path)
+            .map_err(|_| AssetLoadError::FileNotFound(img_path))?;
+        let image = image::load_from_memory(&image_bytes)
+            .map_err(|err| AssetLoadError::LoadFailed(err.to_string()))?;
 
-            let mask_image = if let Some(mask_path) =
-                data.mask.as_ref().map(|p| path.parent().unwrap().join(&p))
-            {
+        let mask_image =
+            if let Some(mask_path) = data.mask.as_ref().map(|p| path.parent().unwrap().join(p)) {
                 let mask_bytes = loader
                     .load_all(&mask_path)
                     .map_err(|_| AssetLoadError::FileNotFound(mask_path))?;
@@ -67,18 +65,17 @@ impl AssetLoader<SpriteSheet> for SpriteSheetLoader {
                 None
             };
 
-            Ok(SpriteSheet {
-                num_cols: data.num_cols,
-                padding: data
-                    .padding
-                    .map(|p| Vec2::new(p.x, p.y))
-                    .unwrap_or_default(),
-                box_size: Vec2::new(data.box_size.x, data.box_size.y),
-                size: Vec2::new(image.width() as f32, image.height() as f32),
-                image,
-                mask: mask_image,
-            })
-        }
+        Ok(SpriteSheet {
+            num_cols: data.num_cols,
+            padding: data
+                .padding
+                .map(|p| Vec2::new(p.x, p.y))
+                .unwrap_or_default(),
+            box_size: Vec2::new(data.box_size.x, data.box_size.y),
+            size: Vec2::new(image.width() as f32, image.height() as f32),
+            image,
+            mask: mask_image,
+        })
     }
 }
 

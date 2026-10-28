@@ -58,11 +58,9 @@ impl FileLoader for TarLoader {
         {
             if let Ok(ep) = e.path()
                 && ep.trim_prefix("./") == p
-            {
-                if e.read_to_end(&mut buf).is_ok() {
+                && e.read_to_end(&mut buf).is_ok() {
                     return Ok(Cow::Owned(buf));
                 }
-            }
         }
         Err(LoadError::NotFound(p.to_path_buf()))
     }

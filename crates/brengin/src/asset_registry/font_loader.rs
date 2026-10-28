@@ -10,22 +10,20 @@ use crate::{
 pub struct FontLoader;
 
 impl AssetLoader<OwnedTypeFace> for FontLoader {
-    fn load(
+    async fn load(
         &self,
         path: std::path::PathBuf,
         loader: Arc<dyn FileLoader>,
-    ) -> impl std::future::Future<Output = Result<OwnedTypeFace, AssetLoadError>> + Send {
-        async move {
-            let data = loader.load_all(&path).map_err(|err| {
-                #[cfg(feature = "tracing")]
-                tracing::error!(?err, "Failed to load font");
-                AssetLoadError::FileNotFound(path)
-            })?;
-            crate::ui::text::parse_font(data.to_vec(), 0).map_err(|err| {
-                #[cfg(feature = "tracing")]
-                tracing::error!(?err, "Failed to load font");
-                AssetLoadError::LoadFailed(err.to_string())
-            })
-        }
+    ) -> Result<OwnedTypeFace, AssetLoadError> {
+        let data = loader.load_all(&path).map_err(|err| {
+            #[cfg(feature = "tracing")]
+            tracing::error!(?err, "Failed to load font");
+            AssetLoadError::FileNotFound(path)
+        })?;
+        crate::ui::text::parse_font(data.to_vec(), 0).map_err(|err| {
+            #[cfg(feature = "tracing")]
+            tracing::error!(?err, "Failed to load font");
+            AssetLoadError::LoadFailed(err.to_string())
+        })
     }
 }

@@ -209,12 +209,11 @@ impl<'a> std::ops::Mul<&'a Self> for Transform {
     type Output = Self;
 
     fn mul(self, rhs: &'a Self) -> Self::Output {
-        let result = &self * rhs;
-        result
+        <&Transform as std::ops::Mul>::mul(&self, rhs)
     }
 }
 
-impl<'a> std::ops::Mul for &'a Transform {
+impl std::ops::Mul for &Transform {
     type Output = Transform;
 
     fn mul(self, rhs: Self) -> Self::Output {

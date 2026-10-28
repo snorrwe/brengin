@@ -80,7 +80,7 @@ pub fn get_bounds(face: &read_fonts::FontRef, glyphs: &Buffer) -> GlyphBufferBou
     let mut padding_x = 0;
     let mut padding_y = (-bounds.y_min).max(0.0) as u32;
     let mut glyph_bounds = Vec::with_capacity(glyph_positions.len());
-    for (pos, info) in glyph_positions.into_iter().zip(info.into_iter()) {
+    for (pos, info) in glyph_positions.iter().zip(info) {
         let glyph_id = harfrust::GlyphId::new(info.glyph_id);
         let bounds = outlines.get(glyph_id).and_then(|outline| {
             let mut pen = ControlBoundsPen::new();
@@ -173,7 +173,7 @@ pub fn draw_glyph_buffer(
 
     let info = glyphs.glyph_infos();
     let glyph_positions = glyphs.glyph_positions();
-    for (pos, info) in glyph_positions.into_iter().zip(info.into_iter()) {
+    for (pos, info) in glyph_positions.iter().zip(info) {
         let glyph_id = info.glyph_id;
         let Some(outline) = face.outline_glyphs().get(harfrust::GlyphId::new(glyph_id)) else {
             continue;
@@ -223,7 +223,7 @@ impl TextOutlineBuilder {
         let r = (color >> 24) & 0xFF;
         let g = (color >> 16) & 0xFF;
         let b = (color >> 8) & 0xFF;
-        let a = (color >> 0) & 0xFF;
+        let a = color & 0xFF;
 
         let mut paint = tiny_skia::Paint::default();
         paint.set_color_rgba8(r as u8, g as u8, b as u8, a as u8);

@@ -34,7 +34,7 @@ impl<T> Eq for AssetId<T> {}
 
 impl<T> PartialOrd for AssetId<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.id.partial_cmp(&other.id)
+        Some(self.cmp(other))
     }
 }
 
@@ -54,10 +54,7 @@ impl<T> Copy for AssetId<T> {}
 
 impl<T> Clone for AssetId<T> {
     fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            _m: PhantomData,
-        }
+        *self
     }
 }
 

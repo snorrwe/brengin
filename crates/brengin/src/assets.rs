@@ -158,8 +158,8 @@ impl<T> Handle<T> {
     }
 
     pub fn downgrade(&self) -> WeakHandle<T> {
-        let weak = self.weak.clone();
-        weak
+        
+        self.weak.clone()
     }
 
     pub fn is_valid(&self) -> bool {

@@ -529,6 +529,12 @@ impl UiState {
     }
 }
 
+impl Default for UiState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Macro to generate Theme and ThemeOverride
 macro_rules! theme {
     ($($name: ident : $ty: ty, $with: ident,)*) => {
@@ -1040,9 +1046,9 @@ impl<'a> Ui<'a> {
         let history_start = self.ui_state.rect_history.len();
         let bounds = self.padd_bounds();
 
-        let width = (self.ui_state.bounds.width() / cols + 1) as i32;
+        let width = self.ui_state.bounds.width() / cols + 1;
 
-        let dims = (0..cols as i32)
+        let dims = (0..cols)
             .map(|i| {
                 [
                     self.ui_state.bounds.min_x + i * width,
@@ -1635,8 +1641,8 @@ impl<'a> Ui<'a> {
                         });
                         let inner = layout_rect(RectLayoutDescriptor {
                             padding: Some(Padding::splat(padding)),
-                            width: width,
-                            height: height,
+                            width,
+                            height,
                             dir: LayoutDirection::TopDown(HorizontalAlignment::Center),
                             bounds: rect,
                         });
@@ -1695,15 +1701,12 @@ impl<'a> Ui<'a> {
         &mut self.theme
     }
 
-    pub fn get_memory_or_default<'b, 'c, T: Default + 'static>(
-        &'c mut self,
-        id: UiId,
-    ) -> &'b RefCell<T> {
+    pub fn get_memory_or_default<'b, T: Default + 'static>(&mut self, id: UiId) -> &'b RefCell<T> {
         self.get_memory_or_insert(id, Default::default)
     }
 
-    pub fn get_memory_or_insert<'c, 'b, T: 'static>(
-        &'b mut self,
+    pub fn get_memory_or_insert<'c, T: 'static>(
+        &mut self,
         id: UiId,
         f: impl FnOnce() -> T,
     ) -> &'c RefCell<T> {
@@ -1716,7 +1719,7 @@ impl<'a> Ui<'a> {
         unsafe { res.as_inner_ptr::<T>().as_ref() }
     }
 
-    pub fn get_memory<'c, 'b, T: 'static>(&'c self, id: UiId) -> Option<&'b RefCell<T>> {
+    pub fn get_memory<'b, T: 'static>(&self, id: UiId) -> Option<&'b RefCell<T>> {
         let key = self.memory_key::<T>(id);
         self.memory
             .0
@@ -1787,14 +1790,12 @@ impl<'a> Ui<'a> {
                     scissor_bounds.min_y,
                     scissor_bounds.max_y - scroll_bar_width,
                 );
-                y = coord as i32;
+                y = coord;
                 parent_state.ty = (y - scissor_bounds.min_y) as f32
                     / (scissor_bounds.height() - scroll_bar_width) as f32;
             }
-        } else if self.is_top_hovered(id) {
-            if is_hovered && self.mouse_down() {
-                self.set_active(id);
-            }
+        } else if self.is_top_hovered(id) && is_hovered && self.mouse_down() {
+            self.set_active(id);
         }
         let control_box = UiRect {
             min_y: y,
@@ -1850,14 +1851,12 @@ impl<'a> Ui<'a> {
                     scissor_bounds.min_x,
                     scissor_bounds.max_x - scroll_bar_height,
                 );
-                x = coord as i32;
+                x = coord;
                 parent_state.tx = (x - scissor_bounds.min_x) as f32
                     / (scissor_bounds.width() - scroll_bar_height) as f32;
             }
-        } else if self.is_top_hovered(id) {
-            if is_hovered && self.mouse_down() {
-                self.set_active(id);
-            }
+        } else if self.is_top_hovered(id) && is_hovered && self.mouse_down() {
+            self.set_active(id);
         }
         let control_box = UiRect {
             min_x: x,
@@ -1907,8 +1906,8 @@ impl<'a> Ui<'a> {
         });
 
         let mut bounds = layout_rect(RectLayoutDescriptor {
-            width: width,
-            height: height,
+            width,
+            height,
             padding: None,
             dir: LayoutDirection::LeftRight(VerticalAlignment::Top),
             bounds: old_bounds,
@@ -1983,21 +1982,20 @@ impl<'a> Ui<'a> {
                 }
             }
             if dt != 0.0 {
-                let t;
-                if self.keyboard.modifiers.shift {
+                let t = if self.keyboard.modifiers.shift {
                     self.ui_inputs.keys.insert(KeyCode::ShiftLeft);
                     self.ui_inputs.keys.insert(KeyCode::ShiftRight);
 
                     if desc.width.is_none() {
                         return;
                     }
-                    t = &mut state.tx;
+                    &mut state.tx
                 } else {
                     if desc.height.is_none() {
                         return;
                     }
-                    t = &mut state.ty;
-                }
+                    &mut state.ty
+                };
                 *t += dt;
                 // TODO: animation at edge?
                 *t = t.clamp(0.0, 1.0);
@@ -2351,14 +2349,14 @@ impl<'a> Ui<'a> {
                     }
                     KeyCode::Enter if desc.multiline => {
                         self.ui_inputs.keys.insert(*k);
-                        desc.content.insert_str(state.cursor, "\n");
+                        desc.content.insert(state.cursor, '\n');
                         changed = true;
                         state.cursor += 1;
                     }
                     // for single-line inputs use tab as a means to jump to the next input
                     KeyCode::Tab if desc.multiline => {
                         self.ui_inputs.keys.insert(*k);
-                        desc.content.insert_str(state.cursor, "\t");
+                        desc.content.insert(state.cursor, '\t');
                         changed = true;
                         state.cursor += 1;
                     }
@@ -2413,10 +2411,8 @@ impl<'a> Ui<'a> {
                     }
                 }
             }
-        } else if self.is_top_hovered(id) {
-            if !self.is_anything_dragged() && self.mouse_down() {
-                self.set_active(id);
-            }
+        } else if self.is_top_hovered(id) && !self.is_anything_dragged() && self.mouse_down() {
+            self.set_active(id);
         }
 
         // shape the text
@@ -2796,14 +2792,13 @@ impl<'a> Ui<'a> {
                 .push(parent_id, self.ui_state.layer)
                 .add_flag(InteractionFlag::ContextMenu);
         }
-        let resp = ContextMenuResponse {
+
+        ContextMenuResponse {
             open,
             inner: resp,
             ui: self,
             id: parent_id,
-        };
-
-        resp
+        }
     }
 
     /// return the next state, might be the same as the input
@@ -2840,10 +2835,8 @@ impl<'a> Ui<'a> {
             } else {
                 self.set_active(id);
             }
-        } else if self.is_top_hovered(id) {
-            if !self.is_anything_dragged() && self.mouse_down() {
-                self.set_active(id);
-            }
+        } else if self.is_top_hovered(id) && !self.is_anything_dragged() && self.mouse_down() {
+            self.set_active(id);
         }
         self.color_rect_from_rect_with_outline(
             toggle_rect,
@@ -3052,12 +3045,11 @@ impl<'a> Ui<'a> {
                 .push(parent_id, self.ui_state.layer)
                 .add_flag(InteractionFlag::ContextMenu);
         }
-        let resp = SelectResponse {
+
+        SelectResponse {
             inner: resp.map_unit(),
             selected,
-        };
-
-        resp
+        }
     }
 
     pub fn context_menu<'b>(
@@ -3718,7 +3710,7 @@ impl<'a> Columns<'a> {
         ctx.ui_state.bounds.max_y = bounds.max_y;
         if rect.width() > w && end as u32 + 1 < self.cols {
             let diff = rect.width() - w;
-            for d in &mut self.dims[end as usize + 1..] {
+            for d in &mut self.dims[end + 1..] {
                 d[0] += diff;
                 d[1] += diff;
             }
@@ -3769,7 +3761,7 @@ fn begin_frame(
         } = &mut *ui;
         window_order
             .order
-            .retain(|name| (|name| windows.get(name).map(|w| w.drawn).unwrap_or(false))(name));
+            .retain(|name| windows.get(name).map(|w| w.drawn).unwrap_or(false));
 
         let mut base = WINDOW_LAYER;
         for name in {
@@ -4344,6 +4336,8 @@ impl ErasedMemoryEntry {
         NonNull::new(ptr).unwrap()
     }
 
+    /// # SAFETY
+    /// Must be called with the same type as `new`
     pub unsafe fn into_inner<T>(mut self) -> Box<RefCell<T>> {
         unsafe {
             let inner: *mut RefCell<T> = self.inner.cast();
@@ -4528,37 +4522,31 @@ pub fn align_rect(
     vertical: Option<VerticalAlignment>,
     padding: IVec2,
 ) -> IVec2 {
-    let dx;
-    match horizontal {
+    let dx = match horizontal {
         Some(HorizontalAlignment::Left) => {
             let min_x = bounds.min_x + padding.x;
-            dx = min_x - rect.min_x;
+            min_x - rect.min_x
         }
-        Some(HorizontalAlignment::Center) => {
-            dx = bounds.center_x() - rect.center_x();
-        }
+        Some(HorizontalAlignment::Center) => bounds.center_x() - rect.center_x(),
         Some(HorizontalAlignment::Right) => {
             let max_x = bounds.max_x - padding.x;
-            dx = max_x - rect.max_x;
+            max_x - rect.max_x
         }
-        None => dx = 0,
-    }
+        None => 0,
+    };
 
-    let dy;
-    match vertical {
+    let dy = match vertical {
         Some(VerticalAlignment::Top) => {
             let min_y = bounds.min_y + padding.y;
-            dy = min_y - rect.min_y;
+            min_y - rect.min_y
         }
-        Some(VerticalAlignment::Center) => {
-            dy = bounds.center_y() - rect.center_y();
-        }
+        Some(VerticalAlignment::Center) => bounds.center_y() - rect.center_y(),
         Some(VerticalAlignment::Bottom) => {
             let max_y = bounds.max_y - padding.y;
-            dy = max_y - rect.max_y;
+            max_y - rect.max_y
         }
-        None => dy = 0,
-    }
+        None => 0,
+    };
 
     rect.offset_x(dx);
     rect.offset_y(dy);

@@ -205,7 +205,18 @@ impl Eq for InstanceKey {}
 
 impl Ord for InstanceKey {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+        let result = 'cmp: {
+            match self.texture.partial_cmp(&other.texture) {
+                Some(core::cmp::Ordering::Equal) => {}
+                ord => break 'cmp ord,
+            }
+            match self.mask.partial_cmp(&other.mask) {
+                Some(core::cmp::Ordering::Equal) => {}
+                ord => break 'cmp ord,
+            }
+            self.mesh.partial_cmp(&other.mesh)
+        };
+        result.unwrap_or(std::cmp::Ordering::Equal)
     }
 }
 
@@ -219,15 +230,7 @@ impl std::hash::Hash for InstanceKey {
 
 impl PartialOrd for InstanceKey {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self.texture.partial_cmp(&other.texture) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.mask.partial_cmp(&other.mask) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.mesh.partial_cmp(&other.mesh)
+        Some(self.cmp(other))
     }
 }
 
@@ -280,7 +283,7 @@ fn update_sprite_pipelines(
             continue;
         };
 
-        let instance_data_bytes = bytemuck::cast_slice::<_, u8>(&cpu);
+        let instance_data_bytes = bytemuck::cast_slice::<_, u8>(cpu);
         let size = instance_data_bytes.len() as u64;
         if instances.instance_gpu.size() < size {
             // resize the buffer
@@ -297,7 +300,7 @@ fn update_sprite_pipelines(
         }
         renderer
             .queue
-            .write_buffer(&instances.instance_gpu, 0, bytemuck::cast_slice(&cpu));
+            .write_buffer(&instances.instance_gpu, 0, bytemuck::cast_slice(cpu));
         instances.count = cpu.len();
     }
 }
@@ -694,7 +697,7 @@ fn add_missing_meshes(
 ) {
     for (id, sheet) in meshes.iter() {
         let key = MeshKey::Mesh(id);
-        if !pipeline.meshes.contains_key(&key) {
+        pipeline.meshes.entry(key).or_insert_with(|| {
             let vertex_buffer =
                 renderer
                     .device
@@ -714,15 +717,12 @@ fn add_missing_meshes(
                     });
             let num_indices = sheet.indices.len() as u32;
 
-            pipeline.meshes.insert(
-                key,
-                SpriteMeshGpu {
-                    vertex_buffer,
-                    index_buffer,
-                    num_indices,
-                },
-            );
-        }
+            SpriteMeshGpu {
+                vertex_buffer,
+                index_buffer,
+                num_indices,
+            }
+        });
     }
 }
 

@@ -194,7 +194,7 @@ impl TextureAtlasRegistry<'_> {
         self.renderer.queue().write_texture(
             wgpu::TexelCopyTextureInfo {
                 aspect: wgpu::TextureAspect::All,
-                texture: &texture,
+                texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d {
                     x: rect.min_x as u32,
@@ -202,11 +202,11 @@ impl TextureAtlasRegistry<'_> {
                     z: 0,
                 },
             },
-            &rgba,
+            rgba,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * width as u32),
-                rows_per_image: Some(height as u32),
+                bytes_per_row: Some(4 * width),
+                rows_per_image: Some(height),
             },
             wgpu::Extent3d {
                 width,

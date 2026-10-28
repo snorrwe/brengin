@@ -439,7 +439,7 @@ fn test_window_order_retain_drawn_compacts_indices() {
     order.z_of("b");
     order.z_of("c");
 
-    order.order.retain(|name| (|name| name != "b")(name));
+    order.order.retain(|name| name != "b");
 
     assert_eq!(order.z_of("a"), 0);
     assert_eq!(order.z_of("c"), 1);
@@ -453,7 +453,7 @@ fn test_window_order_raise_of_removed_window_is_ignored() {
 
     // a window can be closed between the press and the raise being applied
     order.raise(0, "a");
-    order.order.retain(|name| (|name| name != "a")(name));
+    order.order.retain(|name| name != "a");
     order.apply_raise();
 
     assert_eq!(order.z_of("b"), 0);
@@ -509,6 +509,6 @@ fn test_window_order_contains() {
     order.z_of("a");
     assert!(contains(&order, "a"));
 
-    order.order.retain(|name| (|name| name != "a")(name));
+    order.order.retain(|name| name != "a");
     assert!(!contains(&order, "a"));
 }

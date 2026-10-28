@@ -66,9 +66,9 @@ impl FromStr for Color {
         let mut l = 0;
         for c in s.chars().skip(1).take(8).map(|x| x.to_ascii_lowercase()) {
             let x = c as u8;
-            let c = if b'0' <= x && x <= b'9' {
+            let c = if x.is_ascii_digit() {
                 x - b'0'
-            } else if b'a' <= x && x <= b'f' {
+            } else if (b'a'..=b'f').contains(&x) {
                 x - b'a' + 10
             } else {
                 return Err(ColorParseError::InvalidCharacter(c));

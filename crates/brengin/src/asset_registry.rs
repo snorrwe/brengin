@@ -20,7 +20,7 @@ use crate::{asset_registry::erased_loader::ErasedLoader, oneshot::Oneshot, prelu
 
 pub struct AssetRegistryPlugin;
 
-pub const ASSET_LOADING_STAGE: &'static str = "asset-loading-dispatch";
+pub const ASSET_LOADING_STAGE: &str = "asset-loading-dispatch";
 
 /// Gets or inserts the asset loading stage into `s`. The asset loading stage runs when there are
 /// pending load requests
@@ -83,7 +83,7 @@ pub struct FileLoaders(pub Vec<Arc<dyn FileLoader>>);
 
 impl FileLoaders {
     pub fn join(mut self, rhs: Self) -> Self {
-        self.0.extend(rhs.0.into_iter());
+        self.0.extend(rhs.0);
         self
     }
 
@@ -119,7 +119,7 @@ impl FileLoaders {
     // TODO: insert asset pack loaders here
 }
 
-const ASSETS_PATH: &'static str = "assets";
+const ASSETS_PATH: &str = "assets";
 
 impl Default for FileLoaders {
     fn default() -> Self {
@@ -385,13 +385,12 @@ mod tests {
 
         struct NopLoader;
         impl AssetLoader<PathBuf> for NopLoader {
-            fn load(
+            async fn load(
                 &self,
                 path: PathBuf,
                 _loader: Arc<dyn FileLoader>,
-            ) -> impl std::future::Future<Output = Result<PathBuf, AssetLoadError>> + Send
-            {
-                async move { Ok(path) }
+            ) -> Result<PathBuf, AssetLoadError> {
+                Ok(path)
             }
         }
 

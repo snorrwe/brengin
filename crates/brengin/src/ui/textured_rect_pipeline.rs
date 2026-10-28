@@ -322,7 +322,7 @@ fn update_instances(
         rects_consumed += g.len();
         *sc = UiScissor(ui.scissors[g[0].scissor as usize]);
         rects.0.clear();
-        rects.0.extend(g.iter_mut().map(|x| std::mem::take(x)));
+        rects.0.extend(g.iter_mut().map(std::mem::take));
         update_draw_instances(w, h, &mut instances, rects, sc, &pipeline);
     }
     for (_, _, id) in texture_rect_q.iter().skip(buffers_reused) {
@@ -330,7 +330,7 @@ fn update_instances(
     }
     for g in textured_rects[rects_consumed..].chunk_by_mut(|a, b| a.scissor == b.scissor) {
         let scissor = UiScissor(ui.scissors[g[0].scissor as usize]);
-        let requests = TextureRectRequests(g.iter_mut().map(|x| std::mem::take(x)).collect());
+        let requests = TextureRectRequests(g.iter_mut().map(std::mem::take).collect());
         update_draw_instances(w, h, &mut instances, &requests, &scissor, &pipeline);
         cmd.spawn().insert_bundle((scissor, requests));
     }
@@ -379,7 +379,7 @@ fn update_instances(
         }
         renderer
             .queue()
-            .write_buffer(&rendering_data.instance_gpu, 0, bytemuck::cast_slice(&cpu));
+            .write_buffer(&rendering_data.instance_gpu, 0, bytemuck::cast_slice(cpu));
         rendering_data.count = cpu.len();
     }
 }

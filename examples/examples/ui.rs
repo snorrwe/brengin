@@ -125,7 +125,6 @@ fn back(mut ctx: UiRoot, mut state: ResMut<MenuState>) {
             vertical: VerticalAlignment::Top,
             padding: Some(Padding::splat(15)),
             content_layout: Some(brengin::ui::LayoutDirection::Center),
-            ..Default::default()
         },
         |ui| {
             if ui.button("Back").inner.pressed {
@@ -222,7 +221,6 @@ fn dnd_ui(mut ctx: UiRoot, state: Res<MenuState>, mut dnd: ResMut<Dnd>, ui_state
                                     OutlineDescriptor {
                                         outline_color: Color::BLACK,
                                         outline_radius: 5,
-                                        ..Default::default()
                                     },
                                     |ui| {
                                         ui.label(format!("item {n}"));

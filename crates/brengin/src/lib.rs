@@ -1,3 +1,7 @@
+#![recursion_limit = "256"]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+
 pub mod asset_registry;
 pub mod assets;
 pub mod camera;
@@ -168,7 +172,7 @@ impl Default for App {
 }
 
 enum RunningApp {
-    Pending(App),
+    Pending(Box<App>),
     Initialized {
         render_stage: SystemStage<'static>,
         game_world: Arc<Mutex<World>>,
@@ -533,7 +537,7 @@ impl App {
 
         self.world.insert_resource(window);
 
-        let mut app = RunningApp::Pending(self);
+        let mut app = RunningApp::Pending(Box::new(self));
         event_loop.run_app(&mut app)?;
 
         Ok(())

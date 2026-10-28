@@ -118,7 +118,7 @@ fn update_view_projections(
 }
 
 fn upload_camera_uniform(queue: &wgpu::Queue, buffer: &wgpu::Buffer, uni: &CameraUniform) {
-    queue.write_buffer(&buffer, 0, bytemuck::bytes_of(uni));
+    queue.write_buffer(buffer, 0, bytemuck::bytes_of(uni));
 }
 
 fn insert_missing_camera_buffers(
@@ -154,7 +154,7 @@ fn update_camera_buffers(
     q: Query<(&CameraUniform, &mut CameraBuffer)>,
 ) {
     for (uni, CameraBuffer { buffer, .. }) in q.iter() {
-        upload_camera_uniform(renderer.queue(), &buffer, uni);
+        upload_camera_uniform(renderer.queue(), buffer, uni);
     }
 }
 

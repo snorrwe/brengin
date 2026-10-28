@@ -243,7 +243,7 @@ fn update_instances<'a>(
         renderer
             .device()
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("Rect Instance Buffer")),
+                label: Some("Rect Instance Buffer"),
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 contents: buff,
             })
@@ -298,11 +298,11 @@ fn update_instances<'a>(
     ui.color_rects = color_rects;
 }
 
-fn update_rect_instances<'a, 'b>(
-    buff: &'a mut Vec<DrawRectInstance>,
+fn update_rect_instances(
+    buff: &mut Vec<DrawRectInstance>,
     w: f32,
     h: f32,
-    rects: &'b ColorRectRequests,
+    rects: &ColorRectRequests,
 ) {
     buff.clear();
     buff.reserve(rects.0.len());

@@ -11,9 +11,9 @@ clap_derive = "4.6.7"
 tracing-subscriber = "0.3.23"
 pollster = "1.0.1"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
+brengin = { path = "../crates/brengin/" }
 
 [dependencies]
-brengin = { path = "../crates/brengin/" }
 
 [build-dependencies]
 xshell = "0.2.7"
