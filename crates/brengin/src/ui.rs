@@ -4242,6 +4242,10 @@ fn window_title(
     if is_active {
         if ui.mouse_down() {
             ui.set_active(title_id);
+            ui.set_hovered(title_id);
+            ui.next_ids
+                .push(title_id, DRAG_LAYER)
+                .add_flag(InteractionFlag::Dragged);
         }
         let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
 
@@ -4254,17 +4258,15 @@ fn window_title(
         );
 
         state.pos = drag_anchor + offset;
-    } else {
-        if !ui.is_anything_active()
-            && ui.contains_mouse(title_id)
-            && ui.is_top_hovered_window(base, height)
-            && ui.mouse_down()
-        {
-            let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
-            state.drag_start = ui.mouse.cursor_position;
-            state.drag_anchor = state.pos;
-            ui.set_active(title_id);
-        }
+    } else if !ui.is_anything_active()
+        && ui.contains_mouse(title_id)
+        && ui.is_top_hovered_window(base, height)
+        && ui.mouse_down()
+    {
+        let state: &mut WindowState = ui.ui_state.windows.get_mut(desc.name).unwrap();
+        state.drag_start = ui.mouse.cursor_position;
+        state.drag_anchor = state.pos;
+        ui.set_active(title_id);
     }
     let mut request_close = false;
     ui.with_theme_override(
