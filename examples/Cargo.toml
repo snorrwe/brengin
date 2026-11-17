@@ -12,9 +12,9 @@ tracing-subscriber = "0.3.23"
 pollster = "1.0.1"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 brengin = { path = "../crates/brengin/" }
+fastrand = "2.5.0"
 
 [dependencies]
-fastrand = "2.5.0"
 
 [build-dependencies]
 xshell = "0.2.7"
