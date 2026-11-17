@@ -631,7 +631,7 @@ impl From<i32> for UiCoord {
 }
 
 impl UiCoord {
-    pub fn as_abolute(self, max: i32) -> i32 {
+    pub fn as_absolute(self, max: i32) -> i32 {
         match self {
             UiCoord::Absolute(x) => x,
             UiCoord::Percent(p) => {
@@ -1297,8 +1297,8 @@ impl<'a> Ui<'a> {
         } = self.begin_widget();
         let layer = self.ui_state.layer;
 
-        let width = width.as_abolute(self.ui_state.bounds.width());
-        let height = height.as_abolute(self.ui_state.bounds.height());
+        let width = width.as_absolute(self.ui_state.bounds.width());
+        let height = height.as_absolute(self.ui_state.bounds.height());
 
         let rect = layout_rect(RectLayoutDescriptor {
             width,
@@ -1589,11 +1589,13 @@ impl<'a> Ui<'a> {
 
                 let width = match width {
                     WrapperSize::Content => text_width + 2 * text_padding,
-                    WrapperSize::Size(ui_coord) => ui_coord.as_abolute(ui.ui_state.bounds.width()),
+                    WrapperSize::Size(ui_coord) => ui_coord.as_absolute(ui.ui_state.bounds.width()),
                 };
                 let height = match height {
                     WrapperSize::Content => text_height + 2 * text_padding,
-                    WrapperSize::Size(ui_coord) => ui_coord.as_abolute(ui.ui_state.bounds.height()),
+                    WrapperSize::Size(ui_coord) => {
+                        ui_coord.as_absolute(ui.ui_state.bounds.height())
+                    }
                 };
 
                 let rect = layout_rect(RectLayoutDescriptor {
@@ -1624,11 +1626,11 @@ impl<'a> Ui<'a> {
                     ButtonDescriptorPayload::Image(image) => {
                         let width = width
                             .as_size()
-                            .map(|s| s.as_abolute(ui.ui_state.bounds.width()))
+                            .map(|s| s.as_absolute(ui.ui_state.bounds.width()))
                             .unwrap_or(100);
                         let height = height
                             .as_size()
-                            .map(|s| s.as_abolute(ui.ui_state.bounds.height()))
+                            .map(|s| s.as_absolute(ui.ui_state.bounds.height()))
                             .unwrap_or(100);
 
                         let padding = 1;
@@ -1873,11 +1875,11 @@ impl<'a> Ui<'a> {
         let width = desc
             .width
             .unwrap_or(UiCoord::Percent(100))
-            .as_abolute(self.ui_state.bounds.width());
+            .as_absolute(self.ui_state.bounds.width());
         let height = desc
             .height
             .unwrap_or(UiCoord::Percent(100))
-            .as_abolute(self.ui_state.bounds.height());
+            .as_absolute(self.ui_state.bounds.height());
 
         let mut state = self.get_memory_or_default::<ScrollState>(id).borrow_mut();
 
@@ -2917,11 +2919,11 @@ impl<'a> Ui<'a> {
                 }
                 let width = match self.theme.button_width {
                     WrapperSize::Content => text_size.x + 2 * self.theme.text_padding as i32,
-                    WrapperSize::Size(coord) => coord.as_abolute(available.x),
+                    WrapperSize::Size(coord) => coord.as_absolute(available.x),
                 };
                 let height = match self.theme.button_height {
                     WrapperSize::Content => text_size.y + 2 * self.theme.text_padding as i32,
-                    WrapperSize::Size(coord) => coord.as_abolute(available.y),
+                    WrapperSize::Size(coord) => coord.as_absolute(available.y),
                 };
                 content_size.x = content_size.x.max(width + left + right);
                 content_size.y += height + top + bottom;
@@ -3116,8 +3118,8 @@ impl<'a> Ui<'a> {
         let WidgetInfo { id, .. } = self.begin_widget();
         let bounds = self.padd_bounds();
 
-        let width = width.as_abolute(bounds.width());
-        let height = height.as_abolute(bounds.height());
+        let width = width.as_absolute(bounds.width());
+        let height = height.as_absolute(bounds.height());
 
         self.ui_state.bounds.resize_w(width);
         self.ui_state.bounds.resize_h(height);
@@ -3461,10 +3463,12 @@ impl Padding {
     }
 
     pub fn horizonal(self, max_horizontal: i32) -> i32 {
-        self.left.map(|c| c.as_abolute(max_horizontal)).unwrap_or(0)
+        self.left
+            .map(|c| c.as_absolute(max_horizontal))
+            .unwrap_or(0)
             + self
                 .right
-                .map(|c| c.as_abolute(max_horizontal))
+                .map(|c| c.as_absolute(max_horizontal))
                 .unwrap_or(0)
     }
 
@@ -3478,19 +3482,26 @@ impl Padding {
     }
 
     pub fn vertical(self, max_vertical: i32) -> i32 {
-        self.top.map(|c| c.as_abolute(max_vertical)).unwrap_or(0)
-            + self.bottom.map(|c| c.as_abolute(max_vertical)).unwrap_or(0)
+        self.top.map(|c| c.as_absolute(max_vertical)).unwrap_or(0)
+            + self
+                .bottom
+                .map(|c| c.as_absolute(max_vertical))
+                .unwrap_or(0)
     }
 
     /// return left,right,top,bottom
     pub fn as_abs(self, max_horizontal: i32, max_vertical: i32) -> [i32; 4] {
         [
-            self.left.map(|c| c.as_abolute(max_horizontal)).unwrap_or(0),
-            self.right
-                .map(|c| c.as_abolute(max_horizontal))
+            self.left
+                .map(|c| c.as_absolute(max_horizontal))
                 .unwrap_or(0),
-            self.top.map(|c| c.as_abolute(max_vertical)).unwrap_or(0),
-            self.bottom.map(|c| c.as_abolute(max_vertical)).unwrap_or(0),
+            self.right
+                .map(|c| c.as_absolute(max_horizontal))
+                .unwrap_or(0),
+            self.top.map(|c| c.as_absolute(max_vertical)).unwrap_or(0),
+            self.bottom
+                .map(|c| c.as_absolute(max_vertical))
+                .unwrap_or(0),
         ]
     }
 }
@@ -4069,10 +4080,10 @@ impl<'a> UiRoot<'a> {
         let WidgetInfo { id, .. } = self.ui.begin_widget();
         let mut state = self.ui.get_memory_or_default::<PanelState>(id).borrow_mut();
         if let ContainerSize::Coord(w) = desc.width {
-            state.content_width = w.as_abolute(max_w);
+            state.content_width = w.as_absolute(max_w);
         }
         if let ContainerSize::Coord(h) = desc.height {
-            state.content_height = h.as_abolute(max_h);
+            state.content_height = h.as_absolute(max_h);
         }
 
         let padding = desc.padding.unwrap_or(self.ui.theme.padding);
