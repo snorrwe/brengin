@@ -3257,9 +3257,6 @@ impl<'a> Ui<'a> {
             }
         });
 
-        // restore scissor before drawing the background
-        self.ui_state.scissor_idx = old_scissor;
-
         let color = match self.theme.context_background {
             ThemeEntry::Color(color) => color,
             ThemeEntry::Image(_) => self.theme.secondary_color,
@@ -3271,6 +3268,7 @@ impl<'a> Ui<'a> {
         for id in tooltip_ids {
             self.ui_state.next_bounding_boxes.remove(&id);
         }
+        self.ui_state.scissor_idx = old_scissor;
         self.ui_state.rect_history.truncate(history_start);
         self.ui_state.bounds = old_bounds;
         self.ui_state.layer = old_layer;
