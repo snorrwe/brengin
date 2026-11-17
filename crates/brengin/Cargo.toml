@@ -21,7 +21,6 @@ cecs = { git = "https://github.com/snorrwe/cecs", default-features = false, feat
 ] }
 anyhow = "1.0.104"
 bytemuck = { version = "1.25.2", features = ["derive"] }
-fastrand = "2.5.0"
 glam = { version = "0.34.1", features = ["bytemuck"] }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 smallvec = "1.16.3"

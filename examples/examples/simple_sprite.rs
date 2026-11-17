@@ -1,10 +1,12 @@
 use std::time::Duration;
 
-use brengin::camera::{PerspectiveCamera, WindowCamera, camera_bundle};
-use brengin::prelude::*;
-use brengin::renderer::sprite_renderer::{self, SpriteInstance, SpriteSheet};
-use brengin::{App, DefaultPlugins};
-use glam::{Vec2, Vec3};
+use brengin::{
+    App, DefaultPlugins,
+    camera::{PerspectiveCamera, WindowCamera, camera_bundle},
+    glam::{Vec2, Vec3},
+    prelude::*,
+    renderer::sprite_renderer::{self, SpriteInstance, SpriteSheet},
+};
 
 fn animation_system(dt: Res<DeltaTime>, mut q: Query<(&mut SpriteInstance, &mut Timer)>) {
     let dt = dt.0;
