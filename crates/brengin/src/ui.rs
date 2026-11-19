@@ -1012,7 +1012,12 @@ impl<'a> Ui<'a> {
         ///////////////////////
         self.ui_state.layout_dir = layout;
         self.ui_state.bounds = bounds;
-        self.submit_rect_group(id, history_start);
+        self.with_theme_override(
+            ThemeOverride::default().with_padding(Padding::splat(0)),
+            |ui| {
+                ui.submit_rect_group(id, history_start);
+            },
+        );
     }
 
     /// If `hide` is true, then the inner contents are not rendered
@@ -1075,7 +1080,12 @@ impl<'a> Ui<'a> {
 
         self.pop_child();
         self.ui_state.bounds = bounds;
-        self.submit_rect_group(id, history_start);
+        self.with_theme_override(
+            ThemeOverride::default().with_padding(Padding::splat(0)),
+            |ui| {
+                ui.submit_rect_group(id, history_start);
+            },
+        );
     }
 
     pub fn color_rect_from_rect(&mut self, rect: UiRect, color: Color, layer: u16) {
