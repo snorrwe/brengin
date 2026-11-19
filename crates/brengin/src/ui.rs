@@ -485,6 +485,8 @@ impl Default for Theme {
             window_padding: 4,
             button_width: WrapperSize::Content,
             button_height: WrapperSize::Content,
+            grid_row_border_height: 0,
+            grid_row_border_color: Color::BLACK,
         }
     }
 }
@@ -593,6 +595,8 @@ theme!(
     window_padding: u8, with_window_padding,
     button_width: WrapperSize, with_button_width,
     button_height: WrapperSize, with_button_height,
+    grid_row_border_height: i32, with_grid_row_border_height,
+    grid_row_border_color: Color, with_grid_row_border_color,
 );
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -3702,6 +3706,19 @@ impl<'a> Columns<'a> {
         ctx.ui_state.bounds.min_y += self.dims[start][2];
         let w = ctx.ui_state.bounds.width();
         let layer = ctx.ui_state.layer;
+        if ctx.theme.grid_row_border_height > 0 {
+            ctx.color_rect(
+                ctx.ui_state.bounds.min_x,
+                ctx.ui_state.bounds.min_y,
+                ctx.ui_state.bounds.width(),
+                ctx.theme.grid_row_border_height,
+                ctx.theme.grid_row_border_color,
+                layer,
+            );
+        }
+        let [_pleft, _pright, ptop, pbottom] =
+            ctx.theme.padding.as_abs(bounds.width(), bounds.height());
+        ctx.ui_state.bounds.min_y += ptop;
         ctx.ui_state.layer += 1;
         ctx.record_layer(ctx.ui_state.layer);
         ctx.push_child();
@@ -3725,7 +3742,7 @@ impl<'a> Columns<'a> {
             }
         }
         for d in &mut self.dims[start..=end] {
-            d[2] += rect.height();
+            d[2] += rect.height() + ptop + pbottom;
         }
         ctx.ui_state.layer = layer;
     }
