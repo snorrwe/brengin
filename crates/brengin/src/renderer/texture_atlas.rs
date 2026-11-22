@@ -142,8 +142,8 @@ impl TextureAtlasRegistry<'_> {
 
         // no atlas found, attempt to allocate a new
         let mut atlas = {
-            let width = width.max(1024);
-            let height = height.max(1024);
+            let width = width.clamp(1024, 8192);
+            let height = height.clamp(1024, 8192);
 
             let temp = vec![0u8; 4 * width as usize * height as usize];
             let texture = Texture::from_rgba8(
